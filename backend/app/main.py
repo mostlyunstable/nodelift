@@ -1,12 +1,13 @@
 from fastapi import FastAPI
 
-from app.api.v1 import health, nodes
+from app.api.v1 import health, nodes, workflows
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Nodecraft", version="0.1.0")
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(nodes.router, prefix="/api/v1")
+    app.include_router(workflows.router, prefix="/api/v1")
     return app
 
 
