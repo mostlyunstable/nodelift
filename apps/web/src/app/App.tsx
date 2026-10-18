@@ -5,18 +5,33 @@ import { Inspector } from '../panels/Inspector'
 import { RunPanel } from '../panels/RunPanel'
 import { useStore } from '../state/store'
 
-const nodeTypes = { code: CodeNode }
+const nodeTypes = { node: CodeNode }
 
 export function App() {
   const s = useStore()
   useEffect(() => {
     useStore.getState().refresh()
+    void useStore.getState().loadDefinitions()
   }, [])
   return (
     <div className="app">
       <header className="toolbar">
         <strong className="brand">Nodecraft</strong>
-        <button onClick={s.addNode}>+ Code node</button>
+        <select
+          aria-label="Add node"
+          value=""
+          onChange={(e) => e.target.value && s.addNode(e.target.value)}
+        >
+          <option value="">+ Add node…</option>
+          {(s.nodeDefs.length > 0
+            ? s.nodeDefs
+            : [{ type: 'code.python', title: 'Python code' }]
+          ).map((d) => (
+            <option key={d.type} value={d.type}>
+              {d.title}
+            </option>
+          ))}
+        </select>
         <span className="sep" />
         <button onClick={s.validate}>Validate</button>
         <button className="primary" onClick={s.runWorkflow} disabled={s.busy !== null || s.nodes.length === 0}>

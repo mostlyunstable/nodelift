@@ -16,6 +16,12 @@ Treat every workflow like a script you are running yourself.
 - Retries and resume can run code again after an interruption. A node that was in flight when the server died has no
   stored result, so resuming re-runs it; mark nodes idempotent only if repeating them is safe.
 
+## Outbound HTTP (`http.request` node)
+Runs inside the server process, not the worker. The SSRF guard (`runtime/net_guard.py`) allows public addresses only,
+connects to the address it validated, and never follows redirects. This is defence in depth, not a substitute for
+network-level egress policy in a hosted deployment. Node plugins (`NODECRAFT_NODE_PLUGINS`) run with full server
+privileges and must be trusted.
+
 ## NOT provided (prerequisites before hosting or running untrusted code)
 Container/microVM isolation, read-only filesystem, seccomp, non-root user, cgroup memory/pids limits,
 network deny-by-default, authentication, per-user quotas, secret injection and log redaction.

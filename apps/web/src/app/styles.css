@@ -65,3 +65,5 @@ select { background: #21262d; color: var(--text); border: 1px solid var(--border
 .code-node.status-cancelled { border-left-color: #8b949e; }
 .retry-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
 .retry-row input[type='number'] { width: 52px; }
+.field-error { color: var(--bad); font-size: 11px; }
+.check { font-size: 12px; color: var(--muted); }

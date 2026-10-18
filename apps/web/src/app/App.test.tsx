@@ -18,6 +18,22 @@ describe('store', () => {
     expect(s.nodes).toHaveLength(1)
     expect(s.selectedId).toBe(s.nodes[0].id)
   })
+  it('creates nodes from registry defaults and falls back for the code node', () => {
+    useStore.getState().addNode()
+    expect(useStore.getState().nodes[0].data).toMatchObject({ nodeType: 'code.python' })
+    expect(String(useStore.getState().nodes[0].data.config.source)).toContain('def main')
+    useStore.setState({
+      nodeDefs: [
+        { type: 'transform.json', version: 1, title: 'JSON transform', category: 'Data', description: '',
+          config_schema: {}, default_config: { mapping: { value: '$' } } },
+      ],
+    })
+    useStore.getState().addNode('transform.json')
+    const added = useStore.getState().nodes[1]
+    expect(added.data.nodeType).toBe('transform.json')
+    expect(added.data.config).toEqual({ mapping: { value: '$' } })
+    expect(added.data.name).toBe('JSON transform 2')
+  })
   it('rejects invalid run input without calling the API', async () => {
     const spy = vi.spyOn(globalThis, 'fetch')
     useStore.getState().setRunInput('{nope')

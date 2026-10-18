@@ -7,8 +7,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.api.errors import AppError
-from app.api.v1.nodes import get_runner
-from app.domain.ports import CodeRunner
+from app.api.v1.nodes import Registry
 from app.domain.records import (
     RunRecord,
     RunSummary,
@@ -26,14 +25,12 @@ from app.storage.repositories import SqlRunRepository, SqlWorkflowRepository
 router = APIRouter(tags=["stored workflows"])
 
 
-def get_service(
-    request: Request, runner: Annotated[CodeRunner, Depends(get_runner)]
-) -> WorkflowService:
+def get_service(request: Request, registry: Registry) -> WorkflowService:
     sf = request.app.state.session_factory
     return WorkflowService(
         SqlWorkflowRepository(sf),
         SqlRunRepository(sf),
-        runner,
+        registry,
         request.app.state.run_hub,
         request.app.state.settings.max_concurrent_runs,
         request.app.state.settings.max_run_seconds,

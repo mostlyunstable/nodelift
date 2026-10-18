@@ -5,12 +5,12 @@ import time
 import uuid
 from typing import Any
 
-from app.domain.ports import CodeRunner
+from app.domain.nodes import NodeContext, NodeRegistry
 from app.domain.run import ExecutionRun, NodeExecution, NodeStatus, RunObserver, RunStatus
 from app.domain.workflow import WorkflowDefinition, retry_policy, topological_order
 
 # Deterministic failures are never retried: running the same code again cannot change them.
-RETRIABLE_ERRORS = {"runtime_error", "timeout", "worker_crashed"}
+RETRIABLE_ERRORS = {"runtime_error", "timeout", "worker_crashed", "network_error", "http_error"}
 
 
 def _node_input(
@@ -36,7 +36,7 @@ async def _sleep_or_cancel(seconds: float, cancel: asyncio.Event | None) -> None
 
 async def execute_workflow(
     wf: WorkflowDefinition,
-    runner: CodeRunner,
+    registry: NodeRegistry,
     run_input: Any = None,
     timeout_s: float = 30,
     node_inputs: dict[str, Any] | None = None,
@@ -98,7 +98,9 @@ async def execute_workflow(
             node_timeout = timeout_s if remaining is None else max(0.1, min(timeout_s, remaining))
             if observer:
                 await observer.node_started(nid, attempt)
-            res = await runner.run(nodes[nid].config["source"], inp, node_timeout, cancel)
+            impl = registry.get(nodes[nid].type)
+            assert impl is not None  # guaranteed by validate_workflow before execution
+            res = await impl.execute(NodeContext(node_timeout, cancel), inp, nodes[nid].config)
             cancelled = res.error is not None and res.error.type == "cancelled"
             status: NodeStatus = "cancelled" if cancelled else res.status
             budget_left = max_run_s is None or time.monotonic() - start < max_run_s

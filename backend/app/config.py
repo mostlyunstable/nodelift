@@ -17,11 +17,17 @@ class Settings(BaseSettings):
     max_run_seconds: int = 300
     node_memory_mb: int | None = 1024  # enforced on Linux only
     node_max_file_mb: int = 10
+    node_plugins: str = ""  # comma-separated module paths exposing register(registry)
+    http_allow_private: bool = False  # dev only: lets http.request reach localhost/LAN
 
     @computed_field  # type: ignore[prop-decorator]
     @property
     def effective_database_url(self) -> str:
         return self.database_url or f"sqlite:///{self.data_dir / 'nodecraft.db'}"
+
+    @property
+    def plugin_modules(self) -> list[str]:
+        return [m.strip() for m in self.node_plugins.split(",") if m.strip()]
 
     def assert_safe_bind(self) -> None:
         """Code nodes run unsandboxed, so refuse non-loopback binds unless explicitly allowed."""

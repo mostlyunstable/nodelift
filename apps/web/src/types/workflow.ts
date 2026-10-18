@@ -1,9 +1,12 @@
 // Backend execution format (schema_version 1). Independent of React Flow's UI state.
 export interface WorkflowNode {
   id: string
-  type: 'code.python'
+  type: string
   name: string
-  config: { source: string; idempotent?: boolean; retry?: { max_attempts: number; backoff_ms: number } }
+  config: Record<string, unknown> & {
+    idempotent?: boolean
+    retry?: { max_attempts: number; backoff_ms: number }
+  }
 }
 export interface Endpoint {
   node: string
@@ -108,4 +111,14 @@ export interface RunEvent {
   reused?: boolean
   version_no?: number
   reason?: string
+}
+
+export interface NodeDefinition {
+  type: string
+  version: number
+  title: string
+  category: string
+  description: string
+  config_schema: Record<string, unknown>
+  default_config: Record<string, unknown>
 }

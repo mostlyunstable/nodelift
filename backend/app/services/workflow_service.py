@@ -6,7 +6,7 @@ import uuid
 from typing import Any
 
 from app.api.errors import AppError
-from app.domain.ports import CodeRunner
+from app.domain.nodes import NodeRegistry
 from app.domain.records import RunRecord, VersionRecord
 from app.domain.repositories import RunRepository, WorkflowRepository
 from app.domain.run import NodeExecution, RunStatus
@@ -61,12 +61,12 @@ class WorkflowService:
         self,
         workflows: WorkflowRepository,
         runs: RunRepository,
-        runner: CodeRunner,
+        registry: NodeRegistry,
         hub: RunHub,
         max_concurrent_runs: int = 4,
         max_run_seconds: int = 300,
     ) -> None:
-        self.workflows, self.runs, self.runner, self.hub = workflows, runs, runner, hub
+        self.workflows, self.runs, self.registry, self.hub = workflows, runs, registry, hub
         self.max_concurrent_runs = max_concurrent_runs
         self.max_run_seconds = max_run_seconds
 
@@ -134,7 +134,7 @@ class WorkflowService:
         completed: dict[str, NodeExecution] | None = None,
         resumed_from: str | None = None,
     ) -> RunRecord:
-        issues = validate_workflow(version.definition)
+        issues = validate_workflow(version.definition, self.registry)
         if issues:
             raise AppError(
                 422, "validation_failed", "Workflow is invalid", [i.model_dump() for i in issues]
@@ -172,7 +172,7 @@ class WorkflowService:
         try:
             result = await execute_workflow(
                 version.definition,
-                self.runner,
+                self.registry,
                 run_input,
                 timeout_s,
                 observer=recorder,

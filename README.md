@@ -43,7 +43,11 @@ make check   # ruff, mypy, pytest, tsc, vitest
   `config.idempotent: true` plus `config.retry {max_attempts<=5, backoff_ms}`; only runtime errors, timeouts and worker
   crashes are retried, each attempt is its own record. `POST /runs/{id}/resume` starts a new run on the same version that
   reuses already-succeeded nodes (never re-runs them). Worker processes exit by themselves if the server is killed.
-- Not yet: node log streaming, container-level isolation (see docs/security.md), branching, auth, Project entity.
+- M7: node registry (`GET /nodes/definitions`, generic `POST /nodes/test`), built-in `transform.json` and `http.request`
+  nodes, plugin loading via `NODECRAFT_NODE_PLUGINS`. HTTP calls are SSRF-guarded (public addresses only, checked and
+  pinned at connect time, no redirects). See [docs/node-authoring.md](docs/node-authoring.md).
+- Not yet: node log streaming, container-level isolation (see docs/security.md), credential store, branching, auth,
+  Project entity, Postgres/hosted deployment adapters.
 - Monaco loads its editor files from a CDN, so the first load needs internet access.
 
 ## Database migrations

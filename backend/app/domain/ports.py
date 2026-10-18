@@ -15,6 +15,12 @@ ErrorType = Literal[
     "output_too_large",
     "timeout",
     "cancelled",
+    "invalid_config",
+    "transform_error",
+    "blocked_request",
+    "network_error",
+    "http_error",
+    "response_too_large",
     "worker_crashed",
 ]
 

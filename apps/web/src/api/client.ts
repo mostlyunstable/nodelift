@@ -1,5 +1,6 @@
 import type {
   CodeRunResult,
+  NodeDefinition,
   RunEvent,
   RunRecord,
   RunSummary,
@@ -37,8 +38,9 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
 }
 
 export const api = {
-  testCode: (source: string, input: unknown, signal?: AbortSignal) =>
-    request<CodeRunResult>('POST', '/nodes/code/test', { source, input }, signal),
+  nodeDefinitions: () => request<NodeDefinition[]>('GET', '/nodes/definitions'),
+  testNode: (type: string, config: unknown, input: unknown, signal?: AbortSignal) =>
+    request<CodeRunResult>('POST', '/nodes/test', { type, config, input }, signal),
   validate: (workflow: WorkflowDefinition) =>
     request<{ valid: boolean; issues: ValidationIssue[] }>('POST', '/workflows/validate', workflow),
   listWorkflows: () => request<WorkflowSummary[]>('GET', '/workflows'),

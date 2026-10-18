@@ -1,10 +1,9 @@
-from typing import Annotated, Any
+from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from app.api.v1.nodes import get_runner
-from app.domain.ports import CodeRunner
+from app.api.v1.nodes import Registry
 from app.domain.run import ExecutionRun
 from app.domain.workflow import ValidationIssue, WorkflowDefinition, validate_workflow
 from app.engine.executor import execute_workflow
@@ -24,16 +23,14 @@ class RunRequest(BaseModel):
 
 
 @router.post("/workflows/validate", response_model=ValidateResponse)
-def validate(wf: WorkflowDefinition) -> ValidateResponse:
-    issues = validate_workflow(wf)
+def validate(wf: WorkflowDefinition, registry: Registry) -> ValidateResponse:
+    issues = validate_workflow(wf, registry)
     return ValidateResponse(valid=not issues, issues=issues)
 
 
 @router.post("/runs", response_model=ExecutionRun)
-async def run_workflow(
-    req: RunRequest, runner: Annotated[CodeRunner, Depends(get_runner)]
-) -> ExecutionRun | Any:
-    issues = validate_workflow(req.workflow)
+async def run_workflow(req: RunRequest, registry: Registry) -> ExecutionRun | Any:
+    issues = validate_workflow(req.workflow, registry)
     if issues:
         from fastapi.responses import JSONResponse
 
@@ -47,4 +44,4 @@ async def run_workflow(
                 }
             },
         )
-    return await execute_workflow(req.workflow, runner, req.input, req.timeout_ms / 1000)
+    return await execute_workflow(req.workflow, registry, req.input, req.timeout_ms / 1000)

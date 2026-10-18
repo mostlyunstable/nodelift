@@ -13,10 +13,12 @@ from fastapi.testclient import TestClient
 from app.config import Settings
 from app.domain.workflow import WorkflowDefinition, retry_policy, validate_workflow
 from app.main import create_app
+from app.nodes import default_registry
 from app.runtime.subprocess_runner import SubprocessRunner
 from tests.test_run_events import start_run
 from tests.test_storage_api import BOOM, DOUBLE, create, wait_run
 
+REG = default_registry(SubprocessRunner())
 BACKEND = Path(__file__).resolve().parents[1]
 
 
@@ -190,10 +192,12 @@ def test_retry_validation_and_policy() -> None:
             {"nodes": [{"id": "a", "type": "code.python", "config": {"source": "x", **config}}]}
         )
 
-    assert validate_workflow(wfd({"idempotent": True, "retry": {"max_attempts": 2}})) == []
-    bad = validate_workflow(wfd({"idempotent": True, "retry": {"max_attempts": 99}}))
+    assert validate_workflow(wfd({"idempotent": True, "retry": {"max_attempts": 2}}), REG) == []
+    bad = validate_workflow(wfd({"idempotent": True, "retry": {"max_attempts": 99}}), REG)
     assert [i.code for i in bad] == ["invalid_config"]
-    assert [i.code for i in validate_workflow(wfd({"idempotent": "yes"}))] == ["invalid_config"]
+    assert [i.code for i in validate_workflow(wfd({"idempotent": "yes"}), REG)] == [
+        "invalid_config"
+    ]
     node = wfd({"retry": {"max_attempts": 3}}).nodes[0]
     assert retry_policy(node) == (1, 0)  # not idempotent: never retried
     assert retry_policy(wfd(IDEMPOTENT_RETRY).nodes[0]) == (3, 0)

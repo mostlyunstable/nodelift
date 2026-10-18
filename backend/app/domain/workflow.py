@@ -4,7 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-SUPPORTED_NODE_TYPES = {"code.python"}
+from app.domain.nodes import NodeRegistry
+
 MAX_NODES = 200
 MAX_ATTEMPTS = 5
 MAX_BACKOFF_MS = 60_000
@@ -119,7 +120,7 @@ def _retry_issues(n: WorkflowNode) -> list[ValidationIssue]:
     return out
 
 
-def validate_workflow(wf: WorkflowDefinition) -> list[ValidationIssue]:
+def validate_workflow(wf: WorkflowDefinition, registry: NodeRegistry) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     ids = [n.id for n in wf.nodes]
     if len(ids) > MAX_NODES:
@@ -130,20 +131,17 @@ def validate_workflow(wf: WorkflowDefinition) -> list[ValidationIssue]:
         )
     known = set(ids)
     for n in wf.nodes:
-        if n.type not in SUPPORTED_NODE_TYPES:
+        impl = registry.get(n.type)
+        if impl is None:
             issues.append(
                 ValidationIssue(
                     code="unknown_node_type", message=f"Unknown type {n.type}", node_id=n.id
                 )
             )
-        elif n.type == "code.python" and not isinstance(n.config.get("source"), str):
-            issues.append(
-                ValidationIssue(
-                    code="invalid_config", message="config.source must be a string", node_id=n.id
-                )
-            )
-        if n.type == "code.python":
-            issues.extend(_retry_issues(n))
+            continue
+        for problem in impl.validate_config(n.config):
+            issues.append(ValidationIssue(code="invalid_config", message=problem, node_id=n.id))
+        issues.extend(_retry_issues(n))
     for e in wf.edges:
         for end in (e.source, e.target):
             if end.node not in known:

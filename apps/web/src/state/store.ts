@@ -10,11 +10,12 @@ import {
 import { create } from 'zustand'
 import { api, ApiError } from '../api/client'
 import { followRun } from '../api/events'
-import { DEFAULT_SOURCE, fromWorkflow, toWorkflow, type CodeNodeData, type FlowNode } from '../canvas/mapper'
+import { DEFAULT_SOURCE, fromWorkflow, toWorkflow, type FlowNode, type NodeData } from '../canvas/mapper'
 import type {
   CodeRunResult,
   RunSummary,
   ExecutionRun,
+  NodeDefinition,
   NodeLiveStatus,
   RunEvent,
   ValidationIssue,
@@ -52,9 +53,12 @@ interface State {
   onNodesChange: (c: NodeChange<FlowNode>[]) => void
   onEdgesChange: (c: EdgeChange[]) => void
   onConnect: (c: Connection) => void
-  addNode: () => void
+  nodeDefs: NodeDefinition[]
+  loadDefinitions: () => Promise<void>
+  addNode: (type?: string) => void
+  updateConfig: (id: string, patch: Record<string, unknown>) => void
   select: (id: string | null) => void
-  updateData: (id: string, patch: Partial<CodeNodeData>) => void
+  updateData: (id: string, patch: Partial<NodeData>) => void
   setRunInput: (t: string) => void
   testNode: (id: string) => Promise<void>
   runWorkflow: () => Promise<void>
@@ -146,6 +150,7 @@ export const useStore = create<State>((set, get) => ({
   nodes: [],
   edges: [],
   selectedId: null,
+  nodeDefs: [],
   workflowId: null,
   workflowName: 'Untitled',
   revision: 0,
@@ -166,16 +171,26 @@ export const useStore = create<State>((set, get) => ({
   onEdgesChange: (c) => set({ edges: applyEdgeChanges(c, get().edges) }),
   onConnect: (c) => set({ edges: addEdge({ ...c, id: `e_${c.source}_${c.target}` }, get().edges) }),
 
-  addNode: () => {
+  loadDefinitions: async () => {
+    try {
+      set({ nodeDefs: await api.nodeDefinitions() })
+    } catch {
+      /* palette falls back to the built-in code node while the backend is unreachable */
+    }
+  },
+  addNode: (type = 'code.python') => {
     const n = get().nodes.length
     const id = newId()
+    const def = get().nodeDefs.find((d) => d.type === type)
+    const config = def?.default_config ?? (type === 'code.python' ? { source: DEFAULT_SOURCE } : {})
     const node: FlowNode = {
       id,
-      type: 'code',
+      type: 'node',
       position: { x: 80 + n * 40, y: 80 + n * 60 },
       data: {
-        name: `Code ${n + 1}`,
-        source: DEFAULT_SOURCE,
+        name: `${def?.title ?? 'Node'} ${n + 1}`,
+        nodeType: type,
+        config: structuredClone(config),
         testInput: '{}',
         idempotent: false,
         maxAttempts: 1,
@@ -183,6 +198,12 @@ export const useStore = create<State>((set, get) => ({
     }
     set({ nodes: [...get().nodes, node], selectedId: id })
   },
+  updateConfig: (id, patch) =>
+    set({
+      nodes: get().nodes.map((n) =>
+        n.id === id ? { ...n, data: { ...n.data, config: { ...n.data.config, ...patch } } } : n,
+      ),
+    }),
   select: (id) => set({ selectedId: id }),
   updateData: (id, patch) =>
     set({ nodes: get().nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)) }),
@@ -196,10 +217,12 @@ export const useStore = create<State>((set, get) => ({
     const abort = new AbortController()
     set({ busy: 'node', abort, message: null })
     try {
-      const res = await api.testCode(node.data.source, parsed.value, abort.signal)
+      const res = await api.testNode(node.data.nodeType, node.data.config, parsed.value, abort.signal)
       set({ nodeTests: { ...get().nodeTests, [id]: res } })
     } catch (e) {
-      if ((e as Error).name !== 'AbortError') set({ message: (e as Error).message })
+      if (e instanceof ApiError && e.details.length > 0)
+        set({ message: `${e.message}: ${e.details.map((d) => d.message).join('; ')}` })
+      else if ((e as Error).name !== 'AbortError') set({ message: (e as Error).message })
     } finally {
       set({ busy: null, abort: null })
     }

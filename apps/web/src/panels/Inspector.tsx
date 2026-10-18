@@ -1,4 +1,4 @@
-import Editor from '@monaco-editor/react'
+import { ConfigEditor } from './ConfigEditors' 
 import { useStore } from '../state/store'
 import { ResultView } from './ResultView'
 
@@ -13,17 +13,7 @@ export function Inspector() {
         Name
         <input value={node.data.name} onChange={(e) => updateData(node.id, { name: e.target.value })} />
       </label>
-      <div className="field">Python — define <code>main(input_data)</code></div>
-      <div className="editor">
-        <Editor
-          height="240px"
-          language="python"
-          theme="vs-dark"
-          value={node.data.source}
-          onChange={(v) => updateData(node.id, { source: v ?? '' })}
-          options={{ minimap: { enabled: false }, fontSize: 13, scrollBeyondLastLine: false }}
-        />
-      </div>
+      <ConfigEditor node={node} />
       <div className="retry-row">
         <label title="Retries re-run your code, so only enable this if running it twice is safe">
           <input

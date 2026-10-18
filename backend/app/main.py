@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from app.api.errors import install_error_handlers
 from app.api.v1 import health, nodes, stored, workflows
 from app.config import Settings, get_settings
+from app.nodes import default_registry, load_plugins
 from app.runtime.subprocess_runner import SubprocessRunner
 from app.services.run_hub import RunHub
 from app.storage.db import make_engine, make_session_factory, upgrade_to_head
@@ -23,6 +24,9 @@ def create_app(database_url: str | None = None, settings: Settings | None = None
         app.state.session_factory = make_session_factory(engine)
         app.state.settings = settings
         app.state.runner = SubprocessRunner(settings.node_memory_mb, settings.node_max_file_mb)
+        registry = default_registry(app.state.runner, settings.http_allow_private)
+        load_plugins(registry, settings.plugin_modules)
+        app.state.registry = registry
         app.state.run_hub = RunHub()
         runs = SqlRunRepository(app.state.session_factory)
         for run_id in runs.mark_stale_running():  # runs orphaned by a crash or restart
