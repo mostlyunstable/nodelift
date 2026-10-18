@@ -49,3 +49,9 @@ h4 { margin: 10px 0 4px; font-size: 12px; color: var(--muted); text-transform: u
 .dot-succeeded { background: var(--ok); } .dot-failed { background: var(--bad); } .dot-skipped { background: var(--skip); }
 .notice { font-size: 12px; margin-top: 6px; color: var(--accent); }
 .issues { font-size: 12px; color: var(--bad); padding-left: 16px; }
+.wf-name { width: 160px; }
+select { background: #21262d; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font-size: 13px; }
+.toolbar { white-space: nowrap; overflow-x: auto; }
+.toolbar button { flex-shrink: 0; }
+.warn { white-space: nowrap; }
+@media (max-width: 1200px) { .warn { display: none; } }

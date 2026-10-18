@@ -61,3 +61,32 @@ export interface ValidationIssue {
   message: string
   node_id?: string | null
 }
+
+export interface WorkflowSummary {
+  id: string
+  name: string
+  revision: number
+  updated_at: string
+}
+export interface WorkflowRecord {
+  id: string
+  name: string
+  draft: WorkflowDefinition
+  revision: number
+}
+export interface VersionSummary {
+  version_no: number
+  content_hash: string
+  created_at: string
+}
+export interface RunSummary {
+  id: string
+  status: 'succeeded' | 'failed'
+  version_no: number
+  duration_ms: number
+  created_at: string
+}
+export interface RunRecord extends ExecutionRun {
+  workflow_id: string
+  version_no: number
+}

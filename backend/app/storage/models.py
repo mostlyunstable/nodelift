@@ -1,0 +1,64 @@
+from datetime import UTC, datetime
+from typing import Any
+
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+def utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class WorkflowRow(Base):
+    __tablename__ = "workflows"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    draft: Mapped[dict[str, Any]] = mapped_column(JSON)  # mutable working copy
+    revision: Mapped[int] = mapped_column(Integer, default=1)  # optimistic concurrency
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class WorkflowVersionRow(Base):
+    __tablename__ = "workflow_versions"
+    __table_args__ = (UniqueConstraint("workflow_id", "version_no"),)
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    workflow_id: Mapped[str] = mapped_column(
+        ForeignKey("workflows.id", ondelete="CASCADE"), index=True
+    )
+    version_no: Mapped[int] = mapped_column(Integer)
+    content_hash: Mapped[str] = mapped_column(String)
+    definition: Mapped[dict[str, Any]] = mapped_column(JSON)  # immutable snapshot
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class RunRow(Base):
+    __tablename__ = "runs"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    workflow_id: Mapped[str] = mapped_column(
+        ForeignKey("workflows.id", ondelete="CASCADE"), index=True
+    )
+    version_id: Mapped[str] = mapped_column(ForeignKey("workflow_versions.id"))
+    version_no: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String)
+    input: Mapped[Any] = mapped_column(JSON, nullable=True)
+    duration_ms: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class NodeExecutionRow(Base):
+    __tablename__ = "node_executions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"), index=True)
+    seq: Mapped[int] = mapped_column(Integer)
+    node_id: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String)
+    input: Mapped[Any] = mapped_column(JSON, nullable=True)
+    output: Mapped[Any] = mapped_column(JSON, nullable=True)
+    logs: Mapped[list[Any]] = mapped_column(JSON)
+    error: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    duration_ms: Mapped[int] = mapped_column(Integer)

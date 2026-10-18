@@ -3,8 +3,10 @@ name = "nodecraft-backend"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.20.0",
     "fastapi>=0.146.0",
     "pydantic-settings>=2.16.0",
+    "sqlalchemy>=2.1.5",
     "uvicorn[standard]>=0.54.0",
 ]
 

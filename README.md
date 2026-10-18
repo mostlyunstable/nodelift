@@ -25,8 +25,17 @@ make check   # ruff, mypy, pytest, tsc, vitest
 `apps/web` — React + React Flow + Monaco editor. Plan: see docs/.
 
 ## Status
-- M1 done: code-node runner (`POST /api/v1/nodes/code/test`).
-- M2 done: canvas, Monaco, inspector, test-input and output panels.
-- M3 core done: `POST /api/v1/workflows/validate`, `POST /api/v1/runs` (sequential, dependency order, fail-fast).
-- Not yet: server-side persistence/versioning (workflows save to browser localStorage), live streaming, server-side cancel, branching, retries, sandboxing.
+- M1: code-node runner (`POST /api/v1/nodes/code/test`).
+- M2: canvas, Monaco, inspector, test-input and output panels.
+- M3 core: validation, sequential dependency-ordered execution, fail-fast.
+- M4: SQLite persistence (`~/.nodecraft/nodecraft.db`, override with `NODECRAFT_DATA_DIR`), Alembic migrations applied
+  automatically on start, immutable workflow versions (layout changes don't create versions), runs pinned to a version,
+  stored per-node input/output/logs/errors, optimistic concurrency on saves (409 on stale revision).
+- Not yet: live streaming (M5), server-side cancel and isolation (M6), branching/retries, auth, Project entity.
 - Monaco loads its editor files from a CDN, so the first load needs internet access.
+
+## Database migrations
+```bash
+cd backend && uv run alembic revision --autogenerate -m "describe change"
+```
+A test fails if the models and migrations drift apart.

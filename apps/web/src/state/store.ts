@@ -10,9 +10,14 @@ import {
 import { create } from 'zustand'
 import { api, ApiError } from '../api/client'
 import { DEFAULT_SOURCE, fromWorkflow, toWorkflow, type CodeNodeData, type FlowNode } from '../canvas/mapper'
-import type { CodeRunResult, ExecutionRun, ValidationIssue } from '../types/workflow'
-
-const STORAGE_KEY = 'nodecraft.workflow.v1'
+import type {
+  CodeRunResult,
+  RunSummary,
+  ExecutionRun,
+  ValidationIssue,
+  VersionSummary,
+  WorkflowSummary,
+} from '../types/workflow'
 
 function parseJson(text: string): { ok: true; value: unknown } | { ok: false; error: string } {
   try {
@@ -26,6 +31,12 @@ interface State {
   nodes: FlowNode[]
   edges: Edge[]
   selectedId: string | null
+  workflowId: string | null
+  workflowName: string
+  revision: number
+  workflows: WorkflowSummary[]
+  versions: VersionSummary[]
+  runs: RunSummary[]
   runInput: string
   nodeTests: Record<string, CodeRunResult>
   run: ExecutionRun | null
@@ -44,8 +55,12 @@ interface State {
   runWorkflow: () => Promise<void>
   validate: () => Promise<void>
   cancel: () => void
-  save: () => void
-  load: () => void
+  setName: (n: string) => void
+  save: () => Promise<string | null>
+  open: (id: string) => Promise<void>
+  openRun: (runId: string) => Promise<void>
+  publish: () => Promise<void>
+  refresh: () => Promise<void>
   reset: () => void
 }
 
@@ -56,6 +71,12 @@ export const useStore = create<State>((set, get) => ({
   nodes: [],
   edges: [],
   selectedId: null,
+  workflowId: null,
+  workflowName: 'Untitled',
+  revision: 0,
+  workflows: [],
+  versions: [],
+  runs: [],
   runInput: '{}',
   nodeTests: {},
   run: null,
@@ -102,14 +123,16 @@ export const useStore = create<State>((set, get) => ({
   },
 
   runWorkflow: async () => {
-    const { nodes, edges, runInput } = get()
-    const parsed = parseJson(runInput)
+    const parsed = parseJson(get().runInput)
     if (!parsed.ok) return set({ message: `Run input is not valid JSON: ${parsed.error}` })
     const abort = new AbortController()
     set({ busy: 'run', abort, message: null, issues: [], run: null })
     try {
-      const run = await api.runWorkflow(toWorkflow(nodes, edges), parsed.value, abort.signal)
+      const id = await get().save() // runs are pinned to a saved version
+      if (!id) return
+      const run = await api.startRun(id, parsed.value, abort.signal)
       set({ run })
+      await get().refresh()
     } catch (e) {
       if (e instanceof ApiError) set({ message: e.message, issues: e.details })
       else if ((e as Error).name !== 'AbortError') set({ message: (e as Error).message })
@@ -133,23 +156,76 @@ export const useStore = create<State>((set, get) => ({
     set({ busy: null, abort: null, message: 'Cancelled (the server may finish the current node).' })
   },
 
-  save: () => {
+  setName: (n) => set({ workflowName: n }),
+
+  save: async () => {
+    const { nodes, edges, workflowId, workflowName, revision } = get()
+    const definition = toWorkflow(nodes, edges, workflowName)
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(toWorkflow(get().nodes, get().edges)))
-      set({ message: 'Saved to this browser.' })
-    } catch {
-      set({ message: 'Could not save (storage unavailable).' })
+      const rec = workflowId
+        ? await api.updateWorkflow(workflowId, workflowName, definition, revision)
+        : await api.createWorkflow(workflowName, definition)
+      set({ workflowId: rec.id, revision: rec.revision, message: 'Saved.' })
+      await get().refresh()
+      return rec.id
+    } catch (e) {
+      const conflict = e instanceof ApiError && e.code === 'revision_conflict'
+      set({ message: conflict ? 'Saved elsewhere since you opened it. Reopen to get the latest.' : (e as Error).message })
+      return null
     }
   },
-  load: () => {
+
+  open: async (id) => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (!raw) return
-      const { nodes, edges } = fromWorkflow(JSON.parse(raw))
-      set({ nodes, edges })
-    } catch {
-      set({ message: 'Saved workflow could not be loaded.' })
+      const rec = await api.getWorkflow(id)
+      const { nodes, edges } = fromWorkflow(rec.draft)
+      set({
+        nodes, edges, workflowId: rec.id, workflowName: rec.name, revision: rec.revision,
+        selectedId: null, run: null, nodeTests: {}, issues: [], message: null,
+      })
+      await get().refresh()
+    } catch (e) {
+      set({ message: (e as Error).message })
     }
   },
-  reset: () => set({ nodes: [], edges: [], selectedId: null, run: null, nodeTests: {}, issues: [] }),
+
+  openRun: async (runId) => {
+    try {
+      set({ run: await api.getRun(runId) })
+    } catch (e) {
+      set({ message: (e as Error).message })
+    }
+  },
+
+  publish: async () => {
+    const id = await get().save()
+    if (!id) return
+    try {
+      const v = await api.createVersion(id)
+      set({ message: `Version ${v.version_no} is current.` })
+      await get().refresh()
+    } catch (e) {
+      set({ message: (e as Error).message })
+    }
+  },
+
+  refresh: async () => {
+    try {
+      const id = get().workflowId
+      const [workflows, versions, runs] = await Promise.all([
+        api.listWorkflows(),
+        id ? api.listVersions(id) : Promise.resolve([]),
+        id ? api.listRuns(id) : Promise.resolve([]),
+      ])
+      set({ workflows, versions, runs })
+    } catch {
+      /* listing is best-effort; the backend may be down */
+    }
+  },
+
+  reset: () =>
+    set({
+      nodes: [], edges: [], selectedId: null, run: null, nodeTests: {}, issues: [],
+      runInput: '{}', workflowId: null, workflowName: 'Untitled', revision: 0, versions: [], runs: [], message: null,
+    }),
 }))

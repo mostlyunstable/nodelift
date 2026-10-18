@@ -2,7 +2,7 @@ import { useStore } from '../state/store'
 import { ResultView } from './ResultView'
 
 export function RunPanel() {
-  const { run, runInput, setRunInput, selectedId, nodes, issues, message } = useStore()
+  const { run, runs, runInput, setRunInput, selectedId, nodes, issues, message } = useStore()
   const exec = run?.nodes.find((n) => n.node_id === selectedId)
   const nameOf = (id: string) => nodes.find((n) => n.id === id)?.data.name ?? id
   return (
@@ -24,27 +24,37 @@ export function RunPanel() {
         )}
       </div>
       <div className="run-col">
-        <h4>
-          Run history{' '}
-          {run && (
-            <span className={`pill pill-${run.status}`}>
-              {run.status} · {run.duration_ms}ms
-            </span>
-          )}
-        </h4>
-        {!run && <div className="muted">Run the workflow to see per-node results.</div>}
+        <h4>Run history</h4>
+        {runs.length === 0 && <div className="muted">No saved runs yet.</div>}
         <ul className="steps">
-          {run?.nodes.map((n) => (
+          {runs.map((r) => (
             <li
-              key={n.node_id}
-              className={n.node_id === selectedId ? 'active' : ''}
-              onClick={() => useStore.getState().select(n.node_id)}
+              key={r.id}
+              className={r.id === run?.id ? 'active' : ''}
+              onClick={() => useStore.getState().openRun(r.id)}
             >
-              <span className={`dot dot-${n.status}`} /> {nameOf(n.node_id)}
-              <span className="muted"> {n.status} · {n.duration_ms}ms</span>
+              <span className={`dot dot-${r.status}`} /> v{r.version_no} {r.status}
+              <span className="muted"> {r.duration_ms}ms · {new Date(r.created_at).toLocaleTimeString()}</span>
             </li>
           ))}
         </ul>
+        {run && (
+          <>
+            <h4>Steps</h4>
+            <ul className="steps">
+              {run.nodes.map((n) => (
+                <li
+                  key={n.node_id}
+                  className={n.node_id === selectedId ? 'active' : ''}
+                  onClick={() => useStore.getState().select(n.node_id)}
+                >
+                  <span className={`dot dot-${n.status}`} /> {nameOf(n.node_id)}
+                  <span className="muted"> {n.status} · {n.duration_ms}ms</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </div>
       <div className="run-col wide">
         <h4>Node execution{exec ? `: ${nameOf(exec.node_id)}` : ''}</h4>

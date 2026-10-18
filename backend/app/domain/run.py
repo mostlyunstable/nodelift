@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from app.domain.ports import LogLine, NodeError
 
 NodeStatus = Literal["succeeded", "failed", "skipped"]
+RunStatus = Literal["succeeded", "failed"]
 
 
 class NodeExecution(BaseModel):
@@ -19,6 +20,6 @@ class NodeExecution(BaseModel):
 
 class ExecutionRun(BaseModel):
     id: str
-    status: Literal["succeeded", "failed"]
+    status: RunStatus
     nodes: list[NodeExecution]
     duration_ms: int

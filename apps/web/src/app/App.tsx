@@ -10,7 +10,7 @@ const nodeTypes = { code: CodeNode }
 export function App() {
   const s = useStore()
   useEffect(() => {
-    useStore.getState().load()
+    useStore.getState().refresh()
   }, [])
   return (
     <div className="app">
@@ -26,9 +26,29 @@ export function App() {
           Cancel
         </button>
         <span className="sep" />
-        <button onClick={s.save}>Save</button>
-        <button onClick={s.load}>Load</button>
-        <button onClick={s.reset}>Clear</button>
+        <input
+          className="wf-name"
+          aria-label="Workflow name"
+          value={s.workflowName}
+          onChange={(e) => s.setName(e.target.value)}
+        />
+        <button onClick={() => s.save()}>Save</button>
+        <button onClick={s.publish} title="Snapshot the current draft as an immutable version">
+          Publish{s.versions.length > 0 ? ` (v${s.versions[0].version_no})` : ''}
+        </button>
+        <select
+          aria-label="Open workflow"
+          value=""
+          onChange={(e) => e.target.value && s.open(e.target.value)}
+        >
+          <option value="">Open…</option>
+          {s.workflows.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.name}
+            </option>
+          ))}
+        </select>
+        <button onClick={s.reset}>New</button>
         <span className="warn">⚠ Code runs unsandboxed on your machine</span>
       </header>
       <main className="workspace">
