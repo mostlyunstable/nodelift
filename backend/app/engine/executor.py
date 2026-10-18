@@ -5,7 +5,7 @@ import uuid
 from typing import Any
 
 from app.domain.ports import CodeRunner
-from app.domain.run import ExecutionRun, NodeExecution
+from app.domain.run import ExecutionRun, NodeExecution, RunObserver
 from app.domain.workflow import WorkflowDefinition, topological_order
 
 
@@ -26,6 +26,8 @@ async def execute_workflow(
     run_input: Any = None,
     timeout_s: float = 30,
     node_inputs: dict[str, Any] | None = None,
+    observer: RunObserver | None = None,
+    run_id: str | None = None,
 ) -> ExecutionRun:
     """Run nodes in dependency order. Fail-fast: downstream of a failed/skipped node is skipped.
 
@@ -43,30 +45,36 @@ async def execute_workflow(
         upstream = [e.source.node for e in wf.edges if e.target.node == nid]
         if any(u in blocked for u in upstream):
             blocked.add(nid)
-            records.append(NodeExecution(node_id=nid, status="skipped"))
+            skipped = NodeExecution(node_id=nid, status="skipped")
+            records.append(skipped)
+            if observer:
+                await observer.node_finished(skipped)
             continue
         inp = _node_input(wf, nid, outputs, run_input)
         if node_inputs and nid in node_inputs and not upstream:
             inp = node_inputs[nid]
+        if observer:
+            await observer.node_started(nid)
         res = await runner.run(nodes[nid].config["source"], inp, timeout_s)
-        records.append(
-            NodeExecution(
-                node_id=nid,
-                status=res.status,
-                input=inp,
-                output=res.output,
-                logs=res.logs,
-                error=res.error,
-                duration_ms=res.duration_ms,
-            )
+        record = NodeExecution(
+            node_id=nid,
+            status=res.status,
+            input=inp,
+            output=res.output,
+            logs=res.logs,
+            error=res.error,
+            duration_ms=res.duration_ms,
         )
+        records.append(record)
+        if observer:
+            await observer.node_finished(record)
         if res.status == "succeeded":
             outputs[nid] = res.output
         else:
             blocked.add(nid)
     failed = any(r.status == "failed" for r in records)
     return ExecutionRun(
-        id=f"run_{uuid.uuid4().hex[:12]}",
+        id=run_id or f"run_{uuid.uuid4().hex[:12]}",
         status="failed" if failed else "succeeded",
         nodes=records,
         duration_ms=int((time.monotonic() - start) * 1000),

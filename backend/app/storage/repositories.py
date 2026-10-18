@@ -14,10 +14,11 @@ from app.domain.records import (
     WorkflowSummary,
 )
 from app.domain.repositories import RevisionConflict
-from app.domain.run import ExecutionRun, NodeExecution, NodeStatus, RunStatus
+from app.domain.run import NodeExecution, NodeStatus, RunEvent, RunStatus
 from app.domain.workflow import WorkflowDefinition
 from app.storage.models import (
     NodeExecutionRow,
+    RunEventRow,
     RunRow,
     WorkflowRow,
     WorkflowVersionRow,
@@ -160,44 +161,93 @@ class SqlRunRepository:
     def __init__(self, sf: sessionmaker[Session]) -> None:
         self.sf = sf
 
-    def save(
-        self, workflow_id: str, version: VersionRecord, run_input: Any, run: ExecutionRun
+    def create(
+        self, run_id: str, workflow_id: str, version: VersionRecord, run_input: Any
     ) -> RunRecord:
         with self.sf.begin() as s:
             row = RunRow(
-                id=run.id,
+                id=run_id,
                 workflow_id=workflow_id,
                 version_id=version.id,
                 version_no=version.version_no,
-                status=run.status,
+                status="running",
                 input=run_input,
-                duration_ms=run.duration_ms,
+                duration_ms=0,
             )
             s.add(row)
-            s.flush()  # no ORM relationship, so order inserts explicitly (FK run_id)
-            for seq, n in enumerate(run.nodes):
-                s.add(
-                    NodeExecutionRow(
-                        run_id=run.id,
-                        seq=seq,
-                        node_id=n.node_id,
-                        status=n.status,
-                        input=n.input,
-                        output=n.output,
-                        logs=[x.model_dump() for x in n.logs],
-                        error=n.error.model_dump() if n.error else None,
-                        duration_ms=n.duration_ms,
-                    )
-                )
             s.flush()
-            created = row.created_at
-        return RunRecord(
-            **run.model_dump(),
-            workflow_id=workflow_id,
-            version_no=version.version_no,
-            input=run_input,
-            created_at=created,
-        )
+            return RunRecord(
+                id=run_id,
+                status="running",
+                nodes=[],
+                duration_ms=0,
+                workflow_id=workflow_id,
+                version_no=version.version_no,
+                input=run_input,
+                created_at=row.created_at,
+            )
+
+    def add_node_execution(self, run_id: str, seq: int, record: NodeExecution) -> None:
+        with self.sf.begin() as s:
+            s.add(
+                NodeExecutionRow(
+                    run_id=run_id,
+                    seq=seq,
+                    node_id=record.node_id,
+                    status=record.status,
+                    input=record.input,
+                    output=record.output,
+                    logs=[x.model_dump() for x in record.logs],
+                    error=record.error.model_dump() if record.error else None,
+                    duration_ms=record.duration_ms,
+                )
+            )
+
+    def finish(self, run_id: str, status: RunStatus, duration_ms: int) -> None:
+        with self.sf.begin() as s:
+            row = s.get(RunRow, run_id)
+            if row is not None:
+                row.status, row.duration_ms = status, duration_ms
+
+    def add_event(self, run_id: str, type: str, payload: dict[str, Any]) -> RunEvent:
+        with self.sf.begin() as s:
+            last = s.scalar(select(func.max(RunEventRow.seq)).where(RunEventRow.run_id == run_id))
+            row = RunEventRow(run_id=run_id, seq=(last or 0) + 1, type=type, payload=payload)
+            s.add(row)
+            s.flush()
+            return RunEvent(
+                run_id=run_id,
+                seq=row.seq,
+                type=type,
+                created_at=row.created_at,
+                payload=payload,
+            )
+
+    def list_events(self, run_id: str, after_seq: int = 0, limit: int = 500) -> list[RunEvent]:
+        with self.sf() as s:
+            rows = s.scalars(
+                select(RunEventRow)
+                .where(RunEventRow.run_id == run_id, RunEventRow.seq > after_seq)
+                .order_by(RunEventRow.seq)
+                .limit(limit)
+            ).all()
+            return [
+                RunEvent(
+                    run_id=r.run_id,
+                    seq=r.seq,
+                    type=r.type,
+                    created_at=r.created_at,
+                    payload=r.payload,
+                )
+                for r in rows
+            ]
+
+    def mark_stale_running(self) -> list[str]:
+        with self.sf.begin() as s:
+            rows = s.scalars(select(RunRow).where(RunRow.status == "running")).all()
+            for r in rows:
+                r.status = "failed"
+            return [r.id for r in rows]
 
     def get(self, run_id: str) -> RunRecord | None:
         with self.sf() as s:

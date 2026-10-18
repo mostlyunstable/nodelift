@@ -2,7 +2,7 @@ import { useStore } from '../state/store'
 import { ResultView } from './ResultView'
 
 export function RunPanel() {
-  const { run, runs, runInput, setRunInput, selectedId, nodes, issues, message } = useStore()
+  const { run, runs, events, runInput, setRunInput, selectedId, nodes, issues, message } = useStore()
   const exec = run?.nodes.find((n) => n.node_id === selectedId)
   const nameOf = (id: string) => nodes.find((n) => n.id === id)?.data.name ?? id
   return (
@@ -38,6 +38,20 @@ export function RunPanel() {
             </li>
           ))}
         </ul>
+        {events.length > 0 && (
+          <>
+            <h4>Events</h4>
+            <ol className="events">
+              {events.map((e) => (
+                <li key={e.seq}>
+                  <span className="muted">#{e.seq}</span> {e.type}
+                  {e.node_id && <span> · {nameOf(e.node_id)}</span>}
+                  {e.status && <span className={`pill pill-${e.status}`}> {e.status}</span>}
+                </li>
+              ))}
+            </ol>
+          </>
+        )}
         {run && (
           <>
             <h4>Steps</h4>

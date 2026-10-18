@@ -62,3 +62,14 @@ class NodeExecutionRow(Base):
     logs: Mapped[list[Any]] = mapped_column(JSON)
     error: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     duration_ms: Mapped[int] = mapped_column(Integer)
+
+
+class RunEventRow(Base):
+    __tablename__ = "run_events"
+    __table_args__ = (UniqueConstraint("run_id", "seq"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"), index=True)
+    seq: Mapped[int] = mapped_column(Integer)
+    type: Mapped[str] = mapped_column(String)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

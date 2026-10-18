@@ -1,5 +1,6 @@
 import type {
   CodeRunResult,
+  RunEvent,
   RunRecord,
   RunSummary,
   ValidationIssue,
@@ -53,4 +54,11 @@ export const api = {
     request<RunRecord>('POST', `/workflows/${id}/runs`, { input }, signal),
   listRuns: (id: string) => request<RunSummary[]>('GET', `/workflows/${id}/runs`),
   getRun: (runId: string) => request<RunRecord>('GET', `/runs/${runId}`),
+  listEvents: async (runId: string, after = 0) => {
+    const rows = await request<{ seq: number; type: RunEvent['type']; created_at: string; payload: Record<string, unknown> }[]>(
+      'GET',
+      `/runs/${runId}/events?after=${after}`,
+    )
+    return rows.map((r) => ({ seq: r.seq, type: r.type, created_at: r.created_at, ...r.payload }) as RunEvent)
+  },
 }

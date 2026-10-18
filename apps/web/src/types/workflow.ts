@@ -50,9 +50,10 @@ export interface NodeExecution {
   error: NodeError | null
   duration_ms: number
 }
+export type RunStatus = 'running' | 'succeeded' | 'failed'
 export interface ExecutionRun {
   id: string
-  status: 'succeeded' | 'failed'
+  status: RunStatus
   nodes: NodeExecution[]
   duration_ms: number
 }
@@ -81,7 +82,7 @@ export interface VersionSummary {
 }
 export interface RunSummary {
   id: string
-  status: 'succeeded' | 'failed'
+  status: RunStatus
   version_no: number
   duration_ms: number
   created_at: string
@@ -89,4 +90,17 @@ export interface RunSummary {
 export interface RunRecord extends ExecutionRun {
   workflow_id: string
   version_no: number
+}
+
+export type NodeLiveStatus = 'running' | NodeExecution['status']
+export interface RunEvent {
+  seq: number
+  type: 'run.started' | 'node.started' | 'node.finished' | 'run.finished'
+  created_at: string
+  node_id?: string
+  status?: string
+  duration_ms?: number
+  error_type?: string | null
+  version_no?: number
+  reason?: string
 }

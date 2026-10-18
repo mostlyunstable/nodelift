@@ -31,7 +31,12 @@ make check   # ruff, mypy, pytest, tsc, vitest
 - M4: SQLite persistence (`~/.nodecraft/nodecraft.db`, override with `NODECRAFT_DATA_DIR`), Alembic migrations applied
   automatically on start, immutable workflow versions (layout changes don't create versions), runs pinned to a version,
   stored per-node input/output/logs/errors, optimistic concurrency on saves (409 on stale revision).
-- Not yet: live streaming (M5), server-side cancel and isolation (M6), branching/retries, auth, Project entity.
+- M5: runs are asynchronous (`POST /workflows/{id}/runs` returns 202). Every run records ordered events
+  (`run.started`, `node.started`, `node.finished`, `run.finished`) in `run_events`. Watch live with SSE at
+  `GET /runs/{id}/events/stream` (resumes from `Last-Event-ID`/`?after=`), or catch up with `GET /runs/{id}/events?after=N`.
+  Runs orphaned by a server crash are closed as failed (`server_restarted`) on startup. The UI shows live node status,
+  an event timeline, and falls back to polling if the stream stalls.
+- Not yet: node log streaming, server-side cancel and isolation (M6), branching/retries, auth, Project entity.
 - Monaco loads its editor files from a CDN, so the first load needs internet access.
 
 ## Database migrations

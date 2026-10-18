@@ -55,3 +55,8 @@ select { background: #21262d; color: var(--text); border: 1px solid var(--border
 .toolbar button { flex-shrink: 0; }
 .warn { white-space: nowrap; }
 @media (max-width: 1200px) { .warn { display: none; } }
+.code-node.status-running { border-left-color: var(--accent); animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 3px rgba(88, 166, 255, .35); } }
+.dot-running { background: var(--accent); }
+.pill-running { background: #12304f; color: #79c0ff; }
+.events { margin: 0; padding-left: 0; list-style: none; font-size: 12px; font-family: ui-monospace, Menlo, monospace; max-height: 110px; overflow: auto; }

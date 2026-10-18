@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 from alembic.autogenerate import compare_metadata
@@ -22,6 +23,23 @@ def defn(*sources: str, moved: int = 0) -> dict:  # type: ignore[type-arg]
         for i in range(len(nodes) - 1)
     ]
     return {"nodes": nodes, "edges": edges, "ui": {"positions": {"n0": {"x": moved, "y": 0}}}}
+
+
+def wait_run(client: TestClient, run_id: str, timeout: float = 10) -> dict:  # type: ignore[type-arg]
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        data = client.get(f"/api/v1/runs/{run_id}").json()
+        if data["status"] != "running":
+            return data  # type: ignore[no-any-return]
+        time.sleep(0.05)
+    raise AssertionError("run did not finish")
+
+
+def start(client: TestClient, wid: str, **body) -> dict:  # type: ignore[no-untyped-def,type-arg]
+    r = client.post(f"/api/v1/workflows/{wid}/runs", json=body)
+    assert r.status_code == 202, r.text
+    assert r.json()["status"] == "running"
+    return wait_run(client, r.json()["id"])
 
 
 def create(client: TestClient, d: dict) -> dict:  # type: ignore[type-arg]
@@ -71,21 +89,17 @@ def test_versions_dedupe_and_ignore_layout(client: TestClient) -> None:
 def test_run_is_pinned_persisted_and_listed(client: TestClient) -> None:
     wf = create(client, defn(DOUBLE, DOUBLE))
     wid = wf["id"]
-    run = client.post(f"/api/v1/workflows/{wid}/runs", json={"input": {"v": 2}})
-    assert run.status_code == 201
-    data = run.json()
+    data = start(client, wid, input={"v": 2})
     assert data["status"] == "succeeded" and data["version_no"] == 1
     assert [n["output"] for n in data["nodes"]] == [{"v": 4}, {"v": 8}]
     # edit the draft afterwards; the old run still references version 1
     client.put(
         f"/api/v1/workflows/{wid}", json={"name": "WF", "definition": defn(BOOM), "revision": 1}
     )
-    run2 = client.post(f"/api/v1/workflows/{wid}/runs", json={"input": {"v": 1}}).json()
+    run2 = start(client, wid, input={"v": 1})
     assert run2["status"] == "failed" and run2["version_no"] == 2
     assert [n["status"] for n in run2["nodes"]] == ["failed"]
-    pinned = client.post(
-        f"/api/v1/workflows/{wid}/runs", json={"version": 1, "input": {"v": 5}}
-    ).json()
+    pinned = start(client, wid, version=1, input={"v": 5})
     assert pinned["status"] == "succeeded" and pinned["nodes"][-1]["output"] == {"v": 20}
     history = client.get(f"/api/v1/workflows/{wid}/runs").json()
     assert len(history) == 3 and history[0]["id"] == pinned["id"]

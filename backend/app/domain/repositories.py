@@ -10,7 +10,7 @@ from app.domain.records import (
     WorkflowRecord,
     WorkflowSummary,
 )
-from app.domain.run import ExecutionRun
+from app.domain.run import NodeExecution, RunEvent, RunStatus
 from app.domain.workflow import WorkflowDefinition
 
 
@@ -37,8 +37,13 @@ class WorkflowRepository(Protocol):
 
 
 class RunRepository(Protocol):
-    def save(
-        self, workflow_id: str, version: VersionRecord, run_input: Any, run: ExecutionRun
+    def create(
+        self, run_id: str, workflow_id: str, version: VersionRecord, run_input: Any
     ) -> RunRecord: ...
+    def add_node_execution(self, run_id: str, seq: int, record: NodeExecution) -> None: ...
+    def finish(self, run_id: str, status: RunStatus, duration_ms: int) -> None: ...
+    def add_event(self, run_id: str, type: str, payload: dict[str, Any]) -> RunEvent: ...
+    def list_events(self, run_id: str, after_seq: int = 0, limit: int = 500) -> list[RunEvent]: ...
+    def mark_stale_running(self) -> list[str]: ...  # runs left "running" by a crashed server
     def get(self, run_id: str) -> RunRecord | None: ...
     def list_for_workflow(self, workflow_id: str, limit: int = 50) -> list[RunSummary]: ...

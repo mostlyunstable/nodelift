@@ -1,6 +1,9 @@
+import json
+from collections.abc import AsyncIterator
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Header, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.api.errors import AppError
@@ -15,6 +18,7 @@ from app.domain.records import (
     WorkflowSummary,
 )
 from app.domain.repositories import RevisionConflict
+from app.domain.run import RunEvent
 from app.domain.workflow import WorkflowDefinition
 from app.services.workflow_service import WorkflowService
 from app.storage.repositories import SqlRunRepository, SqlWorkflowRepository
@@ -26,7 +30,9 @@ def get_service(
     request: Request, runner: Annotated[CodeRunner, Depends(get_runner)]
 ) -> WorkflowService:
     sf = request.app.state.session_factory
-    return WorkflowService(SqlWorkflowRepository(sf), SqlRunRepository(sf), runner)
+    return WorkflowService(
+        SqlWorkflowRepository(sf), SqlRunRepository(sf), runner, request.app.state.run_hub
+    )
 
 
 Service = Annotated[WorkflowService, Depends(get_service)]
@@ -102,9 +108,9 @@ def get_version(workflow_id: str, version_no: int, svc: Service) -> VersionRecor
     return _must(svc.workflows.get_version(workflow_id, version_no), "Version")
 
 
-@router.post("/workflows/{workflow_id}/runs", response_model=RunRecord, status_code=201)
+@router.post("/workflows/{workflow_id}/runs", response_model=RunRecord, status_code=202)
 async def start_run(workflow_id: str, body: StartRun, svc: Service) -> RunRecord:
-    return await svc.run(workflow_id, body.version, body.input, body.timeout_ms / 1000)
+    return await svc.start_run(workflow_id, body.version, body.input, body.timeout_ms / 1000)
 
 
 @router.get("/workflows/{workflow_id}/runs", response_model=list[RunSummary])
@@ -116,3 +122,60 @@ def list_runs(workflow_id: str, svc: Service) -> list[RunSummary]:
 @router.get("/runs/{run_id}", response_model=RunRecord)
 def get_run(run_id: str, svc: Service) -> RunRecord:
     return _must(svc.runs.get(run_id), "Run")
+
+
+@router.get("/runs/{run_id}/events", response_model=list[RunEvent])
+def list_events(run_id: str, svc: Service, after: int = 0) -> list[RunEvent]:
+    """Catch-up for a client that missed events: everything with seq > `after`."""
+    _must(svc.runs.get(run_id), "Run")
+    return svc.runs.list_events(run_id, after)
+
+
+def _frame(e: RunEvent) -> str:
+    data = json.dumps(
+        {"seq": e.seq, "type": e.type, "created_at": e.created_at.isoformat(), **e.payload}
+    )
+    return f"id: {e.seq}\nevent: {e.type}\ndata: {data}\n\n"
+
+
+@router.get("/runs/{run_id}/events/stream")
+async def stream_events(
+    run_id: str,
+    request: Request,
+    svc: Service,
+    after: int = 0,
+    last_event_id: Annotated[str | None, Header()] = None,
+) -> StreamingResponse:
+    """Server-Sent Events. Resumes after `Last-Event-ID` (sent automatically by EventSource)."""
+    _must(svc.runs.get(run_id), "Run")
+    last = after
+    if last_event_id and last_event_id.isdigit():
+        last = max(last, int(last_event_id))
+
+    async def gen() -> AsyncIterator[str]:
+        cursor = last
+        idle = 0.0
+        while True:
+            events = svc.runs.list_events(run_id, cursor)
+            for e in events:
+                cursor = e.seq
+                idle = 0.0
+                yield _frame(e)
+                if e.type == "run.finished":
+                    return
+            if await request.is_disconnected():
+                return
+            run = svc.runs.get(run_id)
+            if run is not None and run.status != "running" and not events:
+                return  # finished (e.g. recovered after a restart) with nothing left to send
+            await svc.hub.wait(run_id, 0.5)
+            idle += 0.5
+            if idle >= 15:
+                idle = 0.0
+                yield ": keepalive\n\n"
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

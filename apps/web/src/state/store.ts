@@ -9,11 +9,14 @@ import {
 } from '@xyflow/react'
 import { create } from 'zustand'
 import { api, ApiError } from '../api/client'
+import { followRun } from '../api/events'
 import { DEFAULT_SOURCE, fromWorkflow, toWorkflow, type CodeNodeData, type FlowNode } from '../canvas/mapper'
 import type {
   CodeRunResult,
   RunSummary,
   ExecutionRun,
+  NodeLiveStatus,
+  RunEvent,
   ValidationIssue,
   VersionSummary,
   WorkflowSummary,
@@ -40,6 +43,8 @@ interface State {
   runInput: string
   nodeTests: Record<string, CodeRunResult>
   run: ExecutionRun | null
+  events: RunEvent[]
+  liveStatus: Record<string, NodeLiveStatus>
   issues: ValidationIssue[]
   busy: 'node' | 'run' | null
   message: string | null
@@ -64,8 +69,76 @@ interface State {
   reset: () => void
 }
 
+let stopFollowing: (() => void) | null = null
+
 let counter = 1
 const newId = () => `n_${Date.now().toString(36)}${(counter++).toString(36)}`
+
+function applyEvent(e: RunEvent) {
+  const st = useStore.getState()
+  if (st.events.some((x) => x.seq === e.seq)) return // duplicate after a reconnect
+  const events = [...st.events, e].sort((a, b) => a.seq - b.seq)
+  const liveStatus = { ...st.liveStatus }
+  if (e.node_id && e.type === 'node.started') liveStatus[e.node_id] = 'running'
+  if (e.node_id && e.type === 'node.finished') liveStatus[e.node_id] = e.status as NodeLiveStatus
+  if (e.type === 'run.finished') {
+    // a node still marked running never reported back (e.g. the server restarted mid-run)
+    for (const [id, st] of Object.entries(liveStatus)) if (st === 'running') delete liveStatus[id]
+  }
+  useStore.setState({ events, liveStatus })
+}
+
+function follow(runId: string) {
+  stopFollowing?.()
+  const lastSeq = () => Math.max(0, ...useStore.getState().events.map((e) => e.seq))
+  const finish = async () => {
+    stopFollowing?.()
+    stopFollowing = null
+    try {
+      useStore.setState({ run: await api.getRun(runId) })
+    } finally {
+      useStore.setState({ busy: null })
+      await useStore.getState().refresh()
+    }
+  }
+  const onEvent = (e: RunEvent) => {
+    applyEvent(e)
+    if (e.type === 'run.finished') void finish()
+  }
+  const onLost = async () => {
+    // The browser gave up reconnecting: catch up over REST, then resume the stream.
+    stopFollowing?.()
+    try {
+      for (const e of await api.listEvents(runId, lastSeq())) onEvent(e)
+      setTimeout(() => {
+        if (useStore.getState().busy === 'run') follow(runId)
+      }, 1000)
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        useStore.setState({ busy: null, message: 'This run no longer exists on the server.' })
+        return
+      }
+      setTimeout(() => {
+        if (useStore.getState().busy === 'run') follow(runId)
+      }, 2000)
+    }
+  }
+  const closeStream = followRun(runId, lastSeq(), onEvent, () => void onLost())
+  // Safety net for a stream that stalls silently (dead proxy, server restart): poll the run's status.
+  const watchdog = setInterval(async () => {
+    try {
+      const run = await api.getRun(runId)
+      if (run.status === 'running') return
+      for (const e of await api.listEvents(runId, lastSeq())) onEvent(e) // delivers run.finished
+    } catch {
+      /* server unreachable; try again on the next tick */
+    }
+  }, 4000)
+  stopFollowing = () => {
+    closeStream()
+    clearInterval(watchdog)
+  }
+}
 
 export const useStore = create<State>((set, get) => ({
   nodes: [],
@@ -80,6 +153,8 @@ export const useStore = create<State>((set, get) => ({
   runInput: '{}',
   nodeTests: {},
   run: null,
+  events: [],
+  liveStatus: {},
   issues: [],
   busy: null,
   message: null,
@@ -125,19 +200,19 @@ export const useStore = create<State>((set, get) => ({
   runWorkflow: async () => {
     const parsed = parseJson(get().runInput)
     if (!parsed.ok) return set({ message: `Run input is not valid JSON: ${parsed.error}` })
-    const abort = new AbortController()
-    set({ busy: 'run', abort, message: null, issues: [], run: null })
+    stopFollowing?.()
+    set({ busy: 'run', message: null, issues: [], run: null, events: [], liveStatus: {} })
     try {
       const id = await get().save() // runs are pinned to a saved version
-      if (!id) return
-      const run = await api.startRun(id, parsed.value, abort.signal)
+      if (!id) return set({ busy: null })
+      const run = await api.startRun(id, parsed.value)
       set({ run })
+      follow(run.id)
       await get().refresh()
     } catch (e) {
       if (e instanceof ApiError) set({ message: e.message, issues: e.details })
-      else if ((e as Error).name !== 'AbortError') set({ message: (e as Error).message })
-    } finally {
-      set({ busy: null, abort: null })
+      else set({ message: (e as Error).message })
+      set({ busy: null })
     }
   },
 
@@ -151,9 +226,11 @@ export const useStore = create<State>((set, get) => ({
   },
 
   cancel: () => {
-    // Client-side cancel: stops waiting. Server-side cancellation lands with M6.
+    // Client-side only: stops following. The server finishes the run (server-side cancel is M6).
     get().abort?.abort()
-    set({ busy: null, abort: null, message: 'Cancelled (the server may finish the current node).' })
+    stopFollowing?.()
+    stopFollowing = null
+    set({ busy: null, abort: null, message: 'Stopped watching. The run continues on the server.' })
   },
 
   setName: (n) => set({ workflowName: n }),
@@ -179,7 +256,9 @@ export const useStore = create<State>((set, get) => ({
     try {
       const rec = await api.getWorkflow(id)
       const { nodes, edges } = fromWorkflow(rec.draft)
+      stopFollowing?.()
       set({
+        events: [], liveStatus: {}, busy: null,
         nodes, edges, workflowId: rec.id, workflowName: rec.name, revision: rec.revision,
         selectedId: null, run: null, nodeTests: {}, issues: [], message: null,
       })
@@ -190,8 +269,19 @@ export const useStore = create<State>((set, get) => ({
   },
 
   openRun: async (runId) => {
+    stopFollowing?.()
     try {
-      set({ run: await api.getRun(runId) })
+      const [run, events] = await Promise.all([api.getRun(runId), api.listEvents(runId)])
+      const liveStatus: Record<string, NodeLiveStatus> = {}
+      for (const e of events) {
+        if (e.node_id && e.type === 'node.started') liveStatus[e.node_id] = 'running'
+        if (e.node_id && e.type === 'node.finished') liveStatus[e.node_id] = e.status as NodeLiveStatus
+      }
+      set({ run, events, liveStatus })
+      if (run.status === 'running') {
+        set({ busy: 'run' })
+        follow(run.id)
+      }
     } catch (e) {
       set({ message: (e as Error).message })
     }
@@ -225,7 +315,7 @@ export const useStore = create<State>((set, get) => ({
 
   reset: () =>
     set({
-      nodes: [], edges: [], selectedId: null, run: null, nodeTests: {}, issues: [],
+      events: [], liveStatus: {}, nodes: [], edges: [], selectedId: null, run: null, nodeTests: {}, issues: [],
       runInput: '{}', workflowId: null, workflowName: 'Untitled', revision: 0, versions: [], runs: [], message: null,
     }),
 }))
