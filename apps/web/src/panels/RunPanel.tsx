@@ -1,4 +1,5 @@
 import { useStore } from '../state/store'
+import { formatTime } from '../utils/format'
 import { ResultView } from './ResultView'
 
 export function RunPanel() {
@@ -34,7 +35,7 @@ export function RunPanel() {
               onClick={() => useStore.getState().openRun(r.id)}
             >
               <span className={`dot dot-${r.status}`} /> v{r.version_no} {r.status}
-              <span className="muted"> {r.duration_ms}ms · {new Date(r.created_at).toLocaleTimeString()}</span>
+              <span className="muted"> {r.duration_ms}ms · {formatTime(r.created_at)}</span>
             </li>
           ))}
         </ul>

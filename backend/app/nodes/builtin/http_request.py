@@ -52,8 +52,11 @@ class HttpRequestNode:
         default_config={"url": "https://", "method": "GET"},
     )
 
-    def __init__(self, allow_private: bool = False) -> None:
+    def __init__(
+        self, allow_private: bool = False, ssl_context: ssl.SSLContext | None = None
+    ) -> None:
         self.allow_private = allow_private  # dev/test only: lets nodes reach localhost
+        self._ssl_context = ssl_context  # tests inject a private CA; production uses certifi
 
     # ------------------------------------------------------------------ validation
     def validate_config(self, config: dict[str, Any]) -> list[str]:
@@ -188,7 +191,7 @@ class HttpRequestNode:
         timeout: float,
         cap: int,
     ) -> tuple[int, dict[str, str], bytes]:
-        ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        ssl_ctx = self._ssl_context or ssl.create_default_context(cafile=certifi.where())
         wire = [(b"User-Agent", b"Nodecraft/0.1"), (b"Accept-Encoding", b"identity")]
         wire += [(k.encode(), v.encode()) for k, v in headers.items()]
         t = {"connect": timeout, "read": timeout, "write": timeout, "pool": timeout}

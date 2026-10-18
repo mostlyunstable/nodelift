@@ -1,15 +1,9 @@
-from typing import Any
-
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app.domain.errors import AppError
 
-class AppError(Exception):
-    def __init__(
-        self, status: int, code: str, message: str, details: list[Any] | None = None
-    ) -> None:
-        super().__init__(message)
-        self.status, self.code, self.message, self.details = status, code, message, details or []
+__all__ = ["AppError", "install_error_handlers"]
 
 
 def install_error_handlers(app: FastAPI) -> None:

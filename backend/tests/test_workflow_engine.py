@@ -56,14 +56,13 @@ def test_cycle_and_dangling_detected() -> None:
     assert "dangling_edge" in [i.code for i in validate_workflow(dang, REG)]
 
 
-def test_api_run_and_validate(client) -> None:  # type: ignore[no-untyped-def]
-    body = {
-        "workflow": {"nodes": [{"id": "a", "type": "code.python", "config": {"source": DOUBLE}}]},
-        "input": {"v": 4},
-    }
-    r = client.post("/api/v1/runs", json=body)
-    assert r.status_code == 200 and r.json()["nodes"][0]["output"] == {"v": 8}
-    bad = {"workflow": {"nodes": [{"id": "a", "type": "nope"}]}}
-    assert client.post("/api/v1/runs", json=bad).status_code == 422
+def test_api_validate_and_legacy_run_removed(client) -> None:  # type: ignore[no-untyped-def]
     v = client.post("/api/v1/workflows/validate", json={"nodes": [{"id": "a", "type": "nope"}]})
     assert v.json()["valid"] is False
+    ok = client.post(
+        "/api/v1/workflows/validate",
+        json={"nodes": [{"id": "a", "type": "code.python", "config": {"source": DOUBLE}}]},
+    )
+    assert ok.json() == {"valid": True, "issues": []}
+    # the unmetered ad-hoc run endpoint no longer exists; runs go through the execution gate
+    assert client.post("/api/v1/runs", json={"workflow": {}}).status_code in (404, 405)

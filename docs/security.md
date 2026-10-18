@@ -4,7 +4,12 @@
 Treat every workflow like a script you are running yourself.
 
 ## Safeguards in the MVP
-- API binds to `127.0.0.1` only; other hosts are refused unless `NODECRAFT_ALLOW_UNSAFE_REMOTE=1`.
+- API binds to `127.0.0.1` only; other hosts are refused unless `NODECRAFT_ALLOW_UNSAFE_REMOTE=1` (which also
+  requires `NODECRAFT_API_TOKEN`).
+- Every request must carry a loopback `Host` header (defeats DNS rebinding), any browser `Origin` must be on
+  `NODECRAFT_ALLOWED_ORIGINS`, and when `NODECRAFT_API_TOKEN` is set a bearer token is required on every route except
+  `/api/v1/health`. The token check uses a constant-time comparison.
+- One execution gate caps concurrent runs and concurrent single-node tests; there is no unmetered execution endpoint.
 - Worker: isolated interpreter (`-I`), scrubbed environment (no inherited secrets), temp cwd, own process group
   (killed on timeout), CPU/core rlimits, capped result (5 MB) and log sizes.
 

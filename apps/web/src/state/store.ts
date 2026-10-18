@@ -20,6 +20,7 @@ import type {
   RunEvent,
   ValidationIssue,
   VersionSummary,
+  WorkflowRecord,
   WorkflowSummary,
 } from '../types/workflow'
 
@@ -31,7 +32,46 @@ function parseJson(text: string): { ok: true; value: unknown } | { ok: false; er
   }
 }
 
+export const AUTOSAVE_MS = 1500
+const RETRY_MS = 5000
+const LAST_KEY = 'nodecraft.lastWorkflow'
+
+// Storage can throw (private windows, blocked cookies); the app must work without it.
+const remember = (id: string) => {
+  try {
+    localStorage.setItem(LAST_KEY, id)
+  } catch {
+    /* ignore */
+  }
+}
+const recall = (): string | null => {
+  try {
+    return localStorage.getItem(LAST_KEY)
+  } catch {
+    return null
+  }
+}
+const forget = () => {
+  try {
+    localStorage.removeItem(LAST_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
+export type SaveState = 'saved' | 'saving' | 'unsaved' | 'error'
+
+let autosaveTimer: ReturnType<typeof setTimeout> | undefined
+let editSeq = 0 // bumped on every edit; a save only clears "dirty" if nothing changed meanwhile
+let generation = 0 // bumped when a different workflow is opened/reset; stale saves must not apply
+let inFlight: Promise<string | null> | null = null
+
 interface State {
+  dirty: boolean
+  saveState: SaveState
+  conflict: boolean // saved elsewhere; autosave stops until the workflow is reopened
+  flush: () => Promise<boolean>
+  restore: () => Promise<void>
   nodes: FlowNode[]
   edges: Edge[]
   selectedId: string | null
@@ -67,7 +107,7 @@ interface State {
   resume: () => Promise<void>
   setName: (n: string) => void
   save: () => Promise<string | null>
-  open: (id: string) => Promise<void>
+  open: (id: string, preloaded?: WorkflowRecord) => Promise<void>
   openRun: (runId: string) => Promise<void>
   publish: () => Promise<void>
   refresh: () => Promise<void>
@@ -146,9 +186,28 @@ function follow(runId: string) {
   }
 }
 
+function scheduleAutosave() {
+  clearTimeout(autosaveTimer)
+  if (useStore.getState().conflict) return // someone else changed it; saving would just fail again
+  autosaveTimer = setTimeout(() => void useStore.getState().save(), AUTOSAVE_MS)
+}
+
+function markDirty() {
+  editSeq++
+  const { conflict, saveState } = useStore.getState()
+  useStore.setState({
+    dirty: true,
+    saveState: conflict ? 'error' : saveState === 'saving' ? 'saving' : 'unsaved',
+  })
+  scheduleAutosave()
+}
+
 export const useStore = create<State>((set, get) => ({
   nodes: [],
   edges: [],
+  dirty: false,
+  saveState: 'saved',
+  conflict: false,
   selectedId: null,
   nodeDefs: [],
   workflowId: null,
@@ -167,9 +226,19 @@ export const useStore = create<State>((set, get) => ({
   message: null,
   abort: null,
 
-  onNodesChange: (c) => set({ nodes: applyNodeChanges(c, get().nodes) }),
-  onEdgesChange: (c) => set({ edges: applyEdgeChanges(c, get().edges) }),
-  onConnect: (c) => set({ edges: addEdge({ ...c, id: `e_${c.source}_${c.target}` }, get().edges) }),
+  onNodesChange: (c) => {
+    set({ nodes: applyNodeChanges(c, get().nodes) })
+    // selection and measurement are not edits; moves, adds and removals are
+    if (c.some((ch) => ch.type !== 'select' && ch.type !== 'dimensions')) markDirty()
+  },
+  onEdgesChange: (c) => {
+    set({ edges: applyEdgeChanges(c, get().edges) })
+    if (c.some((ch) => ch.type !== 'select')) markDirty()
+  },
+  onConnect: (c) => {
+    set({ edges: addEdge({ ...c, id: `e_${c.source}_${c.target}` }, get().edges) })
+    markDirty()
+  },
 
   loadDefinitions: async () => {
     try {
@@ -197,16 +266,21 @@ export const useStore = create<State>((set, get) => ({
       },
     }
     set({ nodes: [...get().nodes, node], selectedId: id })
+    markDirty()
   },
-  updateConfig: (id, patch) =>
+  updateConfig: (id, patch) => {
     set({
       nodes: get().nodes.map((n) =>
         n.id === id ? { ...n, data: { ...n.data, config: { ...n.data.config, ...patch } } } : n,
       ),
-    }),
+    })
+    markDirty()
+  },
   select: (id) => set({ selectedId: id }),
-  updateData: (id, patch) =>
-    set({ nodes: get().nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)) }),
+  updateData: (id, patch) => {
+    set({ nodes: get().nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)) })
+    markDirty()
+  },
   setRunInput: (t) => set({ runInput: t }),
 
   testNode: async (id) => {
@@ -283,35 +357,101 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
-  setName: (n) => set({ workflowName: n }),
+  setName: (n) => {
+    set({ workflowName: n })
+    markDirty()
+  },
 
   save: async () => {
+    if (inFlight) {
+      // wait for the running save, then save again if more edits arrived meanwhile
+      return inFlight.then((id) => (get().dirty ? get().save() : id))
+    }
+    clearTimeout(autosaveTimer)
     const { nodes, edges, workflowId, workflowName, revision } = get()
-    const definition = toWorkflow(nodes, edges, workflowName)
-    try {
-      const rec = workflowId
-        ? await api.updateWorkflow(workflowId, workflowName, definition, revision)
-        : await api.createWorkflow(workflowName, definition)
-      set({ workflowId: rec.id, revision: rec.revision, message: 'Saved.' })
-      await get().refresh()
-      return rec.id
-    } catch (e) {
-      const conflict = e instanceof ApiError && e.code === 'revision_conflict'
-      set({ message: conflict ? 'Saved elsewhere since you opened it. Reopen to get the latest.' : (e as Error).message })
+    if (!workflowId && nodes.length === 0) {
+      set({ dirty: false, saveState: 'saved' }) // nothing worth creating yet
       return null
+    }
+    const seqAtStart = editSeq
+    const gen = generation
+    const definition = toWorkflow(nodes, edges, workflowName)
+    set({ saveState: 'saving' })
+    inFlight = (async () => {
+      try {
+        const rec = workflowId
+          ? await api.updateWorkflow(workflowId, workflowName, definition, revision)
+          : await api.createWorkflow(workflowName, definition)
+        if (gen !== generation) return rec.id // the user moved to another workflow meanwhile
+        const edited = editSeq !== seqAtStart
+        set({
+          workflowId: rec.id,
+          revision: rec.revision,
+          dirty: edited,
+          saveState: edited ? 'unsaved' : 'saved',
+          conflict: false,
+        })
+        remember(rec.id)
+        if (edited) scheduleAutosave()
+        await get().refresh()
+        return rec.id
+      } catch (e) {
+        if (gen !== generation) return null
+        const conflict = e instanceof ApiError && e.code === 'revision_conflict'
+        set({
+          saveState: 'error',
+          conflict,
+          message: conflict
+            ? 'Saved elsewhere since you opened it. Reopen to get the latest.'
+            : `Could not save: ${(e as Error).message}`,
+        })
+        if (!conflict) autosaveTimer = setTimeout(() => void get().save(), RETRY_MS)
+        return null
+      } finally {
+        inFlight = null
+      }
+    })()
+    return inFlight
+  },
+
+  flush: async () => {
+    clearTimeout(autosaveTimer)
+    const { dirty, workflowId, nodes } = get()
+    if (!workflowId && nodes.length === 0) {
+      set({ dirty: false, saveState: 'saved' })
+      return true
+    }
+    if (!dirty && !inFlight) return true
+    await get().save()
+    return !get().dirty
+  },
+
+  restore: async () => {
+    const id = recall()
+    if (!id) return
+    try {
+      const rec = await api.getWorkflow(id)
+      await get().open(rec.id, rec)
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) forget()
+      else set({ message: `Could not reopen your last workflow: ${(e as Error).message}` })
     }
   },
 
-  open: async (id) => {
+  open: async (id, preloaded) => {
     try {
-      const rec = await api.getWorkflow(id)
+      const rec = preloaded ?? (await api.getWorkflow(id))
       const { nodes, edges } = fromWorkflow(rec.draft)
       stopFollowing?.()
+      clearTimeout(autosaveTimer)
+      generation++
       set({
         events: [], liveStatus: {}, busy: null,
         nodes, edges, workflowId: rec.id, workflowName: rec.name, revision: rec.revision,
         selectedId: null, run: null, nodeTests: {}, issues: [], message: null,
+        dirty: false, saveState: 'saved', conflict: false,
       })
+      remember(rec.id)
       await get().refresh()
     } catch (e) {
       set({ message: (e as Error).message })
@@ -363,9 +503,14 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
-  reset: () =>
+  reset: () => {
+    clearTimeout(autosaveTimer)
+    generation++
+    forget()
     set({
       events: [], liveStatus: {}, nodes: [], edges: [], selectedId: null, run: null, nodeTests: {}, issues: [],
       runInput: '{}', workflowId: null, workflowName: 'Untitled', revision: 0, versions: [], runs: [], message: null,
-    }),
+      dirty: false, saveState: 'saved', conflict: false,
+    })
+  },
 }))

@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     node_max_file_mb: int = 10
     node_plugins: str = ""  # comma-separated module paths exposing register(registry)
     http_allow_private: bool = False  # dev only: lets http.request reach localhost/LAN
+    max_concurrent_node_tests: int = 4
+    api_token: str | None = None  # when set, every route except /health needs "Bearer <token>"
+    allowed_hosts: str = "127.0.0.1,localhost,[::1]"  # Host header allowlist (DNS-rebinding guard)
+    allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"  # browser Origin allowlist
+    reload: bool = False  # dev only; the reloader child can outlive its parent
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -29,6 +34,14 @@ class Settings(BaseSettings):
     def plugin_modules(self) -> list[str]:
         return [m.strip() for m in self.node_plugins.split(",") if m.strip()]
 
+    @property
+    def host_list(self) -> list[str]:
+        return [h.strip() for h in self.allowed_hosts.split(",") if h.strip()]
+
+    @property
+    def origin_list(self) -> list[str]:
+        return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
     def assert_safe_bind(self) -> None:
         """Code nodes run unsandboxed, so refuse non-loopback binds unless explicitly allowed."""
         if self.host not in {"127.0.0.1", "localhost", "::1"} and not self.allow_unsafe_remote:
@@ -36,6 +49,8 @@ class Settings(BaseSettings):
                 f"Refusing to bind {self.host}: code nodes are not sandboxed. "
                 "Set NODECRAFT_ALLOW_UNSAFE_REMOTE=1 to override."
             )
+        if self.host not in {"127.0.0.1", "localhost", "::1"} and not self.api_token:
+            raise SystemExit("A non-loopback bind requires NODECRAFT_API_TOKEN to be set.")
 
 
 @lru_cache

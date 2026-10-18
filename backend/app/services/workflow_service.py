@@ -5,13 +5,14 @@ import logging
 import uuid
 from typing import Any
 
-from app.api.errors import AppError
+from app.domain.errors import AppError
 from app.domain.nodes import NodeRegistry
 from app.domain.records import RunRecord, VersionRecord
 from app.domain.repositories import RunRepository, WorkflowRepository
 from app.domain.run import NodeExecution, RunStatus
 from app.domain.workflow import WorkflowDefinition, validate_workflow
 from app.engine.executor import execute_workflow
+from app.services.gate import ExecutionGate
 from app.services.run_hub import RunHub
 
 log = logging.getLogger("nodecraft.runs")
@@ -63,11 +64,11 @@ class WorkflowService:
         runs: RunRepository,
         registry: NodeRegistry,
         hub: RunHub,
-        max_concurrent_runs: int = 4,
+        gate: ExecutionGate,
         max_run_seconds: int = 300,
     ) -> None:
         self.workflows, self.runs, self.registry, self.hub = workflows, runs, registry, hub
-        self.max_concurrent_runs = max_concurrent_runs
+        self.gate = gate
         self.max_run_seconds = max_run_seconds
 
     def snapshot(self, workflow_id: str) -> VersionRecord:
@@ -119,7 +120,7 @@ class WorkflowService:
         run = self.runs.get(run_id)
         if run is None:
             raise AppError(404, "not_found", "Run not found")
-        flag = self.hub.cancels.get(run_id)
+        flag = self.gate.cancels.get(run_id)
         if flag is not None and not flag.is_set():
             flag.set()
             await RunRecorder(run_id, self.runs, self.hub).emit("run.cancel_requested", {})
@@ -139,19 +140,18 @@ class WorkflowService:
             raise AppError(
                 422, "validation_failed", "Workflow is invalid", [i.model_dump() for i in issues]
             )
-        if len(self.hub.cancels) >= self.max_concurrent_runs:
-            raise AppError(
-                429, "too_many_runs", f"At most {self.max_concurrent_runs} runs at once; try later"
-            )
         run_id = f"run_{uuid.uuid4().hex[:12]}"
-        record = self.runs.create(run_id, workflow_id, version, run_input)
-        cancel = asyncio.Event()
-        self.hub.cancels[run_id] = cancel
-        recorder = RunRecorder(run_id, self.runs, self.hub)
-        started: dict[str, Any] = {"version_no": version.version_no}
-        if resumed_from:
-            started |= {"resumed_from": resumed_from, "reused_nodes": sorted(completed or {})}
-        await recorder.emit("run.started", started)
+        cancel = self.gate.open_run(run_id)  # raises 429 before anything is written
+        try:
+            record = self.runs.create(run_id, workflow_id, version, run_input)
+            recorder = RunRecorder(run_id, self.runs, self.hub)
+            started: dict[str, Any] = {"version_no": version.version_no}
+            if resumed_from:
+                started |= {"resumed_from": resumed_from, "reused_nodes": sorted(completed or {})}
+            await recorder.emit("run.started", started)
+        except BaseException:
+            self.gate.close_run(run_id)
+            raise
         self.hub.track(
             asyncio.create_task(
                 self._execute(version, run_input, timeout_s, recorder, run_id, cancel, completed)
@@ -192,5 +192,5 @@ class WorkflowService:
             self.runs.finish(run_id, status, 0)
             await recorder.emit("run.finished", {"status": status, "reason": "internal_error"})
         finally:
-            self.hub.cancels.pop(run_id, None)
+            self.gate.close_run(run_id)
             self.hub.forget(run_id)

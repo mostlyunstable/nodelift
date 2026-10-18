@@ -98,4 +98,6 @@ def test_api_failure_is_200_and_bad_request_is_422(client) -> None:  # type: ign
 def test_non_loopback_bind_refused() -> None:
     with pytest.raises(SystemExit):
         Settings(host="0.0.0.0").assert_safe_bind()
-    Settings(host="0.0.0.0", allow_unsafe_remote=True).assert_safe_bind()
+    with pytest.raises(SystemExit):  # remote bind without a token is still refused
+        Settings(host="0.0.0.0", allow_unsafe_remote=True).assert_safe_bind()
+    Settings(host="0.0.0.0", allow_unsafe_remote=True, api_token="t").assert_safe_bind()

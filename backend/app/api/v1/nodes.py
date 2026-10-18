@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from app.api.errors import AppError
 from app.domain.nodes import NodeContext, NodeDefinition, NodeRegistry
 from app.domain.ports import CodeRunResult, JsonValue
+from app.services.gate import ExecutionGate
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
 
@@ -16,6 +17,14 @@ def get_registry(request: Request) -> NodeRegistry:
 
 
 Registry = Annotated[NodeRegistry, Depends(get_registry)]
+
+
+def get_gate(request: Request) -> ExecutionGate:
+    gate: ExecutionGate = request.app.state.gate
+    return gate
+
+
+Gate = Annotated[ExecutionGate, Depends(get_gate)]
 
 
 class NodeTestRequest(BaseModel):
@@ -37,7 +46,7 @@ def list_definitions(registry: Registry) -> list[NodeDefinition]:
 
 
 @router.post("/test", response_model=CodeRunResult)
-async def test_node(req: NodeTestRequest, registry: Registry) -> CodeRunResult:
+async def test_node(req: NodeTestRequest, registry: Registry, gate: Gate) -> CodeRunResult:
     """Run one node of any registered type in isolation."""
     impl = registry.get(req.type)
     if impl is None:
@@ -48,12 +57,16 @@ async def test_node(req: NodeTestRequest, registry: Registry) -> CodeRunResult:
             422, "validation_failed", "Invalid node config",
             [{"code": "invalid_config", "message": p} for p in problems],
         )  # fmt: skip
-    return await impl.execute(NodeContext(req.timeout_ms / 1000), req.input, req.config)
+    with gate.node_test():
+        return await impl.execute(NodeContext(req.timeout_ms / 1000), req.input, req.config)
 
 
 @router.post("/code/test", response_model=CodeRunResult)
-async def test_code(req: CodeTestRequest, registry: Registry) -> CodeRunResult:
+async def test_code(req: CodeTestRequest, registry: Registry, gate: Gate) -> CodeRunResult:
     """Kept for compatibility; equivalent to /nodes/test with type code.python."""
     impl = registry.get("code.python")
     assert impl is not None
-    return await impl.execute(NodeContext(req.timeout_ms / 1000), req.input, {"source": req.source})
+    with gate.node_test():
+        return await impl.execute(
+            NodeContext(req.timeout_ms / 1000), req.input, {"source": req.source}
+        )

@@ -13,7 +13,8 @@ Python 3.12 (via [uv](https://docs.astral.sh/uv/)), Node 20+, pnpm.
 make setup   # install backend + frontend deps
 make dev     # API on http://127.0.0.1:8000, web on http://localhost:5173
 ```
-Stop with Ctrl+C. Config: copy `.env.example` to `.env`.
+Stop with Ctrl+C (or `make stop`). Config: copy `.env.example` to `.env`.
+`make dev` generates a random API token shared by the API and the dev proxy.
 
 ## Test
 ```bash
@@ -46,6 +47,11 @@ make check   # ruff, mypy, pytest, tsc, vitest
 - M7: node registry (`GET /nodes/definitions`, generic `POST /nodes/test`), built-in `transform.json` and `http.request`
   nodes, plugin loading via `NODECRAFT_NODE_PLUGINS`. HTTP calls are SSRF-guarded (public addresses only, checked and
   pinned at connect time, no redirects). See [docs/node-authoring.md](docs/node-authoring.md).
+- P0 hardening (see [docs/audit](docs/audit/ROADMAP.md)): requests with an unexpected `Host`/`Origin` are rejected and an
+  optional bearer token protects every route (DNS-rebinding defence); one execution gate enforces the concurrency caps
+  for runs and single-node tests (the unmetered `POST /runs` endpoint was removed); all timestamps are explicit UTC;
+  the editor autosaves, shows Saved/Unsaved, restores your last workflow on launch and warns before discarding work;
+  the dev server no longer runs a reloader unless `NODECRAFT_RELOAD=1`; the HTTPS path of `http.request` is tested.
 - Not yet: node log streaming, container-level isolation (see docs/security.md), credential store, branching, auth,
   Project entity, Postgres/hosted deployment adapters.
 - Monaco loads its editor files from a CDN, so the first load needs internet access.

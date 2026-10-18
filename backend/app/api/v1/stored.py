@@ -32,7 +32,7 @@ def get_service(request: Request, registry: Registry) -> WorkflowService:
         SqlRunRepository(sf),
         registry,
         request.app.state.run_hub,
-        request.app.state.settings.max_concurrent_runs,
+        request.app.state.gate,
         request.app.state.settings.max_run_seconds,
     )
 
