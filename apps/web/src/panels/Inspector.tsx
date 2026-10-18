@@ -24,6 +24,29 @@ export function Inspector() {
           options={{ minimap: { enabled: false }, fontSize: 13, scrollBeyondLastLine: false }}
         />
       </div>
+      <div className="retry-row">
+        <label title="Retries re-run your code, so only enable this if running it twice is safe">
+          <input
+            type="checkbox"
+            checked={node.data.idempotent}
+            onChange={(e) =>
+              updateData(node.id, { idempotent: e.target.checked, maxAttempts: e.target.checked ? node.data.maxAttempts : 1 })
+            }
+          />{' '}
+          Idempotent (safe to retry)
+        </label>
+        <label>
+          Max attempts{' '}
+          <input
+            type="number"
+            min={1}
+            max={5}
+            disabled={!node.data.idempotent}
+            value={node.data.maxAttempts}
+            onChange={(e) => updateData(node.id, { maxAttempts: Math.min(5, Math.max(1, Number(e.target.value) || 1)) })}
+          />
+        </label>
+      </div>
       <label className="field">
         Test input (JSON)
         <textarea

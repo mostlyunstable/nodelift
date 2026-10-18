@@ -2,8 +2,8 @@ import { useStore } from '../state/store'
 import { ResultView } from './ResultView'
 
 export function RunPanel() {
-  const { run, runs, events, runInput, setRunInput, selectedId, nodes, issues, message } = useStore()
-  const exec = run?.nodes.find((n) => n.node_id === selectedId)
+  const { run, runs, events, resume, busy, runInput, setRunInput, selectedId, nodes, issues, message } = useStore()
+  const exec = run?.nodes.findLast((n) => n.node_id === selectedId)
   const nameOf = (id: string) => nodes.find((n) => n.id === id)?.data.name ?? id
   return (
     <section className="runpanel">
@@ -58,15 +58,26 @@ export function RunPanel() {
             <ul className="steps">
               {run.nodes.map((n) => (
                 <li
-                  key={n.node_id}
+                  key={`${n.node_id}-${n.attempt ?? 1}`}
                   className={n.node_id === selectedId ? 'active' : ''}
                   onClick={() => useStore.getState().select(n.node_id)}
                 >
                   <span className={`dot dot-${n.status}`} /> {nameOf(n.node_id)}
-                  <span className="muted"> {n.status} · {n.duration_ms}ms</span>
+                  <span className="muted">
+                    {' '}
+                    {n.status}
+                    {n.reused ? ' · reused' : ` · ${n.duration_ms}ms`}
+                    {(n.attempt ?? 1) > 1 ? ` · attempt ${n.attempt}` : ''}
+                  </span>
                 </li>
               ))}
             </ul>
+            {(run.status === 'failed' || run.status === 'cancelled') && (
+              <button onClick={() => void resume()} disabled={busy !== null}
+                title="New run that reuses nodes which already succeeded">
+                ↻ Resume from failure
+              </button>
+            )}
           </>
         )}
       </div>

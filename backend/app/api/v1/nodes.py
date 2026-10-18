@@ -1,10 +1,9 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
 from app.domain.ports import CodeRunner, CodeRunResult, JsonValue
-from app.runtime.subprocess_runner import SubprocessRunner
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
 
@@ -15,8 +14,9 @@ class CodeTestRequest(BaseModel):
     timeout_ms: int = Field(default=5000, ge=100, le=30_000)
 
 
-def get_runner() -> CodeRunner:
-    return SubprocessRunner()
+def get_runner(request: Request) -> CodeRunner:
+    runner: CodeRunner = request.app.state.runner
+    return runner
 
 
 @router.post("/code/test", response_model=CodeRunResult)

@@ -59,7 +59,8 @@ interface State {
   testNode: (id: string) => Promise<void>
   runWorkflow: () => Promise<void>
   validate: () => Promise<void>
-  cancel: () => void
+  cancel: () => Promise<void>
+  resume: () => Promise<void>
   setName: (n: string) => void
   save: () => Promise<string | null>
   open: (id: string) => Promise<void>
@@ -74,13 +75,14 @@ let stopFollowing: (() => void) | null = null
 let counter = 1
 const newId = () => `n_${Date.now().toString(36)}${(counter++).toString(36)}`
 
-function applyEvent(e: RunEvent) {
+export function applyEvent(e: RunEvent) {
   const st = useStore.getState()
   if (st.events.some((x) => x.seq === e.seq)) return // duplicate after a reconnect
   const events = [...st.events, e].sort((a, b) => a.seq - b.seq)
   const liveStatus = { ...st.liveStatus }
   if (e.node_id && e.type === 'node.started') liveStatus[e.node_id] = 'running'
-  if (e.node_id && e.type === 'node.finished') liveStatus[e.node_id] = e.status as NodeLiveStatus
+  if (e.node_id && e.type === 'node.finished')
+    liveStatus[e.node_id] = e.will_retry ? 'running' : (e.status as NodeLiveStatus)
   if (e.type === 'run.finished') {
     // a node still marked running never reported back (e.g. the server restarted mid-run)
     for (const [id, st] of Object.entries(liveStatus)) if (st === 'running') delete liveStatus[id]
@@ -97,7 +99,7 @@ function follow(runId: string) {
     try {
       useStore.setState({ run: await api.getRun(runId) })
     } finally {
-      useStore.setState({ busy: null })
+      useStore.setState({ busy: null, message: null })
       await useStore.getState().refresh()
     }
   }
@@ -171,7 +173,13 @@ export const useStore = create<State>((set, get) => ({
       id,
       type: 'code',
       position: { x: 80 + n * 40, y: 80 + n * 60 },
-      data: { name: `Code ${n + 1}`, source: DEFAULT_SOURCE, testInput: '{}' },
+      data: {
+        name: `Code ${n + 1}`,
+        source: DEFAULT_SOURCE,
+        testInput: '{}',
+        idempotent: false,
+        maxAttempts: 1,
+      },
     }
     set({ nodes: [...get().nodes, node], selectedId: id })
   },
@@ -225,12 +233,31 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
-  cancel: () => {
-    // Client-side only: stops following. The server finishes the run (server-side cancel is M6).
-    get().abort?.abort()
+  cancel: async () => {
+    const run = get().run
+    if (!run || run.status !== 'running') return
+    try {
+      // The server kills the running node and ends the run as `cancelled`; we keep following until then.
+      await api.cancelRun(run.id)
+      set({ message: 'Cancelling…' })
+    } catch (e) {
+      set({ message: (e as Error).message })
+    }
+  },
+
+  resume: async () => {
+    const run = get().run
+    if (!run || run.status === 'running' || run.status === 'succeeded') return
     stopFollowing?.()
-    stopFollowing = null
-    set({ busy: null, abort: null, message: 'Stopped watching. The run continues on the server.' })
+    set({ busy: 'run', message: null, events: [], liveStatus: {} })
+    try {
+      const next = await api.resumeRun(run.id)
+      set({ run: next })
+      follow(next.id)
+      await get().refresh()
+    } catch (e) {
+      set({ busy: null, message: (e as Error).message })
+    }
   },
 
   setName: (n) => set({ workflowName: n }),

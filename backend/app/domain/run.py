@@ -5,8 +5,8 @@ from pydantic import BaseModel
 
 from app.domain.ports import LogLine, NodeError
 
-NodeStatus = Literal["succeeded", "failed", "skipped"]
-RunStatus = Literal["running", "succeeded", "failed"]
+NodeStatus = Literal["succeeded", "failed", "skipped", "cancelled"]
+RunStatus = Literal["running", "succeeded", "failed", "cancelled"]
 
 
 class NodeExecution(BaseModel):
@@ -17,6 +17,8 @@ class NodeExecution(BaseModel):
     logs: list[LogLine] = []
     error: NodeError | None = None
     duration_ms: int = 0
+    attempt: int = 1
+    reused: bool = False  # output carried over from an earlier run (resume), not re-executed
 
 
 class ExecutionRun(BaseModel):
@@ -24,6 +26,7 @@ class ExecutionRun(BaseModel):
     status: RunStatus
     nodes: list[NodeExecution]
     duration_ms: int
+    reason: str | None = None  # why a run stopped early: cancelled, run_timeout
 
 
 class RunEvent(BaseModel):
@@ -37,5 +40,5 @@ class RunEvent(BaseModel):
 class RunObserver(Protocol):
     """Hooks the engine calls while executing. Implemented by the service (persist + notify)."""
 
-    async def node_started(self, node_id: str) -> None: ...
-    async def node_finished(self, record: NodeExecution) -> None: ...
+    async def node_started(self, node_id: str, attempt: int) -> None: ...
+    async def node_finished(self, record: NodeExecution, will_retry: bool) -> None: ...

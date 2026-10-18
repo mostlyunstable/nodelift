@@ -5,6 +5,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 SUPPORTED_NODE_TYPES = {"code.python"}
+MAX_NODES = 200
+MAX_ATTEMPTS = 5
+MAX_BACKOFF_MS = 60_000
 
 
 class Strict(BaseModel):
@@ -64,9 +67,63 @@ def topological_order(wf: WorkflowDefinition) -> list[str] | None:
     return order if len(order) == len(wf.nodes) else None
 
 
+def retry_policy(node: WorkflowNode) -> tuple[int, int]:
+    """(max_attempts, backoff_ms). Retries only apply to nodes explicitly marked idempotent."""
+    retry = node.config.get("retry")
+    if node.config.get("idempotent") is not True or not isinstance(retry, dict):
+        return 1, 0
+    attempts = retry.get("max_attempts", 1)
+    backoff = retry.get("backoff_ms", 0)
+    if not isinstance(attempts, int) or not isinstance(backoff, int):
+        return 1, 0
+    return max(1, min(attempts, MAX_ATTEMPTS)), max(0, min(backoff, MAX_BACKOFF_MS))
+
+
+def _retry_issues(n: WorkflowNode) -> list[ValidationIssue]:
+    out: list[ValidationIssue] = []
+    if "idempotent" in n.config and not isinstance(n.config["idempotent"], bool):
+        out.append(
+            ValidationIssue(
+                code="invalid_config", message="config.idempotent must be a boolean", node_id=n.id
+            )
+        )
+    retry = n.config.get("retry")
+    if retry is None:
+        return out
+    ok = (
+        isinstance(retry, dict)
+        and isinstance(retry.get("max_attempts", 1), int)
+        and 1 <= retry.get("max_attempts", 1) <= MAX_ATTEMPTS
+        and isinstance(retry.get("backoff_ms", 0), int)
+        and 0 <= retry.get("backoff_ms", 0) <= MAX_BACKOFF_MS
+    )
+    if not ok:
+        out.append(
+            ValidationIssue(
+                code="invalid_config",
+                message=(
+                    f"config.retry needs max_attempts 1-{MAX_ATTEMPTS}"
+                    f" and backoff_ms 0-{MAX_BACKOFF_MS}"
+                ),
+                node_id=n.id,
+            )
+        )
+    elif retry.get("max_attempts", 1) > 1 and n.config.get("idempotent") is not True:
+        out.append(
+            ValidationIssue(
+                code="retry_requires_idempotent",
+                message="Retries re-run code, so the node must be marked idempotent",
+                node_id=n.id,
+            )
+        )
+    return out
+
+
 def validate_workflow(wf: WorkflowDefinition) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     ids = [n.id for n in wf.nodes]
+    if len(ids) > MAX_NODES:
+        issues.append(ValidationIssue(code="too_many_nodes", message=f"At most {MAX_NODES} nodes"))
     for dup in {i for i in ids if ids.count(i) > 1}:
         issues.append(
             ValidationIssue(code="duplicate_node_id", message=f"Duplicate id {dup}", node_id=dup)
@@ -85,6 +142,8 @@ def validate_workflow(wf: WorkflowDefinition) -> list[ValidationIssue]:
                     code="invalid_config", message="config.source must be a string", node_id=n.id
                 )
             )
+        if n.type == "code.python":
+            issues.extend(_retry_issues(n))
     for e in wf.edges:
         for end in (e.source, e.target):
             if end.node not in known:

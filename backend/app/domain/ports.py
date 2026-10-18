@@ -1,5 +1,6 @@
 """Framework-free result types shared by the runtime and the API."""
 
+import asyncio
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel
@@ -13,6 +14,7 @@ ErrorType = Literal[
     "invalid_output",
     "output_too_large",
     "timeout",
+    "cancelled",
     "worker_crashed",
 ]
 
@@ -39,4 +41,10 @@ class CodeRunResult(BaseModel):
 
 
 class CodeRunner(Protocol):
-    async def run(self, source: str, input_data: JsonValue, timeout_s: float) -> CodeRunResult: ...
+    async def run(
+        self,
+        source: str,
+        input_data: JsonValue,
+        timeout_s: float,
+        cancel: asyncio.Event | None = None,
+    ) -> CodeRunResult: ...

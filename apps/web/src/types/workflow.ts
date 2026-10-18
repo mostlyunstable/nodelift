@@ -3,7 +3,7 @@ export interface WorkflowNode {
   id: string
   type: 'code.python'
   name: string
-  config: { source: string }
+  config: { source: string; idempotent?: boolean; retry?: { max_attempts: number; backoff_ms: number } }
 }
 export interface Endpoint {
   node: string
@@ -43,14 +43,16 @@ export interface CodeRunResult {
 }
 export interface NodeExecution {
   node_id: string
-  status: 'succeeded' | 'failed' | 'skipped'
+  status: 'succeeded' | 'failed' | 'skipped' | 'cancelled'
+  attempt?: number
+  reused?: boolean
   input: unknown
   output: unknown
   logs: LogLine[]
   error: NodeError | null
   duration_ms: number
 }
-export type RunStatus = 'running' | 'succeeded' | 'failed'
+export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled'
 export interface ExecutionRun {
   id: string
   status: RunStatus
@@ -95,12 +97,15 @@ export interface RunRecord extends ExecutionRun {
 export type NodeLiveStatus = 'running' | NodeExecution['status']
 export interface RunEvent {
   seq: number
-  type: 'run.started' | 'node.started' | 'node.finished' | 'run.finished'
+  type: 'run.started' | 'node.started' | 'node.finished' | 'run.finished' | 'run.cancel_requested'
   created_at: string
   node_id?: string
   status?: string
   duration_ms?: number
   error_type?: string | null
+  attempt?: number
+  will_retry?: boolean
+  reused?: boolean
   version_no?: number
   reason?: string
 }

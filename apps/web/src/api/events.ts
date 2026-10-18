@@ -1,6 +1,12 @@
 import type { RunEvent } from '../types/workflow'
 
-const TYPES: RunEvent['type'][] = ['run.started', 'node.started', 'node.finished', 'run.finished']
+const TYPES: RunEvent['type'][] = [
+  'run.started',
+  'node.started',
+  'node.finished',
+  'run.finished',
+  'run.cancel_requested',
+]
 
 /**
  * Follow a run over SSE starting after `afterSeq`. EventSource reconnects by itself and resends

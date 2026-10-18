@@ -8,6 +8,8 @@ TRUSTED LOCAL MODE: this is not a sandbox.
 import json
 import os
 import sys
+import threading
+import time
 import traceback
 
 USER_FILE = "<node>"
@@ -27,7 +29,17 @@ def _user_traceback(exc: BaseException) -> str:
     return "".join(lines)
 
 
+def _exit_if_orphaned() -> None:
+    """If the server dies (even by SIGKILL) this worker must not keep running on its own."""
+    parent = os.getppid()
+    while True:
+        time.sleep(0.5)
+        if os.getppid() != parent:
+            os._exit(1)
+
+
 def main() -> None:
+    threading.Thread(target=_exit_if_orphaned, daemon=True).start()
     fd = int(sys.argv[1])
     req = json.loads(sys.stdin.read())
     try:

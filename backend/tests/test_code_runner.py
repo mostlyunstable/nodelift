@@ -1,5 +1,5 @@
+import asyncio
 import os
-import subprocess
 
 import pytest
 
@@ -50,12 +50,23 @@ async def test_invalid_output(expr: str) -> None:
     assert r.error and r.error.type == "invalid_output"
 
 
-async def test_timeout_kills_child() -> None:
-    marker = "nodecraft-timeout-marker-9137"
-    r = await run(f"# {marker}\ndef main(i):\n    while True: pass", timeout=0.5)
+async def test_timeout_kills_child(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    pidfile = tmp_path / "pid"
+    src = (
+        "import os\ndef main(i):\n"
+        f"    open({str(pidfile)!r}, 'w').write(str(os.getpid()))\n    while True: pass"
+    )
+    r = await run(src, timeout=0.8)
     assert r.error and r.error.type == "timeout"
-    out = subprocess.run(["pgrep", "-f", marker], capture_output=True)
-    assert out.returncode != 0  # no orphan
+    pid = int(pidfile.read_text())
+    for _ in range(30):
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            break
+        await asyncio.sleep(0.1)
+    else:
+        raise AssertionError("worker still alive after timeout")
 
 
 async def test_output_too_large() -> None:

@@ -200,6 +200,8 @@ class SqlRunRepository:
                     logs=[x.model_dump() for x in record.logs],
                     error=record.error.model_dump() if record.error else None,
                     duration_ms=record.duration_ms,
+                    attempt=record.attempt,
+                    reused=record.reused,
                 )
             )
 
@@ -276,6 +278,8 @@ class SqlRunRepository:
                         logs=[LogLine(**x) for x in n.logs],
                         error=NodeError(**n.error) if n.error else None,
                         duration_ms=n.duration_ms,
+                        attempt=n.attempt,
+                        reused=n.reused,
                     )
                     for n in nodes
                 ],

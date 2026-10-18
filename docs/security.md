@@ -8,6 +8,14 @@ Treat every workflow like a script you are running yourself.
 - Worker: isolated interpreter (`-I`), scrubbed environment (no inherited secrets), temp cwd, own process group
   (killed on timeout), CPU/core rlimits, capped result (5 MB) and log sizes.
 
+## Reliability controls (M6)
+- Runs can be cancelled; the worker's process group is killed. Workers also exit if the server dies (parent watchdog).
+- Limits: per-node timeout, run wall-clock budget, concurrent-run cap, max 200 nodes per workflow, 5 MB result cap,
+  CPU/file-size/open-file rlimits, memory rlimit on Linux only. These stop accidents, not a malicious author:
+  user code can still read files and use the network.
+- Retries and resume can run code again after an interruption. A node that was in flight when the server died has no
+  stored result, so resuming re-runs it; mark nodes idempotent only if repeating them is safe.
+
 ## NOT provided (prerequisites before hosting or running untrusted code)
 Container/microVM isolation, read-only filesystem, seccomp, non-root user, cgroup memory/pids limits,
 network deny-by-default, authentication, per-user quotas, secret injection and log redaction.

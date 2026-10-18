@@ -9,6 +9,7 @@ import asyncio
 class RunHub:
     def __init__(self) -> None:
         self._conds: dict[str, asyncio.Condition] = {}
+        self.cancels: dict[str, asyncio.Event] = {}  # live runs -> cancel flag
         self.tasks: set[asyncio.Task[None]] = set()  # strong refs so runs aren't garbage-collected
 
     def _cond(self, run_id: str) -> asyncio.Condition:

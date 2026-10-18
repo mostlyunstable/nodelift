@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useStore } from '../state/store'
+import { applyEvent, useStore } from '../state/store'
+import type { RunEvent } from '../types/workflow'
 import { RunPanel } from '../panels/RunPanel'
 import { ResultView } from '../panels/ResultView'
 
@@ -114,6 +115,63 @@ describe('live run', () => {
     await vi.waitFor(() => expect(useStore.getState().run?.status).toBe('succeeded'))
     expect(useStore.getState().busy).toBeNull()
     expect(es.readyState).toBe(FakeEventSource.CLOSED)
+  })
+})
+
+describe('cancel and resume', () => {
+  beforeEach(() => {
+    FakeEventSource.instances = []
+    vi.stubGlobal('EventSource', FakeEventSource)
+    vi.restoreAllMocks()
+    useStore.getState().reset()
+  })
+  const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }))
+
+  it('cancels on the server and keeps following until run.finished', async () => {
+    const calls: string[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url, init) => {
+      calls.push(`${init?.method ?? 'GET'} ${String(url)}`)
+      return json({ id: 'run_1', status: 'running', nodes: [], duration_ms: 0, version_no: 1 }, 202)
+    })
+    useStore.setState({ run: { id: 'run_1', status: 'running', nodes: [], duration_ms: 0 }, busy: 'run' })
+    await useStore.getState().cancel()
+    expect(calls).toContain('POST /api/v1/runs/run_1/cancel')
+    expect(useStore.getState().busy).toBe('run') // still waiting for the server to confirm
+  })
+
+  it('does nothing when no run is in progress', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch')
+    await useStore.getState().cancel()
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('resumes a failed run as a new run and follows it', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      json({ id: 'run_2', status: 'running', nodes: [], duration_ms: 0, version_no: 1 }, 202),
+    )
+    useStore.setState({ run: { id: 'run_1', status: 'failed', nodes: [], duration_ms: 3 } })
+    await useStore.getState().resume()
+    expect(useStore.getState().run?.id).toBe('run_2')
+    expect(FakeEventSource.instances[0].url).toContain('/runs/run_2/events/stream')
+  })
+
+  it('refuses to resume a succeeded run', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch')
+    useStore.setState({ run: { id: 'run_1', status: 'succeeded', nodes: [], duration_ms: 3 } })
+    await useStore.getState().resume()
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('keeps a node shown as running while it will be retried', () => {
+    const ev = (seq: number, type: RunEvent['type'], extra: Partial<RunEvent> = {}): RunEvent => ({
+      seq, type, created_at: '', node_id: 'n1', ...extra,
+    })
+    applyEvent(ev(1, 'node.started', { attempt: 1 }))
+    applyEvent(ev(2, 'node.finished', { status: 'failed', attempt: 1, will_retry: true }))
+    expect(useStore.getState().liveStatus.n1).toBe('running')
+    applyEvent(ev(3, 'node.started', { attempt: 2 }))
+    applyEvent(ev(4, 'node.finished', { status: 'succeeded', attempt: 2, will_retry: false }))
+    expect(useStore.getState().liveStatus.n1).toBe('succeeded')
   })
 })
 

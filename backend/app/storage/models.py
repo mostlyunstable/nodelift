@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, false
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -62,6 +62,8 @@ class NodeExecutionRow(Base):
     logs: Mapped[list[Any]] = mapped_column(JSON)
     error: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     duration_ms: Mapped[int] = mapped_column(Integer)
+    attempt: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    reused: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
 
 class RunEventRow(Base):

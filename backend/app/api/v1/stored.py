@@ -31,7 +31,12 @@ def get_service(
 ) -> WorkflowService:
     sf = request.app.state.session_factory
     return WorkflowService(
-        SqlWorkflowRepository(sf), SqlRunRepository(sf), runner, request.app.state.run_hub
+        SqlWorkflowRepository(sf),
+        SqlRunRepository(sf),
+        runner,
+        request.app.state.run_hub,
+        request.app.state.settings.max_concurrent_runs,
+        request.app.state.settings.max_run_seconds,
     )
 
 
@@ -52,6 +57,10 @@ class UpdateWorkflow(BaseModel):
 class StartRun(BaseModel):
     version: int | None = None  # omitted: snapshot the draft and run that
     input: Any = None
+    timeout_ms: int = Field(default=10_000, ge=100, le=30_000)
+
+
+class ResumeRun(BaseModel):
     timeout_ms: int = Field(default=10_000, ge=100, le=30_000)
 
 
@@ -179,3 +188,13 @@ async def stream_events(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.post("/runs/{run_id}/cancel", response_model=RunRecord, status_code=202)
+async def cancel_run(run_id: str, svc: Service) -> RunRecord:
+    return await svc.cancel_run(run_id)
+
+
+@router.post("/runs/{run_id}/resume", response_model=RunRecord, status_code=202)
+async def resume_run(run_id: str, svc: Service, body: ResumeRun | None = None) -> RunRecord:
+    return await svc.resume_run(run_id, (body.timeout_ms if body else 10_000) / 1000)

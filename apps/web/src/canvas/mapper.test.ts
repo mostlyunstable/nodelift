@@ -2,11 +2,22 @@ import { describe, expect, it } from 'vitest'
 import { fromWorkflow, toWorkflow, type FlowNode } from './mapper'
 
 const nodes: FlowNode[] = [
-  { id: 'a', type: 'code', position: { x: 1, y: 2 }, data: { name: 'A', source: 'S', testInput: '{}' } },
-  { id: 'b', type: 'code', position: { x: 3, y: 4 }, data: { name: 'B', source: 'T', testInput: '{}' } },
+  { id: 'a', type: 'code', position: { x: 1, y: 2 }, data: { name: 'A', source: 'S', testInput: '{}', idempotent: false, maxAttempts: 1 } },
+  { id: 'b', type: 'code', position: { x: 3, y: 4 }, data: { name: 'B', source: 'T', testInput: '{}', idempotent: false, maxAttempts: 1 } },
 ]
 
 describe('mapper', () => {
+  it('only emits retry settings for idempotent nodes', () => {
+    const mk = (idempotent: boolean, maxAttempts: number): FlowNode[] => [
+      { ...nodes[0], data: { ...nodes[0].data, idempotent, maxAttempts } },
+    ]
+    expect(toWorkflow(mk(false, 3), []).nodes[0].config).toEqual({ source: 'S' })
+    expect(toWorkflow(mk(true, 1), []).nodes[0].config).toEqual({ source: 'S', idempotent: true })
+    const cfg = toWorkflow(mk(true, 3), []).nodes[0].config
+    expect(cfg.retry).toEqual({ max_attempts: 3, backoff_ms: 500 })
+    const back = fromWorkflow(toWorkflow(mk(true, 3), []))
+    expect([back.nodes[0].data.idempotent, back.nodes[0].data.maxAttempts]).toEqual([true, 3])
+  })
   it('keeps layout out of nodes and in ui', () => {
     const wf = toWorkflow(nodes, [{ id: 'e1', source: 'a', target: 'b' }])
     expect(wf.nodes[0]).toEqual({ id: 'a', type: 'code.python', name: 'A', config: { source: 'S' } })

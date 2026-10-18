@@ -53,6 +53,8 @@ export const api = {
   startRun: (id: string, input: unknown, signal?: AbortSignal) =>
     request<RunRecord>('POST', `/workflows/${id}/runs`, { input }, signal),
   listRuns: (id: string) => request<RunSummary[]>('GET', `/workflows/${id}/runs`),
+  cancelRun: (runId: string) => request<RunRecord>('POST', `/runs/${runId}/cancel`),
+  resumeRun: (runId: string) => request<RunRecord>('POST', `/runs/${runId}/resume`, {}),
   getRun: (runId: string) => request<RunRecord>('GET', `/runs/${runId}`),
   listEvents: async (runId: string, after = 0) => {
     const rows = await request<{ seq: number; type: RunEvent['type']; created_at: string; payload: Record<string, unknown> }[]>(

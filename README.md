@@ -36,7 +36,14 @@ make check   # ruff, mypy, pytest, tsc, vitest
   `GET /runs/{id}/events/stream` (resumes from `Last-Event-ID`/`?after=`), or catch up with `GET /runs/{id}/events?after=N`.
   Runs orphaned by a server crash are closed as failed (`server_restarted`) on startup. The UI shows live node status,
   an event timeline, and falls back to polling if the stream stalls.
-- Not yet: node log streaming, server-side cancel and isolation (M6), branching/retries, auth, Project entity.
+- M6: server-side cancel (`POST /runs/{id}/cancel`, idempotent; kills the running node's process, skips the rest, run ends
+  `cancelled`). Limits: per-node timeout, whole-run wall-clock budget (`NODECRAFT_MAX_RUN_SECONDS`, default 300),
+  concurrent runs (`NODECRAFT_MAX_CONCURRENT_RUNS`, default 4, then HTTP 429), file-size/open-file rlimits per node, memory
+  limit (`NODECRAFT_NODE_MEMORY_MB`, **Linux only**: macOS does not enforce it). Retries are opt-in: a node needs
+  `config.idempotent: true` plus `config.retry {max_attempts<=5, backoff_ms}`; only runtime errors, timeouts and worker
+  crashes are retried, each attempt is its own record. `POST /runs/{id}/resume` starts a new run on the same version that
+  reuses already-succeeded nodes (never re-runs them). Worker processes exit by themselves if the server is killed.
+- Not yet: node log streaming, container-level isolation (see docs/security.md), branching, auth, Project entity.
 - Monaco loads its editor files from a CDN, so the first load needs internet access.
 
 ## Database migrations

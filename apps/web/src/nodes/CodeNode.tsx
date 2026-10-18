@@ -4,7 +4,7 @@ import { useStore } from '../state/store'
 import type { NodeLiveStatus } from '../types/workflow'
 
 export function CodeNode({ id, data, selected }: NodeProps<FlowNode>) {
-  const done = useStore((s) => s.run?.nodes.find((n) => n.node_id === id))
+  const done = useStore((s) => s.run?.nodes.findLast((n) => n.node_id === id))
   const live = useStore((s): NodeLiveStatus | undefined => s.liveStatus[id])
   const state: NodeLiveStatus | 'idle' = live ?? done?.status ?? 'idle'
   return (

@@ -22,7 +22,7 @@ export function App() {
         <button className="primary" onClick={s.runWorkflow} disabled={s.busy !== null || s.nodes.length === 0}>
           {s.busy === 'run' ? 'Running…' : '▶ Run workflow'}
         </button>
-        <button onClick={s.cancel} disabled={s.busy === null}>
+        <button onClick={() => void s.cancel()} disabled={s.busy !== 'run' || s.run?.status !== 'running'}>
           Cancel
         </button>
         <span className="sep" />

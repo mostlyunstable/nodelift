@@ -5,20 +5,24 @@ from fastapi import FastAPI
 
 from app.api.errors import install_error_handlers
 from app.api.v1 import health, nodes, stored, workflows
-from app.config import get_settings
+from app.config import Settings, get_settings
+from app.runtime.subprocess_runner import SubprocessRunner
 from app.services.run_hub import RunHub
 from app.storage.db import make_engine, make_session_factory, upgrade_to_head
 from app.storage.repositories import SqlRunRepository
 
 
-def create_app(database_url: str | None = None) -> FastAPI:
-    url = database_url or get_settings().effective_database_url
+def create_app(database_url: str | None = None, settings: Settings | None = None) -> FastAPI:
+    settings = settings or get_settings()
+    url = database_url or settings.effective_database_url
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         upgrade_to_head(url)  # fail fast on a bad/unmigratable database
         engine = make_engine(url)
         app.state.session_factory = make_session_factory(engine)
+        app.state.settings = settings
+        app.state.runner = SubprocessRunner(settings.node_memory_mb, settings.node_max_file_mb)
         app.state.run_hub = RunHub()
         runs = SqlRunRepository(app.state.session_factory)
         for run_id in runs.mark_stale_running():  # runs orphaned by a crash or restart

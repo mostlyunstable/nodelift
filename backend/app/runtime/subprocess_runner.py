@@ -5,6 +5,7 @@ Safeguards: scrubbed env, isolated interpreter (-I), temp cwd, own process group
 """
 
 import asyncio
+import contextlib
 import json
 import os
 import resource
@@ -13,6 +14,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from typing import Any
 
 from app.domain.ports import CodeRunResult, JsonValue, LogLine, NodeError
 
@@ -22,9 +24,13 @@ MAX_LOG_BYTES = 64 * 1024
 MAX_LOG_LINES = 1000
 
 
-def _limits(cpu_s: int) -> None:
+def _limits(cpu_s: int, memory_mb: int | None, max_file_mb: int) -> None:
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     resource.setrlimit(resource.RLIMIT_CPU, (cpu_s, cpu_s + 1))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (max_file_mb << 20, max_file_mb << 20))
+    resource.setrlimit(resource.RLIMIT_NOFILE, (256, 256))
+    if memory_mb and sys.platform == "linux":  # macOS does not enforce RLIMIT_AS/RLIMIT_DATA
+        resource.setrlimit(resource.RLIMIT_AS, (memory_mb << 20, memory_mb << 20))
 
 
 async def _read_capped(stream: asyncio.StreamReader, cap: int) -> tuple[bytes, bool]:
@@ -51,7 +57,17 @@ def _kill_group(proc: asyncio.subprocess.Process) -> None:
 
 
 class SubprocessRunner:
-    async def run(self, source: str, input_data: JsonValue, timeout_s: float) -> CodeRunResult:
+    def __init__(self, memory_mb: int | None = None, max_file_mb: int = 10) -> None:
+        self.memory_mb = memory_mb  # enforced on Linux only
+        self.max_file_mb = max_file_mb
+
+    async def run(
+        self,
+        source: str,
+        input_data: JsonValue,
+        timeout_s: float,
+        cancel: asyncio.Event | None = None,
+    ) -> CodeRunResult:
         start = time.monotonic()
 
         def done(
@@ -91,7 +107,9 @@ class SubprocessRunner:
                     },
                     pass_fds=(w_fd,),
                     start_new_session=True,
-                    preexec_fn=lambda: _limits(int(timeout_s) + 1),
+                    preexec_fn=lambda: _limits(
+                        int(timeout_s) + 1, self.memory_mb, self.max_file_mb
+                    ),
                 )
             finally:
                 os.close(w_fd)
@@ -110,22 +128,36 @@ class SubprocessRunner:
                 except (BrokenPipeError, ConnectionResetError):
                     pass
 
-            try:
-                (res, res_trunc), (out, _), (err, _), _, _ = await asyncio.wait_for(
-                    asyncio.gather(
-                        _read_capped(result_reader, MAX_RESULT_BYTES),
-                        _read_capped(proc.stdout, MAX_LOG_BYTES),
-                        _read_capped(proc.stderr, MAX_LOG_BYTES),
-                        feed(),
-                        proc.wait(),
-                    ),
-                    timeout=timeout_s,
+            work = asyncio.ensure_future(
+                asyncio.gather(
+                    _read_capped(result_reader, MAX_RESULT_BYTES),
+                    _read_capped(proc.stdout, MAX_LOG_BYTES),
+                    _read_capped(proc.stderr, MAX_LOG_BYTES),
+                    feed(),
+                    proc.wait(),
                 )
-            except TimeoutError:
-                _kill_group(proc)
-                await proc.wait()
-                return done(NodeError(type="timeout", message=f"Exceeded {timeout_s:g}s limit"))
+            )
+            cancel_wait = asyncio.ensure_future(cancel.wait()) if cancel else None
+            try:
+                waiting: set[asyncio.Future[Any]] = {work}
+                if cancel_wait:
+                    waiting.add(cancel_wait)
+                finished, _ = await asyncio.wait(
+                    waiting, timeout=timeout_s, return_when=asyncio.FIRST_COMPLETED
+                )
+                if work not in finished:
+                    _kill_group(proc)
+                    work.cancel()
+                    with contextlib.suppress(asyncio.CancelledError, Exception):
+                        await work
+                    await proc.wait()
+                    if cancel_wait and cancel_wait in finished:
+                        return done(NodeError(type="cancelled", message="Cancelled by user"))
+                    return done(NodeError(type="timeout", message=f"Exceeded {timeout_s:g}s limit"))
+                (res, res_trunc), (out, _), (err, _), _, _ = work.result()
             finally:
+                if cancel_wait:
+                    cancel_wait.cancel()
                 _kill_group(proc)  # reap any grandchildren
                 transport.close()
 

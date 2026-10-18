@@ -1,3 +1,4 @@
+from functools import lru_cache
 from pathlib import Path
 
 from pydantic import computed_field
@@ -12,6 +13,10 @@ class Settings(BaseSettings):
     allow_unsafe_remote: bool = False
     data_dir: Path = Path.home() / ".nodecraft"
     database_url: str | None = None
+    max_concurrent_runs: int = 4
+    max_run_seconds: int = 300
+    node_memory_mb: int | None = 1024  # enforced on Linux only
+    node_max_file_mb: int = 10
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -27,5 +32,6 @@ class Settings(BaseSettings):
             )
 
 
+@lru_cache
 def get_settings() -> Settings:
     return Settings()
