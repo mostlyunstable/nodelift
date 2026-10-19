@@ -122,6 +122,7 @@ export function App() {
             onPaneClick={() => s.select(null)}
             colorMode="dark"
             fitView
+            minZoom={0.1} // the default 0.5 made graphs wider than the canvas impossible to see whole
             deleteKeyCode={['Backspace', 'Delete']}
           >
             <Background />
