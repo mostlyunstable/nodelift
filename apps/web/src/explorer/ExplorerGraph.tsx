@@ -306,8 +306,14 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
             <ul>
               {selectedEdgeData.relations.slice(0, 8).map((r, i) => (
                 <li key={i}>
-                  <code>{r.src}</code>:{r.line} {r.kind.replace('_', ' ')} <code>{r.raw}</code> →{' '}
-                  <code>{r.dst}</code>
+                  <button
+                    className="link-button"
+                    onClick={() => void useExplorer.getState().goTo(r.src, r.line)}
+                    title="Open the importing file at this line"
+                  >
+                    {r.src}:{r.line}
+                  </button>{' '}
+                  {r.kind.replace('_', ' ')} <code>{r.raw}</code> → <code>{r.dst}</code>
                   <div className="muted">
                     {r.confidence} · {r.provenance}
                     {r.note ? ` · ${r.note}` : ''}

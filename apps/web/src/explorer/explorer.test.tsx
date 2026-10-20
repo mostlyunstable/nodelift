@@ -67,6 +67,7 @@ beforeEach(() => {
     starting: false,
   })
   vi.spyOn(api, 'explorerRevisions').mockResolvedValue([])
+  vi.spyOn(api, 'explorerAnalysis').mockRejectedValue(new Error('no analysis in this test'))
 })
 
 describe('Repository Explorer', () => {

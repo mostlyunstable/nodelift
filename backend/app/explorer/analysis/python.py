@@ -106,7 +106,8 @@ class _Visitor(ast.NodeVisitor):
             RepoSymbolRecord(
                 path=self.path, name=node.name, kind=kind, line=node.lineno,
                 end_line=node.end_lineno or node.lineno, parent=parent,
-                exported=not node.name.startswith("_"),
+                exported=not node.name.startswith("_")
+                or (node.name.startswith("__") and node.name.endswith("__")),  # dunders are public API
             )
         )  # fmt: skip
 

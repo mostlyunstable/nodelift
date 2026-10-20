@@ -132,6 +132,17 @@ def test_python_symbols(tmp_path: Path) -> None:
     assert ("_private", "function", None, False) in syms
 
 
+def test_python_dunder_methods_are_not_marked_private(tmp_path: Path) -> None:
+    res = run(
+        tmp_path,
+        {
+            "a.py": "class A:\n    def __init__(self):\n        pass\n    def _x(self):\n        pass\n"
+        },
+    )
+    got = {(s.name, s.exported) for s in res.symbols}
+    assert got == {("A", True), ("__init__", True), ("_x", False)}
+
+
 def test_test_files_link_by_import_and_by_name_only_when_needed(tmp_path: Path) -> None:
     res = run(tmp_path, PY_TREE)
     named = [e for e in res.edges if e.kind == "tests"]

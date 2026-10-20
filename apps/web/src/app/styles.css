@@ -1225,3 +1225,90 @@ path.xe-dep.xe-heuristic {
 .edge-detail code {
   font-family: var(--font-mono);
 }
+
+/* ---------- file panel, details, problems ---------- */
+.file-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.panel-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.subtabs {
+  display: flex;
+  gap: 2px;
+}
+.subtabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  font-size: 12px;
+}
+.subtabs button[aria-selected='true'] {
+  border-bottom-color: var(--accent);
+  color: var(--accent-fg);
+}
+.details,
+.problems {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 12px;
+  min-height: 0;
+}
+.detail-section h4,
+.problems h4 {
+  margin: 12px 0 4px;
+  font-size: 12px;
+}
+.detail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+}
+.path-link {
+  font-family: var(--font-mono);
+  text-align: left;
+}
+.conf-heuristic {
+  color: var(--warning-fg);
+}
+.conf-unresolved {
+  color: var(--danger-fg);
+}
+.sev-error {
+  color: var(--danger-fg);
+}
+.sev-warning {
+  color: var(--warning-fg);
+}
+.nc-line-highlight {
+  background: var(--accent-bg);
+}
+.preview {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.preview-note {
+  margin: 0;
+  padding: 6px 12px;
+}
+.preview iframe {
+  flex: 1;
+  border: 0;
+  background: #fff;
+}

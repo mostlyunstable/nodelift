@@ -3,6 +3,7 @@ import { ancestorDirs } from '../explorer/graph'
 import {
   api,
   ApiError,
+  type FileAnalysis,
   type RepoDiagnostic,
   type RepoEdge,
   type RepoFile,
@@ -11,7 +12,7 @@ import {
 } from '../api/client'
 
 export type Mode = 'build' | 'explorer'
-export type ExplorerTab = 'graph' | 'code'
+export type ExplorerTab = 'graph' | 'code' | 'problems'
 
 const ROOT_OPEN = () => new Set([''])
 
@@ -40,7 +41,7 @@ interface ExplorerState {
   focus: { path: string; n: number } | null
   selectedEdge: string | null
   setSelectedEdge: (id: string | null) => void
-  reveal: (path: string) => Promise<void>
+  reveal: (path: string, opts?: { remember?: boolean }) => Promise<void>
   file: RepoFileContent | null
   fileError: string | null
   error: string | null
@@ -51,7 +52,12 @@ interface ExplorerState {
   cancelImport: () => Promise<void>
   removeRevision: (id: string) => Promise<void>
   closeRevision: () => void
-  selectFile: (path: string) => Promise<void>
+  selectFile: (path: string, opts?: { remember?: boolean }) => Promise<void>
+  analysis: FileAnalysis | null
+  target: { path: string; line: number; n: number } | null
+  history: string[]
+  goTo: (path: string, line?: number) => Promise<void>
+  back: () => Promise<void>
 }
 
 let pollTimer: ReturnType<typeof setTimeout> | undefined
@@ -144,17 +150,20 @@ export const useExplorer = create<ExplorerState>((set, get) => {
     focus: null,
     selectedEdge: null,
     setSelectedEdge: (selectedEdge) => set({ selectedEdge }),
-    reveal: async (path) => {
+    reveal: async (path, opts) => {
       // open every parent folder so the file's node exists, then ask the canvas to centre on it
       set((st) => ({
         expanded: new Set([...st.expanded, ...ancestorDirs(path)]),
         languages: new Set(),
         focus: { path, n: (st.focus?.n ?? 0) + 1 },
       }))
-      await get().selectFile(path)
+      await get().selectFile(path, opts)
     },
     file: null,
     fileError: null,
+    analysis: null,
+    target: null,
+    history: [],
     error: null,
     starting: false,
 
@@ -179,6 +188,9 @@ export const useExplorer = create<ExplorerState>((set, get) => {
         diagnostics: [],
         graphTruncated: false,
         selectedPath: null,
+        analysis: null,
+        target: null,
+        history: [],
         file: null,
         expanded: ROOT_OPEN(),
         languages: new Set(),
@@ -202,6 +214,9 @@ export const useExplorer = create<ExplorerState>((set, get) => {
         diagnostics: [],
         graphTruncated: false,
         selectedPath: null,
+        analysis: null,
+        target: null,
+        history: [],
         file: null,
         fileError: null,
         expanded: ROOT_OPEN(),
@@ -246,6 +261,9 @@ export const useExplorer = create<ExplorerState>((set, get) => {
         diagnostics: [],
         graphTruncated: false,
         selectedPath: null,
+        analysis: null,
+        target: null,
+        history: [],
         file: null,
         fileError: null,
         error: null,
@@ -255,17 +273,42 @@ export const useExplorer = create<ExplorerState>((set, get) => {
       })
     },
 
-    selectFile: async (path) => {
+    selectFile: async (path, opts) => {
       const rev = get().revision
       if (!rev || rev.status !== 'ready') return
       const mine = ++fileGen
-      set({ selectedPath: path, fileError: null, selectedEdge: null })
-      try {
-        const file = await api.explorerFile(rev.id, path)
-        if (mine === fileGen) set({ file })
-      } catch (e) {
-        if (mine === fileGen) set({ file: null, fileError: message(e) })
-      }
+      const prev = get().selectedPath
+      set((st) => ({
+        selectedPath: path,
+        fileError: null,
+        selectedEdge: null,
+        analysis: prev === path ? st.analysis : null,
+        history:
+          opts?.remember !== false && prev && prev !== path ? [...st.history, prev].slice(-50) : st.history,
+      }))
+      const [file, analysis] = await Promise.allSettled([
+        api.explorerFile(rev.id, path),
+        api.explorerAnalysis(rev.id, path),
+      ])
+      if (mine !== fileGen) return
+      if (file.status === 'fulfilled') set({ file: file.value })
+      else set({ file: null, fileError: message(file.reason) })
+      // analysis is optional context: a missing result must never hide the source
+      set({ analysis: analysis.status === 'fulfilled' ? analysis.value : null })
+    },
+
+    goTo: async (path, line) => {
+      await get().reveal(path)
+      set((st) => ({ target: line ? { path, line, n: (st.target?.n ?? 0) + 1 } : null }))
+    },
+
+    back: async () => {
+      const h = get().history
+      const path = h[h.length - 1]
+      if (!path) return
+      set({ history: h.slice(0, -1) })
+      await get().reveal(path, { remember: false })
+      set({ target: null })
     },
   }
 })

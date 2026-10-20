@@ -2,7 +2,8 @@ import { useEffect } from 'react'
 import { useExplorer } from '../state/explorer'
 import { ExplorerGraph } from './ExplorerGraph'
 import { FileTree } from './FileTree'
-import { FileViewer } from './FileViewer'
+import { FilePanel } from './FilePanel'
+import { ProblemsView } from './ProblemsView'
 import { formatBytes } from './tree'
 
 export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
@@ -136,6 +137,10 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
               <button role="tab" aria-selected={e.tab === 'code'} onClick={() => e.setTab('code')}>
                 Code
               </button>
+              <button role="tab" aria-selected={e.tab === 'problems'} onClick={() => e.setTab('problems')}>
+                Problems
+                {rev.diagnostic_count > 0 && <span className="xn-problems"> ⚠ {rev.diagnostic_count}</span>}
+              </button>
             </div>
             {e.tab === 'graph' ? (
               <div className={`graph-split${e.selectedPath ? ' with-viewer' : ''}`}>
@@ -144,12 +149,14 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
                 </div>
                 {e.selectedPath && (
                   <div className="graph-viewer">
-                    <FileViewer file={e.file} error={e.fileError} theme={theme} />
+                    <FilePanel theme={theme} />
                   </div>
                 )}
               </div>
+            ) : e.tab === 'problems' ? (
+              <ProblemsView />
             ) : (
-              <FileViewer file={e.file} error={e.fileError} theme={theme} />
+              <FilePanel theme={theme} />
             )}
           </>
         ) : (

@@ -106,3 +106,16 @@ legend, edge detail, ⚠ problem badges rolled up to folders.
 39 of 122 text files analysed (37 Python + 1 HTML + 1 CSS), 342 relations (131 file-to-file), 0 diagnostics.
 **Not done:** call relationships (symbols are extracted but calls are not linked), YAML/JSON/SQL/shell references, tsconfig/webpack aliases,
 runtime tracing. The bundled desktop runtime has not been rebuilt with the new native tree-sitter wheels (scheduled for R7).
+
+## R5 status (2026-10-20): implemented
+Explorer file panel: **Source** (read-only Monaco with analysis diagnostics as markers and a highlighted target line), **Details**
+(file facts; problems; symbols with filter; imports inside the repo; imported-by; name-matched tests; unresolved; external), **Preview**
+(HTML only: `<iframe sandbox="">` + `srcdoc` starting with a deny-all CSP — no scripts, same-origin, forms, navigation or network).
+Every reference is a link that opens the target file (symbols/diagnostics/dependents open at their line); Back returns to the previous
+file; selection survives switching Graph/Code/Problems. New **Problems** tab lists all diagnostics, click opens the line. Edge detail
+lists each underlying relation with a link to the importing line.
+**Verified:** in the real browser on `psf/requests`: Details lists 31 symbols whose lines match the source (e.g. `Session` at 395);
+clicking `Session.request` highlights and centres line 557; the sandbox configuration blocked script execution, parent DOM access and a
+network probe (script flag stayed 0, no request recorded). Fixed along the way: dunder methods were wrongly shown as private.
+**Not done:** call-site navigation (go to definition across files), JSON formatting action, schema validation, Markdown preview, side-by-side
+diff (R6), recent-changes history (no Git history is fetched).
