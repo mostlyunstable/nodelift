@@ -15,6 +15,10 @@ const BADGES: Record<string, string> = {
   sql: 'sql',
   shell: 'sh',
   markdown: 'md',
+  go: 'go',
+  java: 'java',
+  rust: 'rs',
+  ruby: 'rb',
 }
 
 export function FileNode({ data, selected }: NodeProps<ExplorerNode>) {

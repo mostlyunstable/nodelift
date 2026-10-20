@@ -34,9 +34,14 @@ def _edge(
     )  # fmt: skip
 
 
+_GO_STD_FIRST_SEGMENT_NO_DOT = True  # Go standard library paths have no dot in their first segment
+
+
 class Resolver:
-    def __init__(self, files: set[str]) -> None:
+    def __init__(self, files: set[str], go_modules: dict[str, str] | None = None) -> None:
         self.files = files
+        self.go_modules = go_modules or {}  # folder of go.mod -> module path
+        self._java: list[str] | None = None
 
     # ---- Python -------------------------------------------------------------------------
     def _py_root(self, path: str) -> str:
@@ -212,6 +217,32 @@ class Resolver:
         path = raw.split("#", 1)[0].split("?", 1)[0]
         if not path:
             return []
+        if (
+            ref.note == "uses:"
+        ):  # GitHub Actions: a local action is a folder, relative to the repository root
+            root_rel = posixpath.normpath(path)
+            for cand in (root_rel, f"{root_rel}/action.yml", f"{root_rel}/action.yaml"):
+                if cand in self.files and cand != src:
+                    return [
+                        _edge(
+                            src,
+                            cand,
+                            ref,
+                            "resolved",
+                            provenance,
+                            "local action (repository-root relative)",
+                        )
+                    ]
+            return [
+                _edge(
+                    src,
+                    None,
+                    ref,
+                    "unresolved",
+                    provenance,
+                    "local action not found in the repository",
+                )
+            ]
         base = (
             posixpath.normpath(path.lstrip("/"))
             if path.startswith("/")
@@ -229,7 +260,196 @@ class Resolver:
             return [_edge(src, base, ref, conf, provenance, note)]
         return [_edge(src, None, ref, "unresolved", provenance, "file not found in the repository")]
 
+    # ---- Go ------------------------------------------------------------------------------
+    def go(self, src: str, ref: Ref, provenance: str) -> list[RepoEdgeRecord]:
+        raw = ref.raw
+        for folder, mod in sorted(self.go_modules.items(), key=lambda kv: -len(kv[1])):
+            if raw == mod or raw.startswith(mod + "/"):
+                rel = raw[len(mod) :].strip("/")
+                pkg = posixpath.join(folder, rel) if rel else folder
+                pkg = pkg.strip("/")
+                hits = sorted(
+                    p
+                    for p in self.files
+                    if p.endswith(".go")
+                    and not p.endswith("_test.go")
+                    and posixpath.dirname(p) == pkg
+                )
+                if hits:
+                    note = f"package of {len(hits)} files" if len(hits) > 1 else None
+                    return [_edge(src, h, ref, "resolved", provenance, note) for h in hits[:8]]
+                return [
+                    _edge(
+                        src,
+                        None,
+                        ref,
+                        "unresolved",
+                        provenance,
+                        "package folder not found in the repository",
+                    )
+                ]
+        if "." not in raw.split("/")[0]:
+            return [_edge(src, None, ref, "external", provenance, "standard library")]
+        return [
+            _edge(
+                src, None, ref, "external", provenance, "module dependency (not in the repository)"
+            )
+        ]
+
+    # ---- Java ----------------------------------------------------------------------------
+    def java(self, src: str, ref: Ref, provenance: str) -> list[RepoEdgeRecord]:
+        raw = ref.raw
+        if raw.startswith(("java.", "javax.", "jdk.", "sun.")):
+            return [_edge(src, None, ref, "external", provenance, "Java standard library")]
+        if self._java is None:
+            self._java = [p for p in self.files if p.endswith(".java")]
+        parts = raw.removesuffix(".*").split(".")
+        if raw.endswith(".*"):
+            suffix = "/".join(parts) + "/"
+            hits = sorted(
+                p
+                for p in self._java
+                if ("/" + posixpath.dirname(p) + "/").endswith("/" + suffix)
+                or (posixpath.dirname(p) + "/") == suffix
+            )
+            if hits:
+                return [
+                    _edge(src, h, ref, "resolved", provenance, f"package of {len(hits)} files")
+                    for h in hits[:8]
+                ]
+        else:
+            for cut in (0, 1):  # a static import names a member after the class
+                cand = "/".join(parts[: len(parts) - cut]) + ".java"
+                hits = sorted(p for p in self._java if p == cand or p.endswith("/" + cand))
+                if hits:
+                    return [
+                        _edge(
+                            src,
+                            hits[0],
+                            ref,
+                            "resolved",
+                            provenance,
+                            None if len(hits) == 1 else "several files match; the first is shown",
+                        )
+                    ]
+        return [
+            _edge(
+                src,
+                None,
+                ref,
+                "external",
+                provenance,
+                "not found in the repository (library or generated)",
+            )
+        ]
+
+    # ---- Rust ----------------------------------------------------------------------------
+    def rust(self, src: str, ref: Ref, provenance: str) -> list[RepoEdgeRecord]:
+        raw = ref.raw
+        here = posixpath.dirname(src)
+        base = posixpath.basename(src)
+        if ref.note == "mod declaration":
+            folder = (
+                here
+                if base in {"mod.rs", "lib.rs", "main.rs"}
+                else posixpath.join(here, base.removesuffix(".rs"))
+            )
+            for cand in (
+                posixpath.join(folder, raw + ".rs"),
+                posixpath.join(folder, raw, "mod.rs"),
+            ):
+                if cand in self.files:
+                    return [_edge(src, cand, ref, "resolved", provenance)]
+            return [_edge(src, None, ref, "unresolved", provenance, "module file not found")]
+        segs = [x for x in raw.replace("{", "").replace("}", "").replace(" ", "").split("::") if x]
+        if not segs or segs[0] in {"std", "core", "alloc"}:
+            return [_edge(src, None, ref, "external", provenance, "standard library")]
+        if segs[0] in {"crate", "self", "super"}:
+            root = here
+            while root and not (
+                posixpath.join(root, "lib.rs") in self.files
+                or posixpath.join(root, "main.rs") in self.files
+            ):
+                root = posixpath.dirname(root)
+            if segs[0] == "crate" and (
+                posixpath.join(root, "lib.rs") in self.files
+                or posixpath.join(root, "main.rs") in self.files
+            ):
+                path = segs[1:]
+                for n in range(len(path), 0, -1):
+                    for cand in (
+                        posixpath.join(root, *path[:n]) + ".rs",
+                        posixpath.join(root, *path[:n], "mod.rs"),
+                    ):
+                        if cand in self.files and cand != src:
+                            return [_edge(src, cand, ref, "resolved", provenance)]
+            return [
+                _edge(
+                    src,
+                    None,
+                    ref,
+                    "unresolved",
+                    provenance,
+                    "module path not found in the repository",
+                )
+            ]
+        return [
+            _edge(
+                src, None, ref, "external", provenance, "crate dependency (not in the repository)"
+            )
+        ]
+
+    # ---- Ruby ----------------------------------------------------------------------------
+    def ruby(self, src: str, ref: Ref, provenance: str) -> list[RepoEdgeRecord]:
+        name = ref.raw if ref.raw.endswith(".rb") else ref.raw + ".rb"
+        if ref.note == "require_relative":
+            cand = posixpath.normpath(posixpath.join(posixpath.dirname(src), name))
+            if cand in self.files:
+                return [_edge(src, cand, ref, "resolved", provenance)]
+            return [_edge(src, None, ref, "unresolved", provenance, "file not found")]
+        for cand in (
+            posixpath.join("lib", name),
+            name,
+            posixpath.join(posixpath.dirname(src), name),
+        ):
+            cand = posixpath.normpath(cand)
+            if cand in self.files and cand != src:
+                return [_edge(src, cand, ref, "resolved", provenance)]
+        return [_edge(src, None, ref, "external", provenance, "gem or standard library")]
+
+    # ---- shell ---------------------------------------------------------------------------
+    def shell(self, src: str, ref: Ref, provenance: str) -> list[RepoEdgeRecord]:
+        raw = ref.raw
+        if not raw or "$" in raw or "`" in raw:
+            return [_edge(src, None, ref, "unresolved", provenance, "path computed at runtime")]
+        for cand in (
+            posixpath.normpath(posixpath.join(posixpath.dirname(src), raw)),
+            posixpath.normpath(raw.lstrip("/")),
+        ):
+            if cand in self.files and cand != src and not cand.startswith(".."):
+                return [
+                    _edge(
+                        src,
+                        cand,
+                        ref,
+                        "heuristic",
+                        provenance,
+                        "relative to the script's folder or the repository root; the real base is the working directory at run time",
+                    )
+                ]
+        return [_edge(src, None, ref, "unresolved", provenance, "file not found in the repository")]
+
     def resolve(self, src: str, language: str, ref: Ref, provenance: str) -> list[RepoEdgeRecord]:
+        if language == "go":
+            return self.go(src, ref, provenance)
+        if language == "java":
+            return self.java(src, ref, provenance)
+        if language == "rust":
+            return self.rust(src, ref, provenance)
+        if language == "ruby":
+            return self.ruby(src, ref, provenance)
+        if language == "shell":
+            return self.shell(src, ref, provenance)
         if language == "python":
             return self.python(src, ref, provenance)
         if language in {"javascript", "typescript"}:

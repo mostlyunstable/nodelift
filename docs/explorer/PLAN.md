@@ -148,3 +148,9 @@ analysis lists what it calls and who calls into it. The editor underlines resolv
 Cross-checked on `psf/requests`: `sessions.Session()` in api.py:70 resolves to sessions.py:395; the seven `request(...)` wrappers resolve to api.py:24;
 `session.request(...)` (a call on a local variable) is correctly not resolved.
 **Not done:** a function-level call graph view; call resolution for other languages; type-based dispatch.
+
+## More languages (2026-10-20): implemented
+Go, Java, Rust, Ruby, shell, Markdown, YAML, JSON, SQL added to the analyzer interface (see ADR 0009), each with fixture tests that assert the exact edges,
+symbols and diagnostics, including what is *not* linked (remote actions, computed shell paths, tables created nowhere). Real run on `psf/requests`: files
+analysed went from 39 to 64 of 122 readable files (adds README, YAML, JSON), 394 relations, 0 diagnostics.
+**Not analysed:** C#, PHP, Kotlin, Swift, C/C++ (shown and readable only).

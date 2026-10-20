@@ -337,7 +337,8 @@ def test_import_runs_analysis_and_serves_the_graph(api: TestClient, gh: FakeGitH
     rev = api.post("/api/v1/explorer/imports", json={"url": "github.com/octo/hello"}).json()
     done = wait_analysis(api, rev["id"])
     assert (
-        done["status"] == "ready" and done["analyzed_count"] == 3
+        done["status"] == "ready"
+        and done["analyzed_count"] == 4  # main.py, utils.py, index.html, config.json
     )  # main, utils, html, json? see below
     g = api.get(f"/api/v1/explorer/revisions/{rev['id']}/graph").json()
     pairs = {(e["src"], e["dst"], e["confidence"]) for e in g["edges"]}

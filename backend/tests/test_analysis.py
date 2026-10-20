@@ -256,7 +256,7 @@ def test_html_and_css_references(tmp_path: Path) -> None:
 
 
 def test_unsupported_and_unreadable_files_are_reported_not_analyzed(tmp_path: Path) -> None:
-    root, files = build(tmp_path, {"README.md": "# hi\n", "a.py": "x = 1\n"})
+    root, files = build(tmp_path, {"notes.txt": "hi\n", "a.py": "x = 1\n"})
     files.append(
         RepoFileRecord(
             path="logo.png", language="plaintext", size=5, lines=0, binary=True, stored=False,
@@ -264,7 +264,7 @@ def test_unsupported_and_unreadable_files_are_reported_not_analyzed(tmp_path: Pa
         )
     )  # fmt: skip
     res = analyze_files(root, files)
-    assert res.statuses == {"README.md": "unsupported", "a.py": "analyzed", "logo.png": "skipped"}
+    assert res.statuses == {"notes.txt": "unsupported", "a.py": "analyzed", "logo.png": "skipped"}
 
 
 def test_one_bad_file_does_not_stop_the_run(tmp_path: Path) -> None:
@@ -418,3 +418,177 @@ def test_javascript_calls_resolve_through_named_namespace_and_require_bindings(
         assert line not in got
     inner = refs(run(tmp_path / "x", CALL_JS), "lib/math.js")
     assert any(v[1] == "add" for v in inner.values())
+
+
+# ---- more languages ---------------------------------------------------------------------------
+def kinds(res: AnalysisResult, src: str) -> set[tuple[str | None, str]]:
+    return {(e.dst, e.confidence) for e in res.edges if e.src == src}
+
+
+def test_go_imports_resolve_through_go_mod_and_stdlib_is_external(tmp_path: Path) -> None:
+    res = run(
+        tmp_path,
+        {
+            "go.mod": "module example.com/app\n\ngo 1.22\n",
+            "main.go": 'package main\n\nimport (\n\t"fmt"\n\tu "example.com/app/util"\n\t"github.com/x/y"\n)\n\nfunc Run() {}\n\ntype T struct{}\n\nfunc (t T) Method() {}\n',
+            "util/a.go": "package util\n",
+            "util/b.go": "package util\n",
+            "util/b_test.go": "package util\n",
+        },
+    )
+    got = kinds(res, "main.go")
+    assert ("util/a.go", "resolved") in got and ("util/b.go", "resolved") in got
+    assert not any(
+        d == "util/b_test.go" for d, _ in got
+    )  # test files are not part of the package import
+    notes = {e.raw: e.note for e in res.edges if e.src == "main.go" and e.dst is None}
+    assert notes["fmt"] == "standard library" and "not in the repository" in (
+        notes["github.com/x/y"] or ""
+    )
+    syms = {(s.name, s.kind, s.parent, s.exported) for s in res.symbols if s.path == "main.go"}
+    assert (
+        ("Run", "function", None, True) in syms
+        and ("Method", "method", "T", True) in syms
+        and ("T", "class", None, True) in syms
+    )
+
+
+def test_java_imports_match_package_paths(tmp_path: Path) -> None:
+    res = run(
+        tmp_path,
+        {
+            "src/main/java/a/b/Main.java": "package a.b;\nimport a.c.Helper;\nimport java.util.List;\nimport a.c.*;\npublic class Main { public void run() {} private void x() {} }\n",
+            "src/main/java/a/c/Helper.java": "package a.c;\npublic class Helper {}\n",
+        },
+    )
+    got = kinds(res, "src/main/java/a/b/Main.java")
+    assert ("src/main/java/a/c/Helper.java", "resolved") in got
+    assert any(e.note == "Java standard library" for e in res.edges)
+    syms = {
+        (s.name, s.kind, s.parent, s.exported) for s in res.symbols if s.path.endswith("Main.java")
+    }
+    assert (
+        ("Main", "class", None, True) in syms
+        and ("run", "method", "Main", True) in syms
+        and ("x", "method", "Main", False) in syms
+    )
+
+
+def test_rust_mod_and_crate_paths(tmp_path: Path) -> None:
+    res = run(
+        tmp_path,
+        {
+            "Cargo.toml": "[package]\nname='x'\n",
+            "src/main.rs": "mod util;\nmod missing;\nuse crate::util::tools::go;\nuse std::io;\nuse serde::Serialize;\nfn main() {}\n",
+            "src/util.rs": "pub mod tools;\npub fn helper() {}\n",
+            "src/util/tools.rs": "pub fn go() {}\n",
+        },
+    )
+    got = {(e.raw, e.dst, e.confidence) for e in res.edges if e.src == "src/main.rs"}
+    assert ("util", "src/util.rs", "resolved") in got
+    assert ("missing", None, "unresolved") in got
+    assert ("crate::util::tools::go", "src/util/tools.rs", "resolved") in got
+    assert ("std::io", None, "external") in got and ("serde::Serialize", None, "external") in got
+    assert ("tools", "src/util/tools.rs", "resolved") in {
+        (e.raw, e.dst, e.confidence) for e in res.edges if e.src == "src/util.rs"
+    }
+
+
+def test_ruby_requires(tmp_path: Path) -> None:
+    res = run(
+        tmp_path,
+        {
+            "app.rb": "require_relative 'lib/thing'\nrequire 'json'\nrequire 'helper'\nclass App\n  def go; end\nend\n",
+            "lib/thing.rb": "class Thing; end\n",
+            "lib/helper.rb": "module Helper; end\n",
+        },
+    )
+    got = {(e.raw, e.dst, e.confidence) for e in res.edges if e.src == "app.rb"}
+    assert ("lib/thing", "lib/thing.rb", "resolved") in got
+    assert ("helper", "lib/helper.rb", "resolved") in got and ("json", None, "external") in got
+
+
+def test_shell_source_is_heuristic_about_its_base_folder(tmp_path: Path) -> None:
+    res = run(
+        tmp_path,
+        {
+            "run.sh": 'source ./lib/common.sh\n. missing.sh\nbash scripts/build.sh\nsource "$DIR/x.sh"\nfoo() { echo; }\n',
+            "lib/common.sh": "x=1\n",
+            "scripts/build.sh": "echo\n",
+        },
+    )
+    got = {(e.raw, e.dst, e.confidence) for e in res.edges if e.src == "run.sh"}
+    assert ("./lib/common.sh", "lib/common.sh", "heuristic") in got
+    assert ("scripts/build.sh", "scripts/build.sh", "heuristic") in got
+    assert ("missing.sh", None, "unresolved") in got
+    assert ("$DIR/x.sh", None, "unresolved") in got
+    assert any(s.name == "foo" and s.kind == "function" for s in res.symbols)
+
+
+def test_markdown_links_and_headings(tmp_path: Path) -> None:
+    res = run(
+        tmp_path,
+        {
+            "README.md": "# Title\n\nSee [guide](docs/guide.md#top), ![logo](img/logo.png), [site](https://x.dev), [gone](nope.md).\n\n## Usage\n",
+            "docs/guide.md": "# Guide\n",
+            "img/logo.png": "x",
+        },
+    )
+    got = {(e.raw, e.dst, e.confidence) for e in res.edges if e.src == "README.md"}
+    assert ("docs/guide.md#top", "docs/guide.md", "resolved") in got and (
+        "img/logo.png",
+        "img/logo.png",
+        "resolved",
+    ) in got
+    assert ("https://x.dev", None, "external") in got and ("nope.md", None, "unresolved") in got
+    assert [s.name for s in res.symbols if s.path == "README.md"] == ["Title", "Usage"]
+
+
+def test_yaml_and_json_references(tmp_path: Path) -> None:
+    res = run(
+        tmp_path,
+        {
+            ".github/workflows/ci.yml": "jobs:\n  a:\n    steps:\n      - uses: ./.github/actions/setup\n      - uses: actions/checkout@v4\n      - run: echo\n",
+            ".github/actions/setup/action.yml": "name: setup\n",
+            "package.json": '{\n "name": "x",\n "main": "dist/index.js",\n "scripts": {"a": "b"}\n}',
+            "dist/index.js": "module.exports = 1\n",
+            "schema.json": '{"$ref": "./defs.json#/a"}',
+            "defs.json": "{}",
+            "broken.json": "{not json",
+            "bad.yml": "a: [1, 2\n",
+        },
+    )
+    assert ("./.github/actions/setup", ".github/actions/setup/action.yml", "resolved") in {
+        (e.raw, e.dst, e.confidence) for e in res.edges if e.src == ".github/workflows/ci.yml"
+    }
+    assert not any(
+        e.raw == "actions/checkout@v4" for e in res.edges
+    )  # a remote action is not a file reference
+    assert ("./dist/index.js", "dist/index.js", "resolved") in {
+        (e.raw, e.dst, e.confidence) for e in res.edges if e.src == "package.json"
+    }
+    assert ("./defs.json", "defs.json", "resolved") in {
+        (e.raw, e.dst, e.confidence) for e in res.edges if e.src == "schema.json"
+    }
+    bad = {d.path: d for d in res.diagnostics if d.code == "syntax_error"}
+    assert (
+        bad["broken.json"].severity == "error"
+        and bad["bad.yml"].severity == "error"
+        and bad["bad.yml"].line >= 1
+    )
+
+
+def test_sql_symbols_and_heuristic_table_references(tmp_path: Path) -> None:
+    res = run(
+        tmp_path,
+        {
+            "db/schema.sql": "CREATE TABLE users (id INT);\nCREATE VIEW active AS SELECT * FROM users;\n",
+            "db/report.sql": "SELECT * FROM users JOIN orders ON 1=1;\n",
+        },
+    )
+    syms = {(s.name, s.kind) for s in res.symbols if s.path == "db/schema.sql"}
+    assert ("users", "class") in syms and ("active", "class") in syms
+    got = [(e.dst, e.raw, e.confidence) for e in res.edges if e.src == "db/report.sql"]
+    assert got == [
+        ("db/schema.sql", "users", "heuristic")
+    ]  # `orders` is created nowhere, so no edge is invented

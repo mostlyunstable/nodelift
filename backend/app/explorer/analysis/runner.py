@@ -73,7 +73,18 @@ def analyze_files(
     """Analyse every readable file of a supported language. Reads text only; executes nothing."""
     analyzers = analyzers if analyzers is not None else default_analyzers()
     paths = {f.path for f in files}
-    resolver = Resolver(paths)
+    go_modules: dict[str, str] = {}
+    for p in paths:
+        if p.endswith("go.mod"):
+            try:
+                for line in (root.resolve() / p).read_text(encoding="utf-8").splitlines():
+                    if line.startswith("module "):
+                        go_modules[posixpath.dirname(p)] = line.split(None, 1)[1].strip().strip('"')
+                        break
+            except OSError:
+                pass
+    resolver = Resolver(paths, go_modules)
+    table_refs: list[tuple[str, int, str]] = []
     res = AnalysisResult()
     deadline = time.monotonic() + budget_seconds
     lang_of = {f.path: f.language for f in files}
@@ -116,6 +127,9 @@ def analyze_files(
         res.diagnostics.extend(result.diagnostics)
         seen: set[tuple[str, str | None, str, int, str]] = set()
         for ref in result.refs:
+            if ref.kind == "table":  # SQL: matched to CREATE statements once every file is read
+                table_refs.append((f.path, ref.line, ref.raw))
+                continue
             for edge in resolver.resolve(f.path, f.language, ref, an.id):
                 key = (edge.src, edge.dst, edge.kind, edge.line, edge.raw)
                 if key in seen:
@@ -135,6 +149,19 @@ def analyze_files(
                         )
                     )  # fmt: skip
 
+    creators: dict[str, list[str]] = {}
+    for sy in res.symbols:
+        if lang_of.get(sy.path) == "sql" and sy.kind == "class":
+            creators.setdefault(sy.name.lower(), []).append(sy.path)
+    for tpath, tline, tname in table_refs:
+        owners = [o for o in creators.get(tname.lower(), []) if o != tpath]
+        if len(owners) == 1:
+            res.edges.append(
+                RepoEdgeRecord(
+                    src=tpath, dst=owners[0], kind="reference", confidence="heuristic", line=tline, raw=tname,
+                    provenance="sqlglot", note="table name matched to its CREATE statement; no schema or search path is considered",
+                )
+            )  # fmt: skip
     res.references = resolve_calls(analyses, lang_of, providers, resolver)
 
     # name-based test association, only where no import already links the pair
