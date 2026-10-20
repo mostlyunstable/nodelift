@@ -143,6 +143,10 @@ class RepoRevisionRow(Base):
     skipped_count: Mapped[int] = mapped_column(Integer, default=0)
     total_bytes: Mapped[int] = mapped_column(Integer, default=0)
     analyzed_count: Mapped[int] = mapped_column(Integer, default=0)
+    analysis_status: Mapped[str] = mapped_column(String, default="not_analyzed")
+    analysis_error: Mapped[str | None] = mapped_column(String, nullable=True)
+    edge_count: Mapped[int] = mapped_column(Integer, default=0)
+    diagnostic_count: Mapped[int] = mapped_column(Integer, default=0)
     error_code: Mapped[str | None] = mapped_column(String, nullable=True)
     error_message: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
@@ -164,3 +168,49 @@ class RepoFileRow(Base):
     stored: Mapped[bool] = mapped_column(Boolean)
     skip_reason: Mapped[str | None] = mapped_column(String, nullable=True)
     analysis_status: Mapped[str] = mapped_column(String, default="not_analyzed")
+
+
+class RepoEdgeRow(Base):
+    __tablename__ = "repo_edges"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    revision_id: Mapped[str] = mapped_column(
+        ForeignKey("repo_revisions.id", ondelete="CASCADE"), index=True
+    )
+    src: Mapped[str] = mapped_column(String, index=True)
+    dst: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    kind: Mapped[str] = mapped_column(String)
+    confidence: Mapped[str] = mapped_column(String)
+    line: Mapped[int] = mapped_column(Integer)
+    raw: Mapped[str] = mapped_column(String)
+    provenance: Mapped[str] = mapped_column(String)
+    note: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class RepoSymbolRow(Base):
+    __tablename__ = "repo_symbols"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    revision_id: Mapped[str] = mapped_column(
+        ForeignKey("repo_revisions.id", ondelete="CASCADE"), index=True
+    )
+    path: Mapped[str] = mapped_column(String, index=True)
+    name: Mapped[str] = mapped_column(String)
+    kind: Mapped[str] = mapped_column(String)
+    line: Mapped[int] = mapped_column(Integer)
+    end_line: Mapped[int] = mapped_column(Integer)
+    parent: Mapped[str | None] = mapped_column(String, nullable=True)
+    exported: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class RepoDiagnosticRow(Base):
+    __tablename__ = "repo_diagnostics"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    revision_id: Mapped[str] = mapped_column(
+        ForeignKey("repo_revisions.id", ondelete="CASCADE"), index=True
+    )
+    path: Mapped[str] = mapped_column(String, index=True)
+    line: Mapped[int] = mapped_column(Integer)
+    column: Mapped[int] = mapped_column(Integer)
+    severity: Mapped[str] = mapped_column(String)
+    code: Mapped[str] = mapped_column(String)
+    message: Mapped[str] = mapped_column(String)
+    source: Mapped[str] = mapped_column(String)

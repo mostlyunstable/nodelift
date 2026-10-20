@@ -322,3 +322,50 @@ def test_import_never_executes_repository_code(
     rev = api.post("/api/v1/explorer/imports", json={"url": "github.com/octo/hello"}).json()
     wait_ready(api, rev["id"])
     assert not marker.exists()
+
+
+def wait_analysis(c: TestClient, rid: str, want: str = "done") -> dict:
+    for _ in range(200):
+        r = c.get(f"/api/v1/explorer/revisions/{rid}").json()
+        if r["analysis_status"] == want:
+            return r
+        time.sleep(0.05)
+    raise AssertionError(f"analysis never reached {want}: {r}")
+
+
+def test_import_runs_analysis_and_serves_the_graph(api: TestClient, gh: FakeGitHub) -> None:
+    rev = api.post("/api/v1/explorer/imports", json={"url": "github.com/octo/hello"}).json()
+    done = wait_analysis(api, rev["id"])
+    assert (
+        done["status"] == "ready" and done["analyzed_count"] == 3
+    )  # main, utils, html, json? see below
+    g = api.get(f"/api/v1/explorer/revisions/{rev['id']}/graph").json()
+    pairs = {(e["src"], e["dst"], e["confidence"]) for e in g["edges"]}
+    assert ("main.py", "utils.py", "resolved") in pairs
+    assert all(e["dst"] is not None for e in g["edges"])  # only file-to-file edges are drawn
+    a = api.get(
+        f"/api/v1/explorer/revisions/{rev['id']}/analysis", params={"path": "utils.py"}
+    ).json()
+    assert a["status"] == "analyzed"
+    assert [d["src"] for d in a["dependents"]] == ["main.py"]
+    m = api.get(
+        f"/api/v1/explorer/revisions/{rev['id']}/analysis", params={"path": "main.py"}
+    ).json()
+    assert {(i["raw"], i["confidence"]) for i in m["imports"]} == {("utils", "resolved")}
+    assert (
+        api.get(
+            f"/api/v1/explorer/revisions/{rev['id']}/analysis", params={"path": "nope.py"}
+        ).status_code
+        == 404
+    )
+
+
+def test_reanalysis_replaces_old_results(api: TestClient) -> None:
+    rev = api.post("/api/v1/explorer/imports", json={"url": "github.com/octo/hello"}).json()
+    wait_analysis(api, rev["id"])
+    before = api.get(f"/api/v1/explorer/revisions/{rev['id']}/graph").json()["edges"]
+    r = api.post(f"/api/v1/explorer/revisions/{rev['id']}/analyze")
+    assert r.status_code == 202
+    wait_analysis(api, rev["id"])
+    after = api.get(f"/api/v1/explorer/revisions/{rev['id']}/graph").json()["edges"]
+    assert before == after  # idempotent, not duplicated

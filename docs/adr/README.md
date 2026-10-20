@@ -13,3 +13,4 @@ Newest decisions go at the end. Do not rewrite history: supersede an old ADR wit
 | [0006](0006-local-api-security.md) | Local API: Host/Origin checks, per-launch token, CORS allowlist |
 | [0007](0007-branching-semantics.md) | Branching by output ports; what runs, what is skipped, what a merge receives |
 | [0008](0008-secrets.md) | Credentials in the system keychain, referenced by name, masked everywhere |
+| [0009](0009-static-dependency-analysis.md) | Static dependency analysis with explicit confidence |

@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     explorer_max_files: int = 20_000
     explorer_max_file_kb: int = 1024
     explorer_max_total_mb: int = 300
+    explorer_analysis_seconds: int = 120
+    explorer_max_graph_edges: int = 20_000
     shutdown_endpoint: bool = False  # desktop shell stops the backend through this
 
     @computed_field  # type: ignore[prop-decorator]

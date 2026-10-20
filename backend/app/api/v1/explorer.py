@@ -5,7 +5,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from app.domain.records import RepoFileRecord, RepoRevisionRecord
+from app.domain.records import (
+    FileAnalysisRecord,
+    RepoFileRecord,
+    RepoGraphRecord,
+    RepoRevisionRecord,
+)
 from app.services.container import explorer_service
 from app.services.explorer_service import ExplorerService, FileContent
 
@@ -44,6 +49,24 @@ def get_revision(revision_id: str, svc: Svc) -> RepoRevisionRecord:
 @router.post("/revisions/{revision_id}/cancel", response_model=RepoRevisionRecord)
 def cancel_import(revision_id: str, svc: Svc) -> RepoRevisionRecord:
     return svc.cancel(revision_id)
+
+
+@router.post("/revisions/{revision_id}/analyze", response_model=RepoRevisionRecord, status_code=202)
+async def analyze(revision_id: str, svc: Svc) -> RepoRevisionRecord:
+    # async so the background task is created on the server's event loop, not a worker thread
+    return svc.analyze(revision_id)
+
+
+@router.get("/revisions/{revision_id}/graph", response_model=RepoGraphRecord)
+def graph(revision_id: str, svc: Svc) -> RepoGraphRecord:
+    return svc.graph(revision_id)
+
+
+@router.get("/revisions/{revision_id}/analysis", response_model=FileAnalysisRecord)
+def file_analysis(
+    revision_id: str, svc: Svc, path: Annotated[str, Query(max_length=400)]
+) -> FileAnalysisRecord:
+    return svc.file_analysis(revision_id, path)
 
 
 @router.delete("/revisions/{revision_id}", status_code=204)

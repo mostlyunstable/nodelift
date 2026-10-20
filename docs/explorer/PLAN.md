@@ -92,3 +92,17 @@ Not done in R3: graph undo/redo, context menus, edge validation (nothing can be 
 file tree, custom edge labels; Build-mode node visuals were not restyled.
 Verified in the browser on `psf/requests@611c616`: expand, reveal-by-search, source dock; Build "Debug me" still runs
 (succeeded, succeeded, failed, skipped as designed).
+
+## R4 status (2026-10-20): implemented
+`app/explorer/analysis/`: analyzer adapter interface; Python (`ast`: imports incl. relative, `importlib` literals, optional/type-checking
+notes, functions/classes/methods, syntax errors), JavaScript/TypeScript (tree-sitter: import, require, dynamic `import()`, re-exports,
+symbols, parser errors as warnings), HTML (`html.parser`: script/link/img/...), CSS (tree-sitter `@import` + lexed `url()`). One resolver:
+sys.path-like search for Python (importer folder, package root, repo root, `src/`, `lib/`), extension/index/`.js→.ts` rules for JS.
+Relations carry confidence/provenance; external and unresolved ones are stored but not drawn. Name-based test association is
+`heuristic`. Migration 0007 (`repo_edges`, `repo_symbols`, `repo_diagnostics`, revision analysis columns); API `POST .../analyze`,
+`GET .../graph`, `GET .../analysis?path=`. Frontend: dependency edges with arrowheads, counts, folder aggregation, heuristic style,
+legend, edge detail, ⚠ problem badges rolled up to folders.
+**Cross-checked** on `psf/requests@611c616`: sessions.py's 12 relative imports match an independent `ast` pass line for line;
+39 of 122 text files analysed (37 Python + 1 HTML + 1 CSS), 342 relations (131 file-to-file), 0 diagnostics.
+**Not done:** call relationships (symbols are extracted but calls are not linked), YAML/JSON/SQL/shell references, tsconfig/webpack aliases,
+runtime tracing. The bundled desktop runtime has not been rebuilt with the new native tree-sitter wheels (scheduled for R7).

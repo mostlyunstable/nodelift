@@ -1,6 +1,14 @@
 import { create } from 'zustand'
 import { ancestorDirs } from '../explorer/graph'
-import { api, ApiError, type RepoFile, type RepoFileContent, type RepoRevision } from '../api/client'
+import {
+  api,
+  ApiError,
+  type RepoDiagnostic,
+  type RepoEdge,
+  type RepoFile,
+  type RepoFileContent,
+  type RepoRevision,
+} from '../api/client'
 
 export type Mode = 'build' | 'explorer'
 export type ExplorerTab = 'graph' | 'code'
@@ -15,6 +23,11 @@ interface ExplorerState {
   revision: RepoRevision | null
   revisions: RepoRevision[]
   files: RepoFile[]
+  edges: RepoEdge[]
+  diagnostics: RepoDiagnostic[]
+  graphTruncated: boolean
+  showDeps: boolean
+  setShowDeps: (v: boolean) => void
   selectedPath: string | null
   tab: ExplorerTab
   setTab: (t: ExplorerTab) => void
@@ -62,13 +75,33 @@ export const useExplorer = create<ExplorerState>((set, get) => {
         set({ revision: rev })
         if (rev.status === 'importing') {
           pollTimer = setTimeout(() => void tick(), 400)
-        } else if (rev.status === 'ready') {
-          const files = await api.explorerFiles(id)
-          if (mine === generation) set({ files })
-          void get().loadRevisions()
-        } else {
-          void get().loadRevisions()
+          return
         }
+        if (rev.status !== 'ready') {
+          void get().loadRevisions()
+          return
+        }
+        if (get().files.length === 0) {
+          const files = await api.explorerFiles(id)
+          if (mine !== generation) return
+          set({ files })
+        }
+        if (rev.analysis_status === 'not_analyzed') {
+          // imported before analysis existed (or analysis was never started): static analysis only reads files
+          await api.explorerAnalyze(id)
+          if (mine === generation) pollTimer = setTimeout(() => void tick(), 400)
+          return
+        }
+        if (rev.analysis_status === 'analyzing') {
+          pollTimer = setTimeout(() => void tick(), 500)
+          return
+        }
+        if (rev.analysis_status === 'done' || rev.analysis_status === 'partial') {
+          const g = await api.explorerGraph(id)
+          if (mine === generation)
+            set({ edges: g.edges, diagnostics: g.diagnostics, graphTruncated: g.truncated })
+        }
+        void get().loadRevisions()
       } catch (e) {
         if (mine === generation) set({ error: message(e) })
       }
@@ -84,6 +117,11 @@ export const useExplorer = create<ExplorerState>((set, get) => {
     revision: null,
     revisions: [],
     files: [],
+    edges: [],
+    diagnostics: [],
+    graphTruncated: false,
+    showDeps: true,
+    setShowDeps: (showDeps) => set({ showDeps }),
     selectedPath: null,
     tab: 'graph',
     setTab: (tab) => set({ tab }),
@@ -137,6 +175,9 @@ export const useExplorer = create<ExplorerState>((set, get) => {
         error: null,
         revision: null,
         files: [],
+        edges: [],
+        diagnostics: [],
+        graphTruncated: false,
         selectedPath: null,
         file: null,
         expanded: ROOT_OPEN(),
@@ -157,6 +198,9 @@ export const useExplorer = create<ExplorerState>((set, get) => {
       set({
         error: null,
         files: [],
+        edges: [],
+        diagnostics: [],
+        graphTruncated: false,
         selectedPath: null,
         file: null,
         fileError: null,
@@ -198,6 +242,9 @@ export const useExplorer = create<ExplorerState>((set, get) => {
       set({
         revision: null,
         files: [],
+        edges: [],
+        diagnostics: [],
+        graphTruncated: false,
         selectedPath: null,
         file: null,
         fileError: null,

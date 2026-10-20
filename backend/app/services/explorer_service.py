@@ -17,8 +17,14 @@ from pydantic import BaseModel
 
 from app.config import Settings
 from app.domain.errors import AppError
-from app.domain.records import RepoFileRecord, RepoRevisionRecord
+from app.domain.records import (
+    FileAnalysisRecord,
+    RepoFileRecord,
+    RepoGraphRecord,
+    RepoRevisionRecord,
+)
 from app.domain.repositories import RepoRepository
+from app.explorer.analysis.runner import analyze_files
 from app.explorer.archive import Cancelled, ExtractedFile, Limits, extract_tarball
 from app.explorer.github import GitHubClient
 from app.explorer.urls import InvalidRepoUrl, parse_github_url
@@ -69,6 +75,8 @@ class ExplorerService:
             max_total_bytes=settings.explorer_max_total_mb * 1024 * 1024,
         )
         self.max_download = settings.explorer_max_download_mb * 1024 * 1024
+        self.analysis_seconds = settings.explorer_analysis_seconds
+        self.max_graph_edges = settings.explorer_max_graph_edges
 
     # -- paths ------------------------------------------------------------------------------
     def _dir(self, revision_id: str) -> Path:
@@ -142,6 +150,7 @@ class ExplorerService:
                     lambda n: self._progress(rid, n),
                 )
             self._finish(rid, files)
+            await self._analyze(rid, cancel)
         except Cancelled:
             self.repo.update_revision(rid, status="cancelled", phase="Cancelled")
             self._remove_dir(rid)
@@ -179,6 +188,56 @@ class ExplorerService:
             binary_count=sum(1 for f in files if f.binary),
             skipped_count=sum(1 for f in files if f.skip_reason == "too_large"),
         )  # fmt: skip
+
+    async def _analyze(self, rid: str, cancel: threading.Event) -> None:
+        """Static analysis of the cached files. Failure here never makes the import itself fail."""
+        self.repo.update_revision(rid, analysis_status="analyzing", analysis_error=None)
+        try:
+            files = self.repo.list_files(rid)
+            res = await asyncio.to_thread(
+                analyze_files, self._dir(rid) / "files", files, cancel, float(self.analysis_seconds)
+            )
+            self.repo.replace_analysis(
+                rid, res.edges, res.symbols, res.diagnostics, res.statuses,
+                "partial" if res.partial else "done",
+            )  # fmt: skip
+        except Cancelled:
+            self.repo.update_revision(rid, analysis_status="cancelled")
+        except Exception:
+            log.exception("repository analysis failed")
+            self.repo.update_revision(
+                rid, analysis_status="failed",
+                analysis_error="The analysis failed unexpectedly. See the application log.",
+            )  # fmt: skip
+
+    def analyze(self, revision_id: str) -> RepoRevisionRecord:
+        """(Re)run analysis in the background, e.g. for a revision imported before analysis."""
+        rev = self._ready(revision_id)
+        if rev.analysis_status == "analyzing" or revision_id in self.jobs.tasks:
+            return rev
+        cancel = threading.Event()
+        self.jobs.cancels[revision_id] = cancel
+        self.repo.update_revision(revision_id, analysis_status="analyzing", analysis_error=None)
+        task = asyncio.create_task(self._analyze(revision_id, cancel))
+        self.jobs.tasks[revision_id] = task
+        task.add_done_callback(lambda _t, rid=revision_id: self._forget(rid))  # type: ignore[misc]
+        return self.get(revision_id)
+
+    def graph(self, revision_id: str) -> RepoGraphRecord:
+        self._ready(revision_id)
+        edges, truncated = self.repo.list_internal_edges(revision_id, self.max_graph_edges)
+        return RepoGraphRecord(
+            edges=edges,
+            truncated=truncated,
+            diagnostics=self.repo.list_diagnostics(revision_id, 5000),
+        )
+
+    def file_analysis(self, revision_id: str, path: str) -> FileAnalysisRecord:
+        self._ready(revision_id)
+        out = self.repo.file_analysis(revision_id, path)
+        if out is None:
+            raise AppError(404, "file_not_found", "That file is not in this revision")
+        return out
 
     def cancel(self, revision_id: str) -> RepoRevisionRecord:
         rev = self.get(revision_id)

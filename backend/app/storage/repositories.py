@@ -7,8 +7,12 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.domain.ports import LogLine, NodeError
 from app.domain.records import (
     CredentialRecord,
+    FileAnalysisRecord,
+    RepoDiagnosticRecord,
+    RepoEdgeRecord,
     RepoFileRecord,
     RepoRevisionRecord,
+    RepoSymbolRecord,
     RunRecord,
     RunSummary,
     VersionRecord,
@@ -22,8 +26,11 @@ from app.domain.workflow import WorkflowDefinition
 from app.storage.models import (
     CredentialRow,
     NodeExecutionRow,
+    RepoDiagnosticRow,
+    RepoEdgeRow,
     RepoFileRow,
     RepoRevisionRow,
+    RepoSymbolRow,
     RunEventRow,
     RunRow,
     WorkflowRow,
@@ -390,7 +397,9 @@ class SqlRepoRepository:
             commit_sha=r.commit_sha, description=r.description, status=r.status, phase=r.phase,
             file_count=r.file_count, text_count=r.text_count, binary_count=r.binary_count,
             skipped_count=r.skipped_count, total_bytes=r.total_bytes,
-            analyzed_count=r.analyzed_count, error_code=r.error_code,
+            analyzed_count=r.analyzed_count, analysis_status=r.analysis_status,
+            analysis_error=r.analysis_error, edge_count=r.edge_count,
+            diagnostic_count=r.diagnostic_count, error_code=r.error_code,
             error_message=r.error_message, created_at=r.created_at, updated_at=r.updated_at,
         )  # fmt: skip
 
@@ -464,7 +473,8 @@ class SqlRepoRepository:
 
     def delete_revision(self, revision_id: str) -> bool:
         with self.sf.begin() as s:
-            s.execute(delete(RepoFileRow).where(RepoFileRow.revision_id == revision_id))
+            for table in (RepoEdgeRow, RepoSymbolRow, RepoDiagnosticRow, RepoFileRow):
+                s.execute(delete(table).where(table.revision_id == revision_id))
             row = s.get(RepoRevisionRow, revision_id)
             if row is None:
                 return False
@@ -483,4 +493,121 @@ class SqlRepoRepository:
                 r.error_message = "Nodecraft was closed before the import finished."
                 r.phase = "Failed"
                 r.updated_at = utcnow()
+            for r in s.scalars(
+                select(RepoRevisionRow).where(RepoRevisionRow.analysis_status == "analyzing")
+            ):
+                r.analysis_status = "failed"
+                r.analysis_error = "Nodecraft was closed before the analysis finished."
+                r.updated_at = utcnow()
             return len(rows)
+
+    # -- analysis ---------------------------------------------------------------------------
+    def replace_analysis(
+        self,
+        revision_id: str,
+        edges: list[RepoEdgeRecord],
+        symbols: list[RepoSymbolRecord],
+        diagnostics: list[RepoDiagnosticRecord],
+        statuses: dict[str, str],
+        status: str,
+    ) -> None:
+        with self.sf.begin() as s:
+            for table in (RepoEdgeRow, RepoSymbolRow, RepoDiagnosticRow):
+                s.execute(delete(table).where(table.revision_id == revision_id))
+            s.add_all(RepoEdgeRow(revision_id=revision_id, **e.model_dump()) for e in edges)
+            s.add_all(RepoSymbolRow(revision_id=revision_id, **x.model_dump()) for x in symbols)
+            s.add_all(
+                RepoDiagnosticRow(revision_id=revision_id, **d.model_dump()) for d in diagnostics
+            )
+            for f in s.scalars(select(RepoFileRow).where(RepoFileRow.revision_id == revision_id)):
+                f.analysis_status = statuses.get(f.path, "not_analyzed")
+            rev = s.get(RepoRevisionRow, revision_id)
+            if rev is not None:
+                rev.analysis_status = status
+                rev.analysis_error = None
+                rev.analyzed_count = sum(1 for v in statuses.values() if v == "analyzed")
+                rev.edge_count = len(edges)
+                rev.diagnostic_count = len(diagnostics)
+                rev.updated_at = utcnow()
+
+    @staticmethod
+    def _edge(r: RepoEdgeRow) -> RepoEdgeRecord:
+        return RepoEdgeRecord(
+            src=r.src, dst=r.dst, kind=r.kind, confidence=r.confidence, line=r.line, raw=r.raw,
+            provenance=r.provenance, note=r.note,
+        )  # fmt: skip
+
+    @staticmethod
+    def _diag(r: RepoDiagnosticRow) -> RepoDiagnosticRecord:
+        return RepoDiagnosticRecord(
+            path=r.path, line=r.line, column=r.column, severity=r.severity, code=r.code,
+            message=r.message, source=r.source,
+        )  # fmt: skip
+
+    def list_internal_edges(
+        self, revision_id: str, limit: int
+    ) -> tuple[list[RepoEdgeRecord], bool]:
+        with self.sf() as s:
+            rows = list(
+                s.scalars(
+                    select(RepoEdgeRow)
+                    .where(RepoEdgeRow.revision_id == revision_id, RepoEdgeRow.dst.is_not(None))
+                    .order_by(RepoEdgeRow.id)
+                    .limit(limit + 1)
+                )
+            )
+            return [self._edge(r) for r in rows[:limit]], len(rows) > limit
+
+    def list_diagnostics(self, revision_id: str, limit: int) -> list[RepoDiagnosticRecord]:
+        with self.sf() as s:
+            rows = s.scalars(
+                select(RepoDiagnosticRow)
+                .where(RepoDiagnosticRow.revision_id == revision_id)
+                .order_by(RepoDiagnosticRow.path, RepoDiagnosticRow.line)
+                .limit(limit)
+            )
+            return [self._diag(r) for r in rows]
+
+    def file_analysis(self, revision_id: str, path: str) -> FileAnalysisRecord | None:
+        with self.sf() as s:
+            f = s.scalars(
+                select(RepoFileRow).where(
+                    RepoFileRow.revision_id == revision_id, RepoFileRow.path == path
+                )
+            ).first()
+            if f is None:
+                return None
+            syms = s.scalars(
+                select(RepoSymbolRow)
+                .where(RepoSymbolRow.revision_id == revision_id, RepoSymbolRow.path == path)
+                .order_by(RepoSymbolRow.line)
+            )
+            out = s.scalars(
+                select(RepoEdgeRow)
+                .where(RepoEdgeRow.revision_id == revision_id, RepoEdgeRow.src == path)
+                .order_by(RepoEdgeRow.line)
+            )
+            inc = s.scalars(
+                select(RepoEdgeRow)
+                .where(RepoEdgeRow.revision_id == revision_id, RepoEdgeRow.dst == path)
+                .order_by(RepoEdgeRow.src, RepoEdgeRow.line)
+            )
+            diags = s.scalars(
+                select(RepoDiagnosticRow)
+                .where(RepoDiagnosticRow.revision_id == revision_id, RepoDiagnosticRow.path == path)
+                .order_by(RepoDiagnosticRow.line)
+            )
+            return FileAnalysisRecord(
+                path=path,
+                status=f.analysis_status,
+                symbols=[
+                    RepoSymbolRecord(
+                        path=x.path, name=x.name, kind=x.kind, line=x.line, end_line=x.end_line,
+                        parent=x.parent, exported=x.exported,
+                    )
+                    for x in syms
+                ],
+                imports=[self._edge(r) for r in out],
+                dependents=[self._edge(r) for r in inc],
+                diagnostics=[self._diag(r) for r in diags],
+            )  # fmt: skip

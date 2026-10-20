@@ -30,6 +30,10 @@ const rev = (over: Partial<RepoRevision> = {}): RepoRevision => ({
   skipped_count: 0,
   total_bytes: 100,
   analyzed_count: 0,
+  analysis_status: 'done',
+  analysis_error: null,
+  edge_count: 0,
+  diagnostic_count: 0,
   error_code: null,
   error_message: null,
   created_at: '2026-01-01T00:00:00Z',
@@ -160,7 +164,7 @@ describe('Repository Explorer', () => {
       expect(screen.getByLabelText('Expand src')).toBeInTheDocument()
       expect(screen.queryByText('app.py', { selector: '.xn-name' })).not.toBeInTheDocument()
       expect(screen.getByText(/Folder contains item/)).toBeInTheDocument()
-      expect(screen.getByText(/Dependency edges appear once analysis is available/)).toBeInTheDocument()
+      expect(screen.getByText(/No dependencies between the visible nodes/)).toBeInTheDocument()
     })
 
     it('expands a folder on demand', () => {

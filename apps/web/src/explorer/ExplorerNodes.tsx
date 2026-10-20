@@ -32,6 +32,15 @@ export function FileNode({ data, selected }: NodeProps<ExplorerNode>) {
       </div>
       <div className="xn-meta">
         {data.note ? data.note : `${data.language} · ${data.lines} lines`} · {formatBytes(data.size)}
+        {data.problems > 0 && (
+          <span
+            className="xn-problems"
+            title={`${data.problems} problem${data.problems === 1 ? '' : 's'} found by analysis`}
+          >
+            {' '}
+            ⚠ {data.problems}
+          </span>
+        )}
       </div>
       <Handle type="source" position={Position.Right} isConnectable={false} />
     </div>
@@ -56,6 +65,11 @@ export function DirNode({ data }: NodeProps<ExplorerNode>) {
           {data.expanded ? '▾' : '▸'}
         </button>
         <span className="xn-name">{data.name}</span>
+        {data.problems > 0 && (
+          <span className="xn-problems" title={`${data.problems} problems found by analysis inside`}>
+            ⚠ {data.problems}
+          </span>
+        )}
         <span className="xn-count">{data.count}</span>
       </div>
       <Handle type="source" position={Position.Right} isConnectable={false} />

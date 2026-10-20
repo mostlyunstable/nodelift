@@ -4,8 +4,12 @@ from typing import Any, Protocol
 
 from app.domain.records import (
     CredentialRecord,
+    FileAnalysisRecord,
+    RepoDiagnosticRecord,
+    RepoEdgeRecord,
     RepoFileRecord,
     RepoRevisionRecord,
+    RepoSymbolRecord,
     RunRecord,
     RunSummary,
     VersionRecord,
@@ -64,6 +68,20 @@ class RepoRepository(Protocol):
     def get_file(self, revision_id: str, path: str) -> RepoFileRecord | None: ...
     def delete_revision(self, revision_id: str) -> bool: ...
     def fail_stale_imports(self) -> int: ...
+    def replace_analysis(
+        self,
+        revision_id: str,
+        edges: list[RepoEdgeRecord],
+        symbols: list[RepoSymbolRecord],
+        diagnostics: list[RepoDiagnosticRecord],
+        statuses: dict[str, str],
+        status: str,
+    ) -> None: ...
+    def list_internal_edges(
+        self, revision_id: str, limit: int
+    ) -> tuple[list[RepoEdgeRecord], bool]: ...
+    def list_diagnostics(self, revision_id: str, limit: int) -> list[RepoDiagnosticRecord]: ...
+    def file_analysis(self, revision_id: str, path: str) -> FileAnalysisRecord | None: ...
 
 
 class CredentialRepository(Protocol):

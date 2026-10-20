@@ -132,6 +132,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/explorer/revisions/{revision_id}/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** File Analysis */
+        get: operations["file_analysis_api_v1_explorer_revisions__revision_id__analysis_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions/{revision_id}/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Analyze */
+        post: operations["analyze_api_v1_explorer_revisions__revision_id__analyze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/explorer/revisions/{revision_id}/cancel": {
         parameters: {
             query?: never;
@@ -175,6 +209,23 @@ export interface paths {
         };
         /** List Files */
         get: operations["list_files_api_v1_explorer_revisions__revision_id__files_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions/{revision_id}/graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Graph */
+        get: operations["graph_api_v1_explorer_revisions__revision_id__graph_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -691,6 +742,21 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** FileAnalysisRecord */
+        FileAnalysisRecord: {
+            /** Dependents */
+            dependents: components["schemas"]["RepoEdgeRecord"][];
+            /** Diagnostics */
+            diagnostics: components["schemas"]["RepoDiagnosticRecord"][];
+            /** Imports */
+            imports: components["schemas"]["RepoEdgeRecord"][];
+            /** Path */
+            path: string;
+            /** Status */
+            status: string;
+            /** Symbols */
+            symbols: components["schemas"]["RepoSymbolRecord"][];
+        };
         /** FileContent */
         FileContent: {
             /** Binary */
@@ -921,6 +987,45 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** RepoDiagnosticRecord */
+        RepoDiagnosticRecord: {
+            /** Code */
+            code: string;
+            /** Column */
+            column: number;
+            /** Line */
+            line: number;
+            /** Message */
+            message: string;
+            /** Path */
+            path: string;
+            /** Severity */
+            severity: string;
+            /** Source */
+            source: string;
+        };
+        /**
+         * RepoEdgeRecord
+         * @description A relationship found by static analysis, with how sure we are and who says so.
+         */
+        RepoEdgeRecord: {
+            /** Confidence */
+            confidence: string;
+            /** Dst */
+            dst: string | null;
+            /** Kind */
+            kind: string;
+            /** Line */
+            line: number;
+            /** Note */
+            note?: string | null;
+            /** Provenance */
+            provenance: string;
+            /** Raw */
+            raw: string;
+            /** Src */
+            src: string;
+        };
         /** RepoFileRecord */
         RepoFileRecord: {
             /** Analysis Status */
@@ -940,11 +1045,24 @@ export interface components {
             /** Stored */
             stored: boolean;
         };
+        /** RepoGraphRecord */
+        RepoGraphRecord: {
+            /** Diagnostics */
+            diagnostics: components["schemas"]["RepoDiagnosticRecord"][];
+            /** Edges */
+            edges: components["schemas"]["RepoEdgeRecord"][];
+            /** Truncated */
+            truncated: boolean;
+        };
         /**
          * RepoRevisionRecord
          * @description One repository at one commit. Graphs and files always belong to exactly one revision.
          */
         RepoRevisionRecord: {
+            /** Analysis Error */
+            analysis_error: string | null;
+            /** Analysis Status */
+            analysis_status: string;
             /** Analyzed Count */
             analyzed_count: number;
             /** Binary Count */
@@ -962,6 +1080,10 @@ export interface components {
             default_branch: string;
             /** Description */
             description: string;
+            /** Diagnostic Count */
+            diagnostic_count: number;
+            /** Edge Count */
+            edge_count: number;
             /** Error Code */
             error_code: string | null;
             /** Error Message */
@@ -996,6 +1118,26 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** RepoSymbolRecord */
+        RepoSymbolRecord: {
+            /** End Line */
+            end_line: number;
+            /**
+             * Exported
+             * @default true
+             */
+            exported: boolean;
+            /** Kind */
+            kind: string;
+            /** Line */
+            line: number;
+            /** Name */
+            name: string;
+            /** Parent */
+            parent?: string | null;
+            /** Path */
+            path: string;
         };
         /** ResumeRun */
         ResumeRun: {
@@ -1555,6 +1697,70 @@ export interface operations {
             };
         };
     };
+    file_analysis_api_v1_explorer_revisions__revision_id__analysis_get: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileAnalysisRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    analyze_api_v1_explorer_revisions__revision_id__analyze_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepoRevisionRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     cancel_import_api_v1_explorer_revisions__revision_id__cancel_post: {
         parameters: {
             query?: never;
@@ -1637,6 +1843,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RepoFileRecord"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    graph_api_v1_explorer_revisions__revision_id__graph_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepoGraphRecord"];
                 };
             };
             /** @description Validation Error */

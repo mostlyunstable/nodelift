@@ -194,6 +194,56 @@
         "title": "ExampleInfo",
         "type": "object"
       },
+      "FileAnalysisRecord": {
+        "properties": {
+          "dependents": {
+            "items": {
+              "$ref": "#/components/schemas/RepoEdgeRecord"
+            },
+            "title": "Dependents",
+            "type": "array"
+          },
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/RepoDiagnosticRecord"
+            },
+            "title": "Diagnostics",
+            "type": "array"
+          },
+          "imports": {
+            "items": {
+              "$ref": "#/components/schemas/RepoEdgeRecord"
+            },
+            "title": "Imports",
+            "type": "array"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "symbols": {
+            "items": {
+              "$ref": "#/components/schemas/RepoSymbolRecord"
+            },
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "path",
+          "status",
+          "symbols",
+          "imports",
+          "dependents",
+          "diagnostics"
+        ],
+        "title": "FileAnalysisRecord",
+        "type": "object"
+      },
       "FileContent": {
         "properties": {
           "binary": {
@@ -711,6 +761,111 @@
         "title": "Port",
         "type": "object"
       },
+      "RepoDiagnosticRecord": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "column": {
+            "title": "Column",
+            "type": "integer"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "line",
+          "column",
+          "severity",
+          "code",
+          "message",
+          "source"
+        ],
+        "title": "RepoDiagnosticRecord",
+        "type": "object"
+      },
+      "RepoEdgeRecord": {
+        "description": "A relationship found by static analysis, with how sure we are and who says so.",
+        "properties": {
+          "confidence": {
+            "title": "Confidence",
+            "type": "string"
+          },
+          "dst": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dst"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "provenance": {
+            "title": "Provenance",
+            "type": "string"
+          },
+          "raw": {
+            "title": "Raw",
+            "type": "string"
+          },
+          "src": {
+            "title": "Src",
+            "type": "string"
+          }
+        },
+        "required": [
+          "src",
+          "dst",
+          "kind",
+          "confidence",
+          "line",
+          "raw",
+          "provenance"
+        ],
+        "title": "RepoEdgeRecord",
+        "type": "object"
+      },
       "RepoFileRecord": {
         "properties": {
           "analysis_status": {
@@ -766,9 +921,53 @@
         "title": "RepoFileRecord",
         "type": "object"
       },
+      "RepoGraphRecord": {
+        "properties": {
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/RepoDiagnosticRecord"
+            },
+            "title": "Diagnostics",
+            "type": "array"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/RepoEdgeRecord"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "edges",
+          "truncated",
+          "diagnostics"
+        ],
+        "title": "RepoGraphRecord",
+        "type": "object"
+      },
       "RepoRevisionRecord": {
         "description": "One repository at one commit. Graphs and files always belong to exactly one revision.",
         "properties": {
+          "analysis_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Error"
+          },
+          "analysis_status": {
+            "title": "Analysis Status",
+            "type": "string"
+          },
           "analyzed_count": {
             "title": "Analyzed Count",
             "type": "integer"
@@ -797,6 +996,14 @@
           "description": {
             "title": "Description",
             "type": "string"
+          },
+          "diagnostic_count": {
+            "title": "Diagnostic Count",
+            "type": "integer"
+          },
+          "edge_count": {
+            "title": "Edge Count",
+            "type": "integer"
           },
           "error_code": {
             "anyOf": [
@@ -888,12 +1095,65 @@
           "skipped_count",
           "total_bytes",
           "analyzed_count",
+          "analysis_status",
+          "analysis_error",
+          "edge_count",
+          "diagnostic_count",
           "error_code",
           "error_message",
           "created_at",
           "updated_at"
         ],
         "title": "RepoRevisionRecord",
+        "type": "object"
+      },
+      "RepoSymbolRecord": {
+        "properties": {
+          "end_line": {
+            "title": "End Line",
+            "type": "integer"
+          },
+          "exported": {
+            "default": true,
+            "title": "Exported",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "name",
+          "kind",
+          "line",
+          "end_line"
+        ],
+        "title": "RepoSymbolRecord",
         "type": "object"
       },
       "ResumeRun": {
@@ -1841,6 +2101,100 @@
         ]
       }
     },
+    "/api/v1/explorer/revisions/{revision_id}/analysis": {
+      "get": {
+        "operationId": "file_analysis_api_v1_explorer_revisions__revision_id__analysis_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "maxLength": 400,
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileAnalysisRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "File Analysis",
+        "tags": [
+          "explorer"
+        ]
+      }
+    },
+    "/api/v1/explorer/revisions/{revision_id}/analyze": {
+      "post": {
+        "operationId": "analyze_api_v1_explorer_revisions__revision_id__analyze_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "title": "Revision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoRevisionRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Analyze",
+        "tags": [
+          "explorer"
+        ]
+      }
+    },
     "/api/v1/explorer/revisions/{revision_id}/cancel": {
       "post": {
         "operationId": "cancel_import_api_v1_explorer_revisions__revision_id__cancel_post",
@@ -1976,6 +2330,48 @@
           }
         },
         "summary": "List Files",
+        "tags": [
+          "explorer"
+        ]
+      }
+    },
+    "/api/v1/explorer/revisions/{revision_id}/graph": {
+      "get": {
+        "operationId": "graph_api_v1_explorer_revisions__revision_id__graph_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "title": "Revision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoGraphRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Graph",
         "tags": [
           "explorer"
         ]

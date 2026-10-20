@@ -79,8 +79,16 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
                 <dd>{rev.skipped_count}</dd>
                 <dt>Analyzed</dt>
                 <dd>
-                  {rev.analyzed_count} of {rev.text_count}
+                  {rev.analysis_status === 'analyzing'
+                    ? 'working…'
+                    : rev.analysis_status === 'failed'
+                      ? 'failed'
+                      : `${rev.analyzed_count} of ${rev.text_count}`}
                 </dd>
+                <dt>Dependencies</dt>
+                <dd>{rev.edge_count}</dd>
+                <dt>Problems</dt>
+                <dd>{rev.diagnostic_count}</dd>
                 <dt>Download</dt>
                 <dd>{formatBytes(rev.total_bytes)}</dd>
               </dl>
