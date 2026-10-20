@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from app.config import Settings
 from app.main import create_app
 from app.runtime import sandbox
-from tests.test_explorer import FakeGitHub, make_tar
+from tests.test_explorer import SHA, FakeGitHub, make_tar
 
 TOP = "octo-hello-aaaa"
 BUGGY = "def add(a, b):\n    return a - b\n"
@@ -335,3 +335,37 @@ def test_call_relationships_are_served_per_file_both_ways(api: TestClient, rev: 
     assert [(c["path"], c["scope"], c["dst_symbol"]) for c in calc["called_by"]] == [
         ("test_calc.py", "T.test_add", "add")
     ]
+
+
+def test_workflow_draft_from_a_repository_function_has_provenance_and_creates_nothing(
+    api: TestClient, rev: str
+) -> None:
+    base = f"/api/v1/explorer/revisions/{rev}"
+    before = api.get("/api/v1/workflows").json()
+    r = api.post(f"{base}/workflow-draft", json={"path": "calc.py", "symbol": "add"})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert (
+        d["kind"] == "copied implementation"
+        and d["node_type"] == "code.python"
+        and d["params"] == ["a", "b"]
+    )
+    assert d["provenance"] == {
+        "repository": "octo/hello",
+        "commit": SHA,
+        "path": "calc.py",
+        "line": 1,
+        "symbol": "add",
+    }
+    assert d["config"]["provenance"]["kind"] == "copied implementation"
+    assert (
+        "def add(a, b):" in d["config"]["source"]
+        and "return add(**input_data)" in d["config"]["source"]
+    )
+    assert api.get("/api/v1/workflows").json() == before  # nothing was saved
+    bad = api.post(f"{base}/workflow-draft", json={"path": "package.json", "symbol": "x"})
+    assert bad.status_code == 422 and bad.json()["error"]["code"] == "not_convertible"
+    assert (
+        api.post(f"{base}/workflow-draft", json={"path": "calc.py", "symbol": "nope"}).status_code
+        == 422
+    )

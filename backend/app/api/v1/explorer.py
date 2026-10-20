@@ -15,6 +15,7 @@ from app.domain.records import (
     RepoGraphRecord,
     RepoPatchRecord,
     RepoRevisionRecord,
+    WorkflowDraftRecord,
     WorkspaceRecord,
 )
 from app.services.command_service import CommandRuns
@@ -212,3 +213,15 @@ def revert_patch(revision_id: str, patch_id: str, svc: Svc) -> RepoPatchRecord:
 @router.delete("/revisions/{revision_id}/patches/{patch_id}", status_code=204)
 def delete_patch(revision_id: str, patch_id: str, svc: Svc) -> None:
     svc.delete_patch(revision_id, patch_id)
+
+
+# ---- repository code -> workflow node ------------------------------------------------------------
+class DraftRequest(BaseModel):
+    path: str = Field(max_length=400)
+    symbol: str = Field(max_length=200)
+
+
+@router.post("/revisions/{revision_id}/workflow-draft", response_model=WorkflowDraftRecord)
+def workflow_draft(revision_id: str, body: DraftRequest, svc: Svc) -> WorkflowDraftRecord:
+    """A reviewable draft node from one Python function. Nothing is created or run."""
+    return svc.workflow_draft(revision_id, body.path, body.symbol)

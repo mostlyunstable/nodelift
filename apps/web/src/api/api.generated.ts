@@ -415,6 +415,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/explorer/revisions/{revision_id}/workflow-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Workflow Draft
+         * @description A reviewable draft node from one Python function. Nothing is created or run.
+         */
+        post: operations["workflow_draft_api_v1_explorer_revisions__revision_id__workflow_draft_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/explorer/revisions/{revision_id}/workspace": {
         parameters: {
             query?: never;
@@ -995,6 +1015,13 @@ export interface components {
             suggestions: components["schemas"]["SuggestionRecord"][];
             /** Test Files */
             test_files: string[];
+        };
+        /** DraftRequest */
+        DraftRequest: {
+            /** Path */
+            path: string;
+            /** Symbol */
+            symbol: string;
         };
         /** Endpoint */
         Endpoint: {
@@ -1705,6 +1732,34 @@ export interface components {
             ui: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * WorkflowDraftRecord
+         * @description A workflow node proposed from repository code. Nothing is saved until the user creates it.
+         */
+        WorkflowDraftRecord: {
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /** Copied */
+            copied: {
+                [key: string]: unknown;
+            }[];
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /** Node Type */
+            node_type: string;
+            /** Params */
+            params: string[];
+            /** Provenance */
+            provenance: {
+                [key: string]: unknown;
+            };
+            /** Warnings */
+            warnings: string[];
         };
         /** WorkflowEdge */
         WorkflowEdge: {
@@ -2645,6 +2700,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RepoPatchRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    workflow_draft_api_v1_explorer_revisions__revision_id__workflow_draft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowDraftRecord"];
                 };
             };
             /** @description Validation Error */

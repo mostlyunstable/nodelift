@@ -225,3 +225,16 @@ class CommandRunRecord(BaseModel):
     output_truncated: bool
     confinement: dict[str, object]
     notes: list[str]
+
+
+class WorkflowDraftRecord(BaseModel):
+    """A workflow node proposed from repository code. Nothing is saved until the user creates it."""
+
+    name: str
+    node_type: str
+    config: dict[str, object]
+    kind: str  # "copied implementation"
+    provenance: dict[str, object]
+    copied: list[dict[str, object]]
+    warnings: list[str]
+    params: list[str]

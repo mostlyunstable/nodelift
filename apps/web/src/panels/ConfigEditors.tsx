@@ -9,6 +9,11 @@ import { errorLine, explainError } from './errors'
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']
 
+function isProvenance(v: unknown): v is { repository: string; commit: string; path: string } {
+  const p = v as Record<string, unknown> | null
+  return !!p && typeof p.repository === 'string' && typeof p.commit === 'string' && typeof p.path === 'string'
+}
+
 function CodeConfig({ node }: { node: FlowNode }) {
   const { updateConfig } = useStore()
   const exec = useStore((s) => s.run?.nodes.findLast((n) => n.node_id === node.id))
@@ -78,6 +83,13 @@ function CodeConfig({ node }: { node: FlowNode }) {
           options={{ minimap: { enabled: false }, fontSize: 13, scrollBeyondLastLine: false }}
         />
       </div>
+      {isProvenance(node.data.config.provenance) && (
+        <p className="small" role="note">
+          Copied implementation from {node.data.config.provenance.repository}@
+          {node.data.config.provenance.commit.slice(0, 7)} {node.data.config.provenance.path}. Review it: it
+          is not linked to the repository.
+        </p>
+      )}
       <label className="check">
         <input
           type="checkbox"

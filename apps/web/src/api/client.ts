@@ -59,6 +59,7 @@ export type RepoDiagnostic = Schemas['RepoDiagnosticRecord']
 export type RepoGraph = Schemas['RepoGraphRecord']
 export type FileAnalysis = Schemas['FileAnalysisRecord']
 export type RepoReference = Schemas['RepoReferenceRecord']
+export type WorkflowDraft = Schemas['WorkflowDraftRecord']
 export type Discovery = Schemas['DiscoveryRecord']
 export type Suggestion = Schemas['SuggestionRecord']
 export type Workspace = Schemas['WorkspaceRecord']
@@ -111,6 +112,8 @@ export const api = {
     request<RepoPatch>('POST', `/explorer/revisions/${id}/patches/${patchId}/revert`),
   explorerDeletePatch: (id: string, patchId: string) =>
     request<null>('DELETE', `/explorer/revisions/${id}/patches/${patchId}`),
+  explorerWorkflowDraft: (id: string, body: { path: string; symbol: string }) =>
+    request<WorkflowDraft>('POST', `/explorer/revisions/${id}/workflow-draft`, body),
   explorerFiles: (id: string) => request<RepoFile[]>('GET', `/explorer/revisions/${id}/files`),
   explorerFile: (id: string, path: string) =>
     request<RepoFileContent>('GET', `/explorer/revisions/${id}/file?path=${encodeURIComponent(path)}`),

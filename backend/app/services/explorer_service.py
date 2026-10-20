@@ -28,6 +28,7 @@ from app.domain.records import (
     RepoPatchRecord,
     RepoRevisionRecord,
     SuggestionRecord,
+    WorkflowDraftRecord,
     WorkspaceRecord,
 )
 from app.domain.repositories import RepoRepository
@@ -41,10 +42,14 @@ from app.explorer.archive import (
 )
 from app.explorer.discovery import CONFIG_NAMES, discover
 from app.explorer.github import GitHubClient
+from app.explorer.nodegen import NotConvertible, build_draft
 from app.explorer.patches import stats, unified_diff
 from app.explorer.urls import InvalidRepoUrl, parse_github_url
 
 log = logging.getLogger("nodecraft.explorer")
+_EMPTY = FileAnalysisRecord(
+    path="", status="", symbols=[], imports=[], dependents=[], diagnostics=[]
+)
 
 
 @dataclass
@@ -509,6 +514,47 @@ class ExplorerService:
             )
         self.repo.set_patch_applied(patch_id, False)
         return self._patch(revision_id, patch_id)[0]
+
+    # -- repository code -> workflow node draft (copied implementation; never saved here) ------
+    def workflow_draft(self, revision_id: str, path: str, symbol: str) -> WorkflowDraftRecord:
+        rev = self._ready(revision_id)
+        meta = self.repo.get_file(revision_id, path)
+        if meta is None or meta.language != "python":
+            raise AppError(
+                422, "not_convertible", "Only Python functions can be turned into a node for now"
+            )
+        text = self._original(revision_id, path)
+        sym = next(
+            (
+                s
+                for s in (self.repo.file_analysis(revision_id, path) or _EMPTY).symbols
+                if s.name == symbol and s.parent is None and s.kind == "function"
+            ),
+            None,
+        )
+        origin = (
+            f"{rev.full_name}@{rev.commit_sha[:7]} {path}:{sym.line if sym else '?'} ({symbol})"
+        )
+        try:
+            draft = build_draft(text, symbol, origin)
+        except NotConvertible as e:
+            raise AppError(422, "not_convertible", str(e)) from e
+        return WorkflowDraftRecord(
+            name=symbol,
+            node_type="code.python",
+            config={
+                "source": draft.source,
+                "provenance": {
+                    "repository": rev.full_name, "commit": rev.commit_sha, "path": path,
+                    "line": sym.line if sym else None, "symbol": symbol, "kind": "copied implementation",
+                },
+            },
+            kind="copied implementation",
+            provenance={"repository": rev.full_name, "commit": rev.commit_sha, "path": path, "line": sym.line if sym else None, "symbol": symbol},
+            copied=draft.copied,
+            warnings=draft.warnings,
+            params=draft.params,
+        )  # fmt: skip
 
 
 def command_record(runs: Any, run: Any) -> CommandRunRecord:

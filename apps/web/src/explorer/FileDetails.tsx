@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FileAnalysis, RepoEdge } from '../api/client'
 import { useExplorer } from '../state/explorer'
+import { NodeFromFunctionDialog } from './NodeFromFunctionDialog'
 
 const SEVERITY_ICON: Record<string, string> = { error: '✕', warning: '⚠', info: 'ℹ' }
 
@@ -43,6 +44,7 @@ export function FileDetails({ analysis, path }: { analysis: FileAnalysis | null;
   const meta = useExplorer((s) => s.files.find((f) => f.path === path))
   const rev = useExplorer((s) => s.revision)
   const [symbolFilter, setSymbolFilter] = useState('')
+  const [makeNode, setMakeNode] = useState<string | null>(null)
   if (!analysis) return <div className="viewer-empty muted">Analysis for this file is not available yet.</div>
 
   const calls = analysis.references
@@ -112,6 +114,14 @@ export function FileDetails({ analysis, path }: { analysis: FileAnalysis | null;
                   {s.kind} · line {s.line}
                   {s.exported ? '' : ' · private'}
                 </span>
+                {s.kind === 'function' && !s.parent && meta?.language === 'python' && (
+                  <>
+                    {' '}
+                    <button className="link-button" onClick={() => setMakeNode(s.name)}>
+                      Make node…
+                    </button>
+                  </>
+                )}
               </li>
             ))}
           </ul>
@@ -230,6 +240,14 @@ export function FileDetails({ analysis, path }: { analysis: FileAnalysis | null;
             ))}
           </ul>
         </Section>
+      )}
+      {makeNode && rev && (
+        <NodeFromFunctionDialog
+          revisionId={rev.id}
+          path={path}
+          symbol={makeNode}
+          onClose={() => setMakeNode(null)}
+        />
       )}
     </div>
   )

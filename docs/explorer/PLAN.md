@@ -157,3 +157,13 @@ Go, Java, Rust, Ruby, shell, Markdown, YAML, JSON, SQL added to the analyzer int
 symbols and diagnostics, including what is _not_ linked (remote actions, computed shell paths, tables created nowhere). Real run on `psf/requests`: files
 analysed went from 39 to 64 of 122 readable files (adds README, YAML, JSON), 394 relations, 0 diagnostics.
 **Not analysed:** C#, PHP, Kotlin, Swift, C/C++ (shown and readable only).
+
+## R8 (2026-10-20): implemented — workflow node from a repository function
+Details → Symbols → **Make node…** on a top-level Python function opens a review dialog (nothing is created yet). It shows the provenance (repo, commit,
+file:line), labels the result a **copied implementation** (not linked to the repository), lists what was copied (function, same-file helpers, constants,
+stdlib imports), lists what could not be (relative/third-party imports are left as comments, unknown globals), says how the input maps to arguments, and
+previews the exact source. Create saves a new workflow with that single code node, its provenance in the node config, and opens Build.
+Verified: the generated source of `from_key_val_list` from `psf/requests@611c616` runs in the confined worker and returns `{'a': 1, 'b': 2}`; tests run generated
+nodes in the real worker and compare with the original function.
+**Not done:** methods/classes, JS/TS functions, "callable function" and "generated wrapper" modes that import the repository's own code at run time
+(they would need the worker to read the workspace; deliberately not offered), multi-node drafts (e.g. a test workflow).
