@@ -35,7 +35,8 @@ interface ExplorerState {
   edges: RepoEdge[]
   diagnostics: RepoDiagnostic[]
   graphTruncated: boolean
-  depMode: DepMode
+  /** null = automatic: every line on a small repository, folder-to-folder links on a large one */
+  depMode: DepMode | null
   setDepMode: (m: DepMode) => void
   selectedPath: string | null
   tab: ExplorerTab
@@ -144,7 +145,7 @@ export const useExplorer = create<ExplorerState>((set, get) => {
     edges: [],
     diagnostics: [],
     graphTruncated: false,
-    depMode: 'selected',
+    depMode: null,
     setDepMode: (depMode) => set({ depMode }),
     selectedPath: null,
     tab: 'graph',

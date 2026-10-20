@@ -188,7 +188,6 @@ describe('Repository Explorer', () => {
       expect(screen.getByLabelText(/^Expand src/)).toBeInTheDocument()
       expect(screen.queryByText('app.py', { selector: '.xn-open' })).not.toBeInTheDocument()
       expect(screen.getByText(/Cards are folders; tiles are files/)).toBeInTheDocument()
-      expect(screen.getByText(/Select a file to see what it imports/)).toBeInTheDocument()
     })
 
     it('expands a folder on demand', () => {

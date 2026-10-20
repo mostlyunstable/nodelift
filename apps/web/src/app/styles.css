@@ -1946,3 +1946,18 @@ path.xe-dep.xe-heuristic {
 .react-flow__node input {
   pointer-events: auto;
 }
+
+/* n8n-style connections: smooth grey curves with an arrow, the accent colour for the selected file's lines */
+.xe-dep,
+.xe-dep.react-flow__edge-path,
+path.xe-dep.dir-none {
+  stroke: var(--border-strong);
+  stroke-width: 2;
+}
+.xe-dep.dir-out,
+path.xe-dep.dir-out,
+.xe-dep.dir-in,
+path.xe-dep.dir-in {
+  stroke: var(--accent);
+  stroke-width: 2.4;
+}

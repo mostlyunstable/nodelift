@@ -112,7 +112,7 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
   const selectedEdge = useExplorer((s) => s.selectedEdge)
   const dependencies = useExplorer((s) => s.edges)
   const diagnostics = useExplorer((s) => s.diagnostics)
-  const depMode = useExplorer((s) => s.depMode)
+  const chosenDepMode = useExplorer((s) => s.depMode)
   const graphTruncated = useExplorer((s) => s.graphTruncated)
   const analysisStatus = useExplorer((s) => s.revision?.analysis_status)
   const { setSelectedEdge, reveal, toggleLanguage, clearLanguages, collapseAll, expandAll } =
@@ -121,6 +121,7 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
   const canvas = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')
 
+  const depMode: DepMode = chosenDepMode ?? (dependencies.length <= 40 ? 'all' : 'folders')
   const built = useMemo(
     () =>
       buildGraph(files, repoName, {

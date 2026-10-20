@@ -41,10 +41,10 @@ test.describe('with GitHub', () => {
     for (const name of ['index.html', 'README.md', 'styles.css']) {
       await expect(page.locator('.xt-file .xn-open', { hasText: name })).toBeVisible()
     }
-    // lines are drawn on demand: nothing yet, then selecting index.html shows the one line to styles.css
-    await expect(page.locator('.react-flow__edge-dependency')).toHaveCount(0)
-    await page.locator('.xt-file', { hasText: 'index.html' }).locator('.xn-open').click()
+    // nodes are connected from the start, like n8n: the import between index.html and styles.css is a drawn line
     await expect(page.locator('.react-flow__edge-dependency')).toHaveCount(1, { timeout: 30_000 })
+    await page.locator('.xt-file', { hasText: 'index.html' }).locator('.xn-open').click()
+    await expect(page.locator('.react-flow__edge-dependency')).toHaveCount(1)
 
     // clicking a node shows the real source, read-only
     await page.locator('.xt-file', { hasText: 'styles.css' }).locator('.xn-open').click()
