@@ -49,6 +49,8 @@ export function CommandPalette({ commands, onClose }: { commands: Command[]; onC
       <ul id="palette-results" role="listbox" className="palette-results">
         {results.length === 0 && <li className="muted pad">Nothing matches “{query}”.</li>}
         {results.map((cmd, i) => (
+          // Options are chosen with the keyboard through the combobox input (aria-activedescendant).
+          // eslint-disable-next-line jsx-a11y/click-events-have-key-events
           <li
             key={cmd.id}
             id={`cmd-${cmd.id}`}

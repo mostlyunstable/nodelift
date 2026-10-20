@@ -7,14 +7,15 @@ from pydantic import BaseModel, Field
 
 from app.api.errors import AppError
 from app.domain.records import CredentialRecord
+from app.domain.repositories import CredentialRepository
 from app.domain.secrets import MIN_SECRET_LENGTH, NAME, SecretStore, SecretsUnavailable
-from app.storage.repositories import SqlCredentialRepository
+from app.services.container import credential_repository
 
 router = APIRouter(prefix="/credentials", tags=["credentials"])
 
 
-def get_repo(request: Request) -> SqlCredentialRepository:
-    return SqlCredentialRepository(request.app.state.session_factory)
+def get_repo(request: Request) -> CredentialRepository:
+    return credential_repository(request.app.state)
 
 
 def get_store(request: Request) -> SecretStore:
@@ -22,7 +23,7 @@ def get_store(request: Request) -> SecretStore:
     return store
 
 
-Repo = Annotated[SqlCredentialRepository, Depends(get_repo)]
+Repo = Annotated[CredentialRepository, Depends(get_repo)]
 Store = Annotated[SecretStore, Depends(get_store)]
 
 

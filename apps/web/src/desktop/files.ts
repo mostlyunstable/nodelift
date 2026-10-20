@@ -8,7 +8,10 @@ export async function saveTextFile(defaultName: string, text: string): Promise<b
   if (isDesktop()) {
     const { save } = await import('@tauri-apps/plugin-dialog')
     const { writeTextFile } = await import('@tauri-apps/plugin-fs')
-    const path = await save({ defaultPath: defaultName, filters: [{ name: 'Nodecraft workflow', extensions: ['json'] }] })
+    const path = await save({
+      defaultPath: defaultName,
+      filters: [{ name: 'Nodecraft workflow', extensions: ['json'] }],
+    })
     if (!path) return false
     await writeTextFile(path, text)
     return true
@@ -25,4 +28,9 @@ export async function saveTextFile(defaultName: string, text: string): Promise<b
 }
 
 export const fileSlug = (name: string): string =>
-  name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'workflow'
+  name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || 'workflow'

@@ -6,14 +6,21 @@ export function Toast() {
   const message = useStore((s) => s.message)
   useEffect(() => {
     if (!message) return
-    const t = setTimeout(() => useStore.setState((s) => (s.message === message ? { message: null } : s)), 8000)
+    const t = setTimeout(
+      () => useStore.setState((s) => (s.message === message ? { message: null } : s)),
+      8000,
+    )
     return () => clearTimeout(t)
   }, [message])
   if (!message) return null
   return (
     <div className="toast" role="status" aria-live="polite">
       <span>{message}</span>
-      <button className="icon-button" aria-label="Dismiss message" onClick={() => useStore.setState({ message: null })}>
+      <button
+        className="icon-button"
+        aria-label="Dismiss message"
+        onClick={() => useStore.setState({ message: null })}
+      >
         ✕
       </button>
     </div>

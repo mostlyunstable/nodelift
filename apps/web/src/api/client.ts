@@ -39,7 +39,12 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
   const data = res.status === 204 ? null : await res.json().catch(() => null)
   if (!res.ok) {
     const err = data?.error
-    throw new ApiError(err?.message ?? `Request failed (${res.status})`, res.status, err?.code, err?.details ?? [])
+    throw new ApiError(
+      err?.message ?? `Request failed (${res.status})`,
+      res.status,
+      err?.code,
+      err?.details ?? [],
+    )
   }
   return data as T
 }
@@ -72,13 +77,24 @@ export const api = {
     type Row = { seq: number; type: RunEvent['type']; created_at: string; payload: Record<string, unknown> }
     const out: RunEvent[] = []
     for (let page = 0; page < 100; page++) {
-      const res = await fetch(apiUrl(`/runs/${runId}/events?after=${after}&limit=500`), { headers: authHeaders() })
+      const res = await fetch(apiUrl(`/runs/${runId}/events?after=${after}&limit=500`), {
+        headers: authHeaders(),
+      })
       if (!res.ok) {
         const err = (await res.json().catch(() => null))?.error
-        throw new ApiError(err?.message ?? `Request failed (${res.status})`, res.status, err?.code, err?.details ?? [])
+        throw new ApiError(
+          err?.message ?? `Request failed (${res.status})`,
+          res.status,
+          err?.code,
+          err?.details ?? [],
+        )
       }
       const rows = (await res.json()) as Row[]
-      out.push(...rows.map((r) => ({ seq: r.seq, type: r.type, created_at: r.created_at, ...r.payload }) as RunEvent))
+      out.push(
+        ...rows.map(
+          (r) => ({ seq: r.seq, type: r.type, created_at: r.created_at, ...r.payload }) as RunEvent,
+        ),
+      )
       if (res.headers.get('x-has-more') !== '1') break
       after = Number(res.headers.get('x-next-after'))
     }
@@ -91,7 +107,8 @@ export const api = {
   listExamples: () => request<ExampleInfo[]>('GET', '/examples'),
   createExample: (id: string) => request<WorkflowRecord>('POST', `/examples/${id}/create`),
   systemInfo: () => request<SystemInfo>('GET', '/system/info'),
-  systemLogs: (lines = 200) => request<{ path: string | null; lines: string[] }>('GET', `/system/logs?lines=${lines}`),
+  systemLogs: (lines = 200) =>
+    request<{ path: string | null; lines: string[] }>('GET', `/system/logs?lines=${lines}`),
   listCredentials: () => request<Credential[]>('GET', '/credentials'),
   createCredential: (c: { name: string; value: string; kind?: string; description?: string }) =>
     request<Credential>('POST', '/credentials', c),

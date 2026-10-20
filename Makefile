@@ -24,8 +24,8 @@ test:
 	cd apps/web && pnpm test
 
 lint:
-	cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy
-	cd apps/web && pnpm typecheck
+	cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run lint-imports
+	cd apps/web && pnpm typecheck && pnpm lint && pnpm format:check
 
 check: lint test
 

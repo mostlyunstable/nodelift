@@ -2,8 +2,32 @@ import { describe, expect, it } from 'vitest'
 import { fromWorkflow, toWorkflow, type FlowNode } from './mapper'
 
 const nodes: FlowNode[] = [
-  { id: 'a', type: 'node', position: { x: 1, y: 2 }, data: { name: 'A', nodeType: 'code.python', config: { source: 'S' }, testInput: '{}', idempotent: false, maxAttempts: 1 } },
-  { id: 'b', type: 'node', position: { x: 3, y: 4 }, data: { name: 'B', nodeType: 'http.request', config: { url: 'https://x.test' }, testInput: '{}', idempotent: false, maxAttempts: 1 } },
+  {
+    id: 'a',
+    type: 'node',
+    position: { x: 1, y: 2 },
+    data: {
+      name: 'A',
+      nodeType: 'code.python',
+      config: { source: 'S' },
+      testInput: '{}',
+      idempotent: false,
+      maxAttempts: 1,
+    },
+  },
+  {
+    id: 'b',
+    type: 'node',
+    position: { x: 3, y: 4 },
+    data: {
+      name: 'B',
+      nodeType: 'http.request',
+      config: { url: 'https://x.test' },
+      testInput: '{}',
+      idempotent: false,
+      maxAttempts: 1,
+    },
+  },
 ]
 
 describe('mapper', () => {
@@ -42,11 +66,19 @@ describe('mapper ports', () => {
       { id: 'e1', source: 'a', target: 'b', sourceHandle: 'true', targetHandle: 'in' },
       { id: 'e2', source: 'a', target: 'b' },
     ])
-    expect(wf.edges[0]).toMatchObject({ source: { node: 'a', port: 'true' }, target: { node: 'b', port: 'in' } })
-    expect(wf.edges[1]).toMatchObject({ source: { node: 'a', port: 'out' }, target: { node: 'b', port: 'in' } })
+    expect(wf.edges[0]).toMatchObject({
+      source: { node: 'a', port: 'true' },
+      target: { node: 'b', port: 'in' },
+    })
+    expect(wf.edges[1]).toMatchObject({
+      source: { node: 'a', port: 'out' },
+      target: { node: 'b', port: 'in' },
+    })
   })
   it('restores handles and labels branch edges when reopening', () => {
-    const wf = toWorkflow(nodes, [{ id: 'e1', source: 'a', target: 'b', sourceHandle: 'false', targetHandle: 'in' }])
+    const wf = toWorkflow(nodes, [
+      { id: 'e1', source: 'a', target: 'b', sourceHandle: 'false', targetHandle: 'in' },
+    ])
     const back = fromWorkflow(wf).edges[0]
     expect(back).toMatchObject({ sourceHandle: 'false', targetHandle: 'in', label: 'false' })
     const plain = fromWorkflow(toWorkflow(nodes, [{ id: 'e2', source: 'a', target: 'b' }])).edges[0]

@@ -13,7 +13,11 @@ describe('fuzzyScore', () => {
     expect(fuzzyScore('RUN WORK', 'run workflow')).not.toBeNull()
   })
   it('ranks prefix and word-start matches above scattered ones', () => {
-    const ordered = rank(['Open workflow', 'Run workflow', 'Undo', 'Save version', 'Show versions'], 'run', (s) => s)
+    const ordered = rank(
+      ['Open workflow', 'Run workflow', 'Undo', 'Save version', 'Show versions'],
+      'run',
+      (s) => s,
+    )
     expect(ordered[0]).toBe('Run workflow')
     const sv = rank(['Show versions', 'Save version', 'Validate workflow'], 'sv', (s) => s)
     expect(sv.slice(0, 2).sort()).toEqual(['Save version', 'Show versions'])

@@ -10,7 +10,17 @@ export interface MenuItem {
 }
 
 /** A button that opens a list of actions. Arrow keys move, Enter picks, Esc and outside clicks close. */
-export function Menu({ label, ariaLabel, items, align = 'left' }: { label: string; ariaLabel: string; items: MenuItem[]; align?: 'left' | 'right' }) {
+export function Menu({
+  label,
+  ariaLabel,
+  items,
+  align = 'left',
+}: {
+  label: string
+  ariaLabel: string
+  items: MenuItem[]
+  align?: 'left' | 'right'
+}) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
 
@@ -32,15 +42,23 @@ export function Menu({ label, ariaLabel, items, align = 'left' }: { label: strin
     }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
     e.preventDefault()
-    const entries = [...(root.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? [])]
+    const entries = [
+      ...(root.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? []),
+    ]
     const at = entries.indexOf(document.activeElement as HTMLElement)
-    const next = e.key === 'ArrowDown' ? (at + 1) % entries.length : (at - 1 + entries.length) % entries.length
+    const next =
+      e.key === 'ArrowDown' ? (at + 1) % entries.length : (at - 1 + entries.length) % entries.length
     entries[next]?.focus()
   }
 
   return (
-    <div className="menu" ref={root} onKeyDown={onKeyDown}>
-      <button aria-haspopup="menu" aria-expanded={open} aria-label={ariaLabel} onClick={() => setOpen((o) => !o)}>
+    <div className="menu" role="presentation" ref={root} onKeyDown={onKeyDown}>
+      <button
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        onClick={() => setOpen((o) => !o)}
+      >
         {label}
       </button>
       {open && (

@@ -350,7 +350,9 @@ export const useStore = create<State>((set, get) => ({
     try {
       await api.deleteCredential(name)
       await get().loadCredentials()
-      set({ message: `Deleted credential “${name}”. Workflows that use it will fail until it is added again.` })
+      set({
+        message: `Deleted credential “${name}”. Workflows that use it will fail until it is added again.`,
+      })
     } catch (e) {
       set({ message: (e as Error).message })
     }
@@ -429,7 +431,10 @@ export const useStore = create<State>((set, get) => ({
     if (!id) return
     try {
       const file = await api.exportWorkflow(id)
-      const saved = await saveTextFile(`${fileSlug(get().workflowName)}.nodecraft.json`, JSON.stringify(file, null, 2))
+      const saved = await saveTextFile(
+        `${fileSlug(get().workflowName)}.nodecraft.json`,
+        JSON.stringify(file, null, 2),
+      )
       if (saved) set({ message: 'Workflow exported.' })
     } catch (e) {
       set({ message: `Could not export: ${(e as Error).message}` })
@@ -759,10 +764,22 @@ export const useStore = create<State>((set, get) => ({
       generation++
       clearHistory()
       set({
-        events: [], liveStatus: {}, busy: null,
-        nodes, edges, workflowId: rec.id, workflowName: rec.name, revision: rec.revision,
-        selectedId: null, run: null, nodeTests: {}, issues: [], message: null,
-        dirty: false, saveState: 'saved', conflict: false,
+        events: [],
+        liveStatus: {},
+        busy: null,
+        nodes,
+        edges,
+        workflowId: rec.id,
+        workflowName: rec.name,
+        revision: rec.revision,
+        selectedId: null,
+        run: null,
+        nodeTests: {},
+        issues: [],
+        message: null,
+        dirty: false,
+        saveState: 'saved',
+        conflict: false,
       })
       remember(rec.id)
       await get().refresh()
@@ -825,9 +842,24 @@ export const useStore = create<State>((set, get) => ({
     clearHistory()
     forget()
     set({
-      events: [], liveStatus: {}, nodes: [], edges: [], selectedId: null, run: null, nodeTests: {}, issues: [],
-      runInput: '{}', workflowId: null, workflowName: 'Untitled', revision: 0, versions: [], runs: [], message: null,
-      dirty: false, saveState: 'saved', conflict: false,
+      events: [],
+      liveStatus: {},
+      nodes: [],
+      edges: [],
+      selectedId: null,
+      run: null,
+      nodeTests: {},
+      issues: [],
+      runInput: '{}',
+      workflowId: null,
+      workflowName: 'Untitled',
+      revision: 0,
+      versions: [],
+      runs: [],
+      message: null,
+      dirty: false,
+      saveState: 'saved',
+      conflict: false,
     })
   },
 }))

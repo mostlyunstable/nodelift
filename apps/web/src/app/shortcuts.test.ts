@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { matchShortcut } from './shortcuts'
 
-const key = (k: string, mods: Partial<{ meta: boolean; ctrl: boolean; shift: boolean; alt: boolean }> = {}, target?: EventTarget) => ({
+const key = (
+  k: string,
+  mods: Partial<{ meta: boolean; ctrl: boolean; shift: boolean; alt: boolean }> = {},
+  target?: EventTarget,
+) => ({
   key: k,
   metaKey: !!mods.meta,
   ctrlKey: !!mods.ctrl,

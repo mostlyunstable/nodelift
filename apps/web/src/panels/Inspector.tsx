@@ -1,4 +1,4 @@
-import { ConfigEditor } from './ConfigEditors' 
+import { ConfigEditor } from './ConfigEditors'
 import { useStore } from '../state/store'
 import { ResultView } from './ResultView'
 
@@ -20,7 +20,10 @@ export function Inspector() {
             type="checkbox"
             checked={node.data.idempotent}
             onChange={(e) =>
-              updateData(node.id, { idempotent: e.target.checked, maxAttempts: e.target.checked ? node.data.maxAttempts : 1 })
+              updateData(node.id, {
+                idempotent: e.target.checked,
+                maxAttempts: e.target.checked ? node.data.maxAttempts : 1,
+              })
             }
           />{' '}
           Idempotent (safe to retry)
@@ -33,7 +36,9 @@ export function Inspector() {
             max={5}
             disabled={!node.data.idempotent}
             value={node.data.maxAttempts}
-            onChange={(e) => updateData(node.id, { maxAttempts: Math.min(5, Math.max(1, Number(e.target.value) || 1)) })}
+            onChange={(e) =>
+              updateData(node.id, { maxAttempts: Math.min(5, Math.max(1, Number(e.target.value) || 1)) })
+            }
           />
         </label>
       </div>

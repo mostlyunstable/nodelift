@@ -50,16 +50,19 @@ export interface CommandContext {
 export function buildCommands(c: CommandContext): Command[] {
   const a = c.actions
   const out: Command[] = []
-  const add = (id: string, title: string, group: string, run: () => void, hint?: string) => out.push({ id, title, group, run, hint })
+  const add = (id: string, title: string, group: string, run: () => void, hint?: string) =>
+    out.push({ id, title, group, run, hint })
 
   if (c.hasNodes && c.busy === null) add('run', 'Run workflow', 'Run', a.run, '⌘↵')
   if (c.runStatus === 'running') add('stop', 'Stop the running workflow', 'Run', a.stop, '⌘.')
-  if (c.runStatus === 'failed' || c.runStatus === 'cancelled') add('resume', 'Resume from failure', 'Run', a.resume)
+  if (c.runStatus === 'failed' || c.runStatus === 'cancelled')
+    add('resume', 'Resume from failure', 'Run', a.resume)
   if (c.hasNodes) add('validate', 'Check workflow for problems', 'Run', a.validate)
 
   if (c.canUndo) add('undo', 'Undo', 'Edit', a.undo, '⌘Z')
   if (c.canRedo) add('redo', 'Redo', 'Edit', a.redo, '⇧⌘Z')
-  for (const def of c.nodeDefs) add(`add:${def.type}`, `Add node: ${def.title}`, 'Nodes', () => a.addNode(def.type))
+  for (const def of c.nodeDefs)
+    add(`add:${def.type}`, `Add node: ${def.title}`, 'Nodes', () => a.addNode(def.type))
 
   add('save', 'Save now', 'Workflow', a.save, '⌘S')
   if (c.workflowId) {
@@ -71,7 +74,8 @@ export function buildCommands(c: CommandContext): Command[] {
   add('new', 'New workflow', 'Workflow', a.newWorkflow)
   add('import', 'Import a workflow file…', 'Workflow', a.importFile)
   add('export-all', 'Export everything (backup)…', 'Workflow', a.exportAll)
-  for (const ex of c.examples) add(`example:${ex.id}`, `Try the example: ${ex.title}`, 'Learn', () => a.example(ex.id))
+  for (const ex of c.examples)
+    add(`example:${ex.id}`, `Try the example: ${ex.title}`, 'Learn', () => a.example(ex.id))
   for (const w of c.workflows) {
     if (w.id !== c.workflowId) add(`open:${w.id}`, `Open: ${w.name}`, 'Open', () => a.open(w.id))
   }

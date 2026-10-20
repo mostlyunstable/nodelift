@@ -8,11 +8,20 @@ import { EmptyCanvas, RunAnnouncer, Toast, TourBanner } from './Overlays'
 
 const s = () => useStore.getState()
 const def = (source: string): WorkflowDefinition => ({
-  schema_version: 1, id: '', name: 'W', edges: [], ui: { positions: {} },
+  schema_version: 1,
+  id: '',
+  name: 'W',
+  edges: [],
+  ui: { positions: {} },
   nodes: [{ id: 'n1', type: 'code.python', name: 'Step', config: { source } }],
 })
 const version = (n: number, source: string): VersionRecord => ({
-  id: `v${n}`, workflow_id: 'wf_1', version_no: n, content_hash: 'h', created_at: '2026-10-20T10:00:00Z', definition: def(source),
+  id: `v${n}`,
+  workflow_id: 'wf_1',
+  version_no: n,
+  content_hash: 'h',
+  created_at: '2026-10-20T10:00:00Z',
+  definition: def(source),
 })
 
 beforeEach(() => {
@@ -26,7 +35,13 @@ describe('VersionsDialog', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation((url) =>
       String(url).endsWith('/versions/1') ? jsonResponse(version(1, 'old code')) : jsonResponse([]),
     )
-    useStore.setState({ workflowId: 'wf_1', versions: [{ version_no: 2, content_hash: 'b', created_at: '2026-10-20T11:00:00Z' }, { version_no: 1, content_hash: 'a', created_at: '2026-10-20T10:00:00Z' }] })
+    useStore.setState({
+      workflowId: 'wf_1',
+      versions: [
+        { version_no: 2, content_hash: 'b', created_at: '2026-10-20T11:00:00Z' },
+        { version_no: 1, content_hash: 'a', created_at: '2026-10-20T10:00:00Z' },
+      ],
+    })
     s().addNode()
     useStore.getState().updateConfig(s().nodes[0].id, { source: 'new code' })
     render(<VersionsDialog />)
@@ -43,14 +58,23 @@ describe('VersionsDialog', () => {
   })
 
   it('says so when a version matches the editor exactly', async () => {
-    useStore.setState({ workflowId: 'wf_1', versions: [{ version_no: 1, content_hash: 'a', created_at: '2026-10-20T10:00:00Z' }] })
+    useStore.setState({
+      workflowId: 'wf_1',
+      versions: [{ version_no: 1, content_hash: 'a', created_at: '2026-10-20T10:00:00Z' }],
+    })
     s().addNode()
     const node = s().nodes[0]
     vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
       jsonResponse({
         ...version(1, ''),
-        definition: { schema_version: 1, id: '', name: s().workflowName, edges: [], ui: { positions: {} },
-          nodes: [{ id: node.id, type: node.data.nodeType, name: node.data.name, config: node.data.config }] },
+        definition: {
+          schema_version: 1,
+          id: '',
+          name: s().workflowName,
+          edges: [],
+          ui: { positions: {} },
+          nodes: [{ id: node.id, type: node.data.nodeType, name: node.data.name, config: node.data.config }],
+        },
       }),
     )
     render(<VersionsDialog />)
@@ -61,7 +85,21 @@ describe('VersionsDialog', () => {
 
 describe('ImportDialog', () => {
   const preview = (over = {}) => ({
-    file: {}, preview: { valid: true, issues: [], summary: { name: 'Orders', nodes: 3, edges: 2, node_types: { 'code.python': 2, 'http.request': 1 }, code_nodes: 2, http_hosts: ['api.example.com'], warnings: ['2 code node(s) run Python as you on this computer. Read them before running.'] }, ...over },
+    file: {},
+    preview: {
+      valid: true,
+      issues: [],
+      summary: {
+        name: 'Orders',
+        nodes: 3,
+        edges: 2,
+        node_types: { 'code.python': 2, 'http.request': 1 },
+        code_nodes: 2,
+        http_hosts: ['api.example.com'],
+        warnings: ['2 code node(s) run Python as you on this computer. Read them before running.'],
+      },
+      ...over,
+    },
   })
 
   it('shows what is in the file and the warnings, and lets you import or cancel', () => {
@@ -77,7 +115,13 @@ describe('ImportDialog', () => {
   })
 
   it('refuses an invalid file and lists why', () => {
-    useStore.setState({ importPreview: preview({ valid: false, issues: [{ code: 'unknown_node_type', message: 'Unknown type magic.node' }] }), dialog: 'import' })
+    useStore.setState({
+      importPreview: preview({
+        valid: false,
+        issues: [{ code: 'unknown_node_type', message: 'Unknown type magic.node' }],
+      }),
+      dialog: 'import',
+    })
     render(<ImportDialog />)
     expect(screen.getByRole('button', { name: 'Import' })).toBeDisabled()
     expect(screen.getByRole('alert')).toHaveTextContent('Unknown type magic.node')
@@ -90,11 +134,23 @@ describe('ImportDialog', () => {
 })
 
 describe('DiagnosticsDialog', () => {
-  const INFO = { version: '0.1.0', schema_revision: '0003', schema_head: '0003', data_dir: '/data', log_dir: '/logs', backup_dir: '/data/backups', backups: [], python: '3.12.15', uptime_s: 12.4 }
+  const INFO = {
+    version: '0.1.0',
+    schema_revision: '0003',
+    schema_head: '0003',
+    data_dir: '/data',
+    log_dir: '/logs',
+    backup_dir: '/data/backups',
+    backups: [],
+    python: '3.12.15',
+    uptime_s: 12.4,
+  }
 
   it('shows the facts a support request needs and copies a report', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation((url) =>
-      String(url).includes('/system/info') ? jsonResponse(INFO) : jsonResponse({ path: '/logs/backend.log', lines: ['line one', 'line two'] }),
+      String(url).includes('/system/info')
+        ? jsonResponse(INFO)
+        : jsonResponse({ path: '/logs/backend.log', lines: ['line one', 'line two'] }),
     )
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.assign(navigator, { clipboard: { writeText } })
@@ -157,7 +213,9 @@ describe('RunAnnouncer', () => {
     expect(live()).toHaveTextContent('')
     act(() => useStore.setState({ busy: 'run' }))
     expect(live()).toHaveTextContent('Run in progress')
-    act(() => useStore.setState({ busy: null, run: { id: 'r', status: 'succeeded', nodes: [], duration_ms: 1 } }))
+    act(() =>
+      useStore.setState({ busy: null, run: { id: 'r', status: 'succeeded', nodes: [], duration_ms: 1 } }),
+    )
     expect(live()).toHaveTextContent('Run succeeded')
     act(() => useStore.setState({ run: { id: 'r', status: 'cancelled', nodes: [], duration_ms: 1 } }))
     expect(live()).toHaveTextContent('Run cancelled')
@@ -168,7 +226,22 @@ describe('RunAnnouncer', () => {
     const node = s().nodes[0]
     act(() =>
       useStore.setState({
-        run: { id: 'r', status: 'failed', duration_ms: 1, nodes: [{ node_id: node.id, status: 'failed', input: null, output: null, logs: [], error: null, duration_ms: 1 }] },
+        run: {
+          id: 'r',
+          status: 'failed',
+          duration_ms: 1,
+          nodes: [
+            {
+              node_id: node.id,
+              status: 'failed',
+              input: null,
+              output: null,
+              logs: [],
+              error: null,
+              duration_ms: 1,
+            },
+          ],
+        },
       }),
     )
     render(<RunAnnouncer />)

@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { applyBackendInfo, isDesktop, tauriBridge, type DesktopBridge, type StartupFailure } from './bridge'
+import {
+  applyBackendInfo,
+  isDesktop,
+  tauriBridge,
+  type BackendInfo,
+  type DesktopBridge,
+  type StartupFailure,
+} from './bridge'
 
 type Phase = { name: 'starting' } | { name: 'ready' } | { name: 'failed'; failure: StartupFailure }
 
@@ -16,32 +23,36 @@ function toFailure(e: unknown): StartupFailure {
  * error (with the log tail) if it cannot start. In a browser it renders the app immediately.
  */
 export function Boot({ children, bridge }: { children: ReactNode; bridge?: DesktopBridge }) {
-  const active = bridge ?? (isDesktop() ? tauriBridge() : null)
+  // created once: a new bridge object every render would restart the whole startup wait
+  const [active] = useState(() => bridge ?? (isDesktop() ? tauriBridge() : null))
   const [phase, setPhase] = useState<Phase>(active ? { name: 'starting' } : { name: 'ready' })
   const [crashed, setCrashed] = useState<string | null>(null)
 
-  const start = useCallback(async () => {
-    if (!active) return
+  const onReady = useCallback((info: BackendInfo) => {
+    applyBackendInfo(info)
+    setCrashed(null)
+    setPhase({ name: 'ready' })
+  }, [])
+  const onFailed = useCallback((e: unknown) => setPhase({ name: 'failed', failure: toFailure(e) }), [])
+
+  /** Show "Starting…" again and wait (after a crash or a manual retry). */
+  const restart = useCallback(() => {
     setPhase({ name: 'starting' })
-    try {
-      applyBackendInfo(await active.waitForBackend())
-      setCrashed(null)
-      setPhase({ name: 'ready' })
-    } catch (e) {
-      setPhase({ name: 'failed', failure: toFailure(e) })
-    }
-  }, [active])
+    return active?.waitForBackend().then(onReady, onFailed)
+  }, [active, onReady, onFailed])
 
   useEffect(() => {
-    void start()
+    // the initial phase is already "starting"; state is only set when the answer arrives
+    void active?.waitForBackend().then(onReady, onFailed)
     let off: (() => void) | undefined
-    void active?.onBackendExit((reason) => {
-      setCrashed(reason) // the shell restarts it; wait for it to come back
-      void start()
-    }).then((fn) => (off = fn))
+    void active
+      ?.onBackendExit((reason) => {
+        setCrashed(reason) // the shell restarts it; wait for it to come back
+        void restart()
+      })
+      .then((fn) => (off = fn))
     return () => off?.()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [active, onReady, onFailed, restart])
 
   if (phase.name === 'starting') {
     return (
@@ -63,10 +74,7 @@ export function Boot({ children, bridge }: { children: ReactNode; bridge?: Deskt
           <p>{failure.message}</p>
           {failure.logTail.length > 0 && <pre className="boot-log">{failure.logTail.join('\n')}</pre>}
           <div className="boot-actions">
-            <button
-              className="primary"
-              onClick={() => void active?.restartBackend().then(start, start)}
-            >
+            <button className="primary" onClick={() => void active?.restartBackend().then(restart, restart)}>
               Try again
             </button>
             <button onClick={() => void navigator.clipboard?.writeText(diagnostics)}>Copy diagnostics</button>

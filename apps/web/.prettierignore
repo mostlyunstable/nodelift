@@ -1,0 +1,7 @@
+dist
+src-tauri/target
+src-tauri/gen
+src-tauri/resources
+src-tauri/icons
+pnpm-lock.yaml
+src/api/api.generated.ts

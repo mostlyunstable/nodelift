@@ -26,14 +26,22 @@ describe('Boot', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('renders the app straight away outside the desktop shell', () => {
-    render(<Boot><div>the editor</div></Boot>)
+    render(
+      <Boot>
+        <div>the editor</div>
+      </Boot>,
+    )
     expect(screen.getByText('the editor')).toBeInTheDocument()
   })
 
   it('waits for the backend, applies its address and token, then shows the app', async () => {
     let resolve!: (i: BackendInfo) => void
     const { bridge } = fakeBridge({ waitForBackend: () => new Promise((r) => (resolve = r)) })
-    render(<Boot bridge={bridge}><div>the editor</div></Boot>)
+    render(
+      <Boot bridge={bridge}>
+        <div>the editor</div>
+      </Boot>,
+    )
     expect(screen.getByRole('status')).toHaveTextContent('Starting')
     expect(screen.queryByText('the editor')).not.toBeInTheDocument() // no API calls before it is ready
     await act(async () => resolve(INFO))
@@ -42,10 +50,18 @@ describe('Boot', () => {
   })
 
   it('shows why startup failed, with the log tail, and lets the user retry', async () => {
-    const failure = { message: 'port already in use', logTail: ['line one', 'line two'], logPath: '/tmp/logs/backend.log' }
+    const failure = {
+      message: 'port already in use',
+      logTail: ['line one', 'line two'],
+      logPath: '/tmp/logs/backend.log',
+    }
     const waitForBackend = vi.fn().mockRejectedValueOnce(failure).mockResolvedValueOnce(INFO)
     const { bridge } = fakeBridge({ waitForBackend })
-    render(<Boot bridge={bridge}><div>the editor</div></Boot>)
+    render(
+      <Boot bridge={bridge}>
+        <div>the editor</div>
+      </Boot>,
+    )
     expect(await screen.findByRole('alert')).toHaveTextContent('could not start')
     expect(screen.getByText('port already in use')).toBeInTheDocument()
     expect(screen.getByText(/line one/)).toBeInTheDocument()
@@ -60,7 +76,11 @@ describe('Boot', () => {
     const { bridge } = fakeBridge({ waitForBackend: vi.fn().mockRejectedValue(failure) })
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.assign(navigator, { clipboard: { writeText } })
-    render(<Boot bridge={bridge}><div /></Boot>)
+    render(
+      <Boot bridge={bridge}>
+        <div />
+      </Boot>,
+    )
     fireEvent.click(await screen.findByRole('button', { name: 'Show log folder' }))
     expect(bridge.revealLogs).toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Copy diagnostics' }))
@@ -69,7 +89,11 @@ describe('Boot', () => {
 
   it('hides the log button when there is no log path and tolerates plain-string errors', async () => {
     const { bridge } = fakeBridge({ waitForBackend: vi.fn().mockRejectedValue('plain failure') })
-    render(<Boot bridge={bridge}><div /></Boot>)
+    render(
+      <Boot bridge={bridge}>
+        <div />
+      </Boot>,
+    )
     expect(await screen.findByText('plain failure')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Show log folder' })).not.toBeInTheDocument()
   })
@@ -77,7 +101,11 @@ describe('Boot', () => {
   it('shows a restarting message when the backend exits, and recovers', async () => {
     const waitForBackend = vi.fn().mockResolvedValueOnce(INFO)
     const { bridge, exit } = fakeBridge({ waitForBackend })
-    render(<Boot bridge={bridge}><div>the editor</div></Boot>)
+    render(
+      <Boot bridge={bridge}>
+        <div>the editor</div>
+      </Boot>,
+    )
     expect(await screen.findByText('the editor')).toBeInTheDocument()
     let resolveAgain!: (i: BackendInfo) => void
     waitForBackend.mockImplementationOnce(() => new Promise((r) => (resolveAgain = r)))
@@ -86,5 +114,26 @@ describe('Boot', () => {
     await act(async () => resolveAgain({ ...INFO, token: 'new-token' }))
     expect(await screen.findByText('the editor')).toBeInTheDocument()
     expect(getApiConfig().token).toBe('new-token') // picks up the restarted backend's credentials
+  })
+})
+
+describe('Boot stability', () => {
+  it('waits for the backend exactly once however often it re-renders', async () => {
+    const { bridge } = fakeBridge()
+    const { rerender } = render(
+      <Boot bridge={bridge}>
+        <div>app</div>
+      </Boot>,
+    )
+    expect(await screen.findByText('app')).toBeInTheDocument()
+    for (let i = 0; i < 5; i++) {
+      rerender(
+        <Boot bridge={{ ...bridge }}>
+          <div>app</div>
+        </Boot>,
+      ) // a brand-new bridge object each time must not restart startup
+    }
+    expect(bridge.waitForBackend).toHaveBeenCalledTimes(1)
+    expect(bridge.onBackendExit).toHaveBeenCalledTimes(1)
   })
 })

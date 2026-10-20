@@ -3,14 +3,34 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useStore } from '../state/store'
 import { ConfigEditor } from './ConfigEditors'
 
-vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+vi.stubGlobal(
+  'ResizeObserver',
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+)
 
 describe('branch settings', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('[]'))
     useStore.getState().reset()
-    useStore.setState({ nodeDefs: [{ type: 'logic.branch', version: 1, title: 'Branch (if / else)', category: 'Logic', description: '', config_schema: {}, default_config: { path: '$', operator: 'truthy' }, outputs: [{ name: 'true' }, { name: 'false' }] }] })
+    useStore.setState({
+      nodeDefs: [
+        {
+          type: 'logic.branch',
+          version: 1,
+          title: 'Branch (if / else)',
+          category: 'Logic',
+          description: '',
+          config_schema: {},
+          default_config: { path: '$', operator: 'truthy' },
+          outputs: [{ name: 'true' }, { name: 'false' }],
+        },
+      ],
+    })
     useStore.getState().addNode('logic.branch')
   })
 
@@ -30,7 +50,11 @@ describe('branch settings', () => {
     const value = screen.getByLabelText(/this value/)
     fireEvent.change(value, { target: { value: '100' } })
     fireEvent.change(screen.getByLabelText(/Look at/), { target: { value: '$.order.total' } })
-    expect(useStore.getState().nodes[0].data.config).toMatchObject({ path: '$.order.total', operator: 'gt', value: 100 })
+    expect(useStore.getState().nodes[0].data.config).toMatchObject({
+      path: '$.order.total',
+      operator: 'gt',
+      value: 100,
+    })
     fireEvent.change(screen.getByLabelText(/Send it down/), { target: { value: 'exists' } })
     rerender(<ConfigEditor node={useStore.getState().nodes[0]} />)
     expect(screen.queryByLabelText(/this value/)).toBeNull()

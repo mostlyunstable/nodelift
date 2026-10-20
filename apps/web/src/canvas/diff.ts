@@ -9,7 +9,8 @@ export interface WorkflowDiff {
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
-const edgeKey = (e: WorkflowDefinition['edges'][number]) => `${e.source.node}:${e.source.port}>${e.target.node}:${e.target.port}`
+const edgeKey = (e: WorkflowDefinition['edges'][number]) =>
+  `${e.source.node}:${e.source.port}>${e.target.node}:${e.target.port}`
 
 /** What changed going from one workflow to another. Layout (node positions) is ignored on purpose. */
 export function diffWorkflows(from: WorkflowDefinition, to: WorkflowDefinition): WorkflowDiff {

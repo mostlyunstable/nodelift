@@ -6,10 +6,24 @@ import { jsonResponse } from '../test-utils/sse'
 import type { Credential } from '../types/workflow'
 import { CredentialsDialog } from './Dialogs'
 
-vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+vi.stubGlobal(
+  'ResizeObserver',
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+)
 
 const s = () => useStore.getState()
-const cred = (name: string): Credential => ({ id: `c_${name}`, name, kind: 'other', description: '', created_at: '2026-10-20T10:00:00Z', updated_at: '2026-10-20T10:00:00Z' })
+const cred = (name: string): Credential => ({
+  id: `c_${name}`,
+  name,
+  kind: 'other',
+  description: '',
+  created_at: '2026-10-20T10:00:00Z',
+  updated_at: '2026-10-20T10:00:00Z',
+})
 const SECRET = 'ghp_exampleSecretValue123'
 
 /** A fake credentials backend that records what it was sent. */
@@ -23,11 +37,18 @@ function backend(initial: string[] = []) {
     if (u === '/credentials' && method === 'GET') return new Response(JSON.stringify(names.map(cred)))
     if (u === '/credentials' && method === 'POST') {
       const body = JSON.parse(String(init?.body))
-      if (names.includes(body.name)) return jsonResponse({ error: { code: 'credential_exists', message: `A credential named '${body.name}' already exists` } }, 409)
+      if (names.includes(body.name))
+        return jsonResponse(
+          {
+            error: { code: 'credential_exists', message: `A credential named '${body.name}' already exists` },
+          },
+          409,
+        )
       names.push(body.name)
       return jsonResponse(cred(body.name), 201)
     }
-    if (u.startsWith('/credentials/') && method === 'PUT') return jsonResponse(cred(decodeURIComponent(u.split('/')[2])))
+    if (u.startsWith('/credentials/') && method === 'PUT')
+      return jsonResponse(cred(decodeURIComponent(u.split('/')[2])))
     if (u.startsWith('/credentials/') && method === 'DELETE') {
       names.splice(names.indexOf(decodeURIComponent(u.split('/')[2])), 1)
       return new Response(null, { status: 204 })
@@ -80,7 +101,10 @@ describe('CredentialsDialog', () => {
     fireEvent.change(field, { target: { value: SECRET } })
     fireEvent.click(screen.getByRole('button', { name: 'Save credential' }))
     await waitFor(() => expect(sent.some((c) => c.method === 'POST')).toBe(true))
-    expect(JSON.parse(sent.find((c) => c.method === 'POST')?.body ?? '{}')).toMatchObject({ name: 'github', value: SECRET })
+    expect(JSON.parse(sent.find((c) => c.method === 'POST')?.body ?? '{}')).toMatchObject({
+      name: 'github',
+      value: SECRET,
+    })
     await waitFor(() => expect(screen.getByLabelText('Secret value')).toHaveValue('')) // not kept in the UI
     expect(screen.getByLabelText('Name')).toHaveValue('')
     expect(s().message).toBe('Saved credential “github”.')
@@ -107,7 +131,9 @@ describe('CredentialsDialog', () => {
     expect(screen.queryByLabelText('Name')).toBeNull() // the name cannot change while replacing
     fireEvent.change(screen.getByLabelText('Secret value'), { target: { value: SECRET } })
     fireEvent.click(screen.getByRole('button', { name: 'Replace value' }))
-    await waitFor(() => expect(sent.some((c) => c.method === 'PUT' && c.url === '/credentials/github')).toBe(true))
+    await waitFor(() =>
+      expect(sent.some((c) => c.method === 'PUT' && c.url === '/credentials/github')).toBe(true),
+    )
     await waitFor(() => expect(s().message).toMatch(/Replaced the value of “github”/))
     expect(screen.getByRole('heading', { name: 'Add a credential' })).toBeInTheDocument()
   })
@@ -135,7 +161,20 @@ describe('CredentialsDialog', () => {
 describe('HTTP node credential hint', () => {
   it('tells you not to paste secrets, lists saved credentials, and opens the manager', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('[]'))
-    useStore.setState({ credentials: [cred('github'), cred('stripe')], nodeDefs: [{ type: 'http.request', version: 1, title: 'HTTP request', category: 'Integrations', description: '', config_schema: {}, default_config: { url: 'https://', method: 'GET' } }] })
+    useStore.setState({
+      credentials: [cred('github'), cred('stripe')],
+      nodeDefs: [
+        {
+          type: 'http.request',
+          version: 1,
+          title: 'HTTP request',
+          category: 'Integrations',
+          description: '',
+          config_schema: {},
+          default_config: { url: 'https://', method: 'GET' },
+        },
+      ],
+    })
     s().addNode('http.request')
     render(<ConfigEditor node={s().nodes[0]} />)
     const hint = screen.getByTestId('credential-hint')

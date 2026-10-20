@@ -19,24 +19,14 @@ from app.domain.records import (
 from app.domain.repositories import RevisionConflict
 from app.domain.run import RunEvent
 from app.domain.workflow import WorkflowDefinition
+from app.services.container import workflow_service
 from app.services.workflow_service import WorkflowService
-from app.storage.repositories import SqlRunRepository, SqlWorkflowRepository
 
 router = APIRouter(tags=["stored workflows"])
 
 
 def get_service(request: Request, registry: Registry) -> WorkflowService:
-    sf = request.app.state.session_factory
-    return WorkflowService(
-        SqlWorkflowRepository(sf),
-        SqlRunRepository(sf),
-        registry,
-        request.app.state.run_hub,
-        request.app.state.gate,
-        request.app.state.settings.max_run_seconds,
-        request.app.state.settings.keep_runs_per_workflow,
-        request.app.state.secrets,
-    )
+    return workflow_service(request.app.state, registry)
 
 
 Service = Annotated[WorkflowService, Depends(get_service)]

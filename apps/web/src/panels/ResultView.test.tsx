@@ -20,15 +20,28 @@ describe('ResultView errors', () => {
   it('offers "Show line N" only when there is a line and a handler, and calls it', () => {
     const onShowLine = vi.fn()
     const { rerender } = render(
-      <ResultView status="failed" duration_ms={5} output={null} logs={[]} error={failure} onShowLine={onShowLine} />,
+      <ResultView
+        status="failed"
+        duration_ms={5}
+        output={null}
+        logs={[]}
+        error={failure}
+        onShowLine={onShowLine}
+      />,
     )
     fireEvent.click(screen.getByRole('button', { name: 'Show line 3 in the code' }))
     expect(onShowLine).toHaveBeenCalledWith(3)
     rerender(<ResultView status="failed" duration_ms={5} output={null} logs={[]} error={failure} />)
     expect(screen.queryByRole('button', { name: /Show line/ })).toBeNull() // no handler, no button
     rerender(
-      <ResultView status="failed" duration_ms={5} output={null} logs={[]} onShowLine={onShowLine}
-        error={{ type: 'timeout', message: 'Exceeded 5s limit' }} />,
+      <ResultView
+        status="failed"
+        duration_ms={5}
+        output={null}
+        logs={[]}
+        onShowLine={onShowLine}
+        error={{ type: 'timeout', message: 'Exceeded 5s limit' }}
+      />,
     )
     expect(screen.queryByRole('button', { name: /Show line/ })).toBeNull() // no line to show
   })

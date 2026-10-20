@@ -4,7 +4,7 @@ import { AUTOSAVE_MS, useStore } from './store'
 interface Call {
   method: string
   url: string
-  body?: any // eslint-disable-line @typescript-eslint/no-explicit-any
+  body?: any
 }
 
 /** Fake backend. `hold()` makes the next write wait until `release()` so races can be staged. */
@@ -15,18 +15,40 @@ function fakeBackend(opts: { failWrites?: boolean; conflict?: boolean } = {}) {
   let revision = 0
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
     const method = init?.method ?? 'GET'
-    const call: Call = { method, url: String(url), body: init?.body ? JSON.parse(String(init.body)) : undefined }
+    const call: Call = {
+      method,
+      url: String(url),
+      body: init?.body ? JSON.parse(String(init.body)) : undefined,
+    }
     calls.push(call)
     const reply = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status })
     if (method === 'POST' || method === 'PUT') {
       if (gate) await gate
       if (opts.failWrites) return reply({ error: { code: 'internal', message: 'boom' } }, 500)
-      if (opts.conflict && method === 'PUT') return reply({ error: { code: 'revision_conflict', message: 'x' } }, 409)
+      if (opts.conflict && method === 'PUT')
+        return reply({ error: { code: 'revision_conflict', message: 'x' } }, 409)
       revision += 1
-      return reply({ id: 'wf_1', name: 'Untitled', revision, draft: { nodes: [], edges: [] } }, method === 'POST' ? 201 : 200)
+      return reply(
+        { id: 'wf_1', name: 'Untitled', revision, draft: { nodes: [], edges: [] } },
+        method === 'POST' ? 201 : 200,
+      )
     }
-    if (call.url.endsWith('/workflows/wf_1')) return reply({ id: 'wf_1', name: 'Saved one', revision: 7, draft: { schema_version: 1, id: 'wf_1', name: 'Saved one', nodes: [{ id: 'n1', type: 'code.python', name: 'Hi', config: { source: 'x' } }], edges: [], ui: {} } })
-    if (call.url.endsWith('/workflows/gone')) return reply({ error: { code: 'not_found', message: 'nope' } }, 404)
+    if (call.url.endsWith('/workflows/wf_1'))
+      return reply({
+        id: 'wf_1',
+        name: 'Saved one',
+        revision: 7,
+        draft: {
+          schema_version: 1,
+          id: 'wf_1',
+          name: 'Saved one',
+          nodes: [{ id: 'n1', type: 'code.python', name: 'Hi', config: { source: 'x' } }],
+          edges: [],
+          ui: {},
+        },
+      })
+    if (call.url.endsWith('/workflows/gone'))
+      return reply({ error: { code: 'not_found', message: 'nope' } }, 404)
     return reply([])
   })
   return {
@@ -180,7 +202,12 @@ describe('autosave and unsaved-change tracking', () => {
     fakeBackend()
     localStorage.setItem('nodecraft.lastWorkflow', 'wf_1')
     await useStore.getState().restore()
-    expect(useStore.getState()).toMatchObject({ workflowId: 'wf_1', workflowName: 'Saved one', revision: 7, dirty: false })
+    expect(useStore.getState()).toMatchObject({
+      workflowId: 'wf_1',
+      workflowName: 'Saved one',
+      revision: 7,
+      dirty: false,
+    })
     expect(useStore.getState().nodes[0].data.name).toBe('Hi')
 
     useStore.getState().reset()

@@ -1,5 +1,5 @@
 import { Background, Controls, MiniMap, ReactFlow } from '@xyflow/react'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { checkConnection } from '../canvas/graph'
 import { CodeNode } from '../nodes/CodeNode'
 import { Inspector } from '../panels/Inspector'
@@ -7,7 +7,13 @@ import { RunPanel } from '../panels/RunPanel'
 import { loadTheme, useStore } from '../state/store'
 import { resolveTheme } from '../state/theme'
 import { CommandPalette } from '../ui/CommandPalette'
-import { CredentialsDialog, DiagnosticsDialog, ImportDialog, ShortcutsDialog, VersionsDialog } from '../ui/Dialogs'
+import {
+  CredentialsDialog,
+  DiagnosticsDialog,
+  ImportDialog,
+  ShortcutsDialog,
+  VersionsDialog,
+} from '../ui/Dialogs'
 import { Menu, type MenuItem } from '../ui/Menu'
 import { EmptyCanvas, RunAnnouncer, Toast, TourBanner } from '../ui/Overlays'
 import { buildCommands, type CommandContext } from './commands'
@@ -40,6 +46,7 @@ export function App() {
   const s = useStore()
   const theme = useResolvedTheme()
   const fileInput = useRef<HTMLInputElement>(null)
+  const [importRequests, setImportRequests] = useState(0)
 
   useEffect(() => {
     const st = useStore.getState()
@@ -82,6 +89,10 @@ export function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (importRequests > 0) fileInput.current?.click()
+  }, [importRequests])
+
   // Save pending edits before replacing the canvas; if that fails, ask before discarding them.
   const guarded = async (action: () => void | Promise<void>) => {
     const saved = await s.flush()
@@ -113,7 +124,10 @@ export function App() {
       newWorkflow: () => void guarded(s.reset),
       open: (id) => void guarded(() => s.open(id)),
       deleteCurrent: () => {
-        if (s.workflowId && window.confirm(`Delete “${s.workflowName}” and its run history? This cannot be undone.`)) {
+        if (
+          s.workflowId &&
+          window.confirm(`Delete “${s.workflowName}” and its run history? This cannot be undone.`)
+        ) {
           void s.deleteWorkflow(s.workflowId)
         }
       },
@@ -121,16 +135,19 @@ export function App() {
       example: (id) => void guarded(() => s.createExample(id)),
       exportCurrent: () => void s.exportCurrent(),
       exportAll: () => void s.exportAll(),
-      importFile: () => fileInput.current?.click(),
+      importFile: () => setImportRequests((n) => n + 1),
       credentials: () => s.openDialog('credentials'),
       diagnostics: () => s.openDialog('diagnostics'),
       shortcuts: () => s.openDialog('shortcuts'),
       theme: s.setTheme,
     },
   }
-  const commands = useMemo(() => buildCommands(context), [context.hasNodes, context.busy, context.runStatus, context.canUndo, context.canRedo, context.workflowId, context.workflows, context.nodeDefs, context.examples, context.hasVersions, s.workflowName]) // eslint-disable-line react-hooks/exhaustive-deps
+  // only needed while the palette is open; building the list is cheap
+  const commands = s.dialog === 'palette' ? buildCommands(context) : []
 
-  const addItems: MenuItem[] = (s.nodeDefs.length > 0 ? s.nodeDefs : [{ type: 'code.python', title: 'Python code' }]).map((d) => ({
+  const addItems: MenuItem[] = (
+    s.nodeDefs.length > 0 ? s.nodeDefs : [{ type: 'code.python', title: 'Python code' }]
+  ).map((d) => ({
     label: d.title,
     onSelect: () => s.addNode(d.type),
   }))
@@ -151,8 +168,13 @@ export function App() {
     { label: 'Check for problems', onSelect: () => void s.validate(), disabled: s.nodes.length === 0 },
     { label: 'Versions…', onSelect: () => s.openDialog('versions'), disabled: !s.workflowId },
     { label: 'Save a version', onSelect: () => void s.publish(), disabled: s.nodes.length === 0 },
-    { label: 'Export this workflow…', onSelect: () => void s.exportCurrent(), disabled: s.nodes.length === 0, separatorBefore: true },
-    { label: 'Import a workflow…', onSelect: () => fileInput.current?.click() },
+    {
+      label: 'Export this workflow…',
+      onSelect: () => void s.exportCurrent(),
+      disabled: s.nodes.length === 0,
+      separatorBefore: true,
+    },
+    { label: 'Import a workflow…', onSelect: () => setImportRequests((n) => n + 1) },
     { label: 'Export everything…', onSelect: () => void s.exportAll() },
     { label: 'Credentials…', onSelect: () => s.openDialog('credentials'), separatorBefore: true },
     { label: 'Diagnostics…', onSelect: () => s.openDialog('diagnostics') },
@@ -179,16 +201,29 @@ export function App() {
           {SAVE_LABEL[s.saveState]}
         </span>
         <span className="sep" />
-        <button className="primary" onClick={() => void s.runWorkflow()} disabled={s.busy !== null || s.nodes.length === 0} title="Run (⌘↵)">
+        <button
+          className="primary"
+          onClick={() => void s.runWorkflow()}
+          disabled={s.busy !== null || s.nodes.length === 0}
+          title="Run (⌘↵)"
+        >
           {s.busy === 'run' ? 'Running…' : '▶ Run'}
         </button>
-        <button onClick={() => void s.cancel()} disabled={s.busy !== 'run' || s.run?.status !== 'running'} title="Stop (⌘.)">
+        <button
+          onClick={() => void s.cancel()}
+          disabled={s.busy !== 'run' || s.run?.status !== 'running'}
+          title="Stop (⌘.)"
+        >
           Stop
         </button>
         <span className="spacer" />
         <Menu label="+ Node" ariaLabel="Add node" items={addItems} />
         <Menu label="Workflows" ariaLabel="Workflows" items={workflowItems} align="right" />
-        <button onClick={() => s.openDialog('palette')} title="Command palette (⌘K)" aria-label="Command palette">
+        <button
+          onClick={() => s.openDialog('palette')}
+          title="Command palette (⌘K)"
+          aria-label="Command palette"
+        >
           ⌘K
         </button>
         <Menu label="⋯" ariaLabel="More actions" items={moreItems} align="right" />
@@ -205,7 +240,8 @@ export function App() {
             onEdgesChange={s.onEdgesChange}
             onConnect={s.onConnect}
             isValidConnection={(c) =>
-              checkConnection(useStore.getState().edges, c.source, c.target, c.sourceHandle, c.targetHandle).ok
+              checkConnection(useStore.getState().edges, c.source, c.target, c.sourceHandle, c.targetHandle)
+                .ok
             }
             onNodeDragStart={s.beginDrag}
             onNodeClick={(_, n) => s.select(n.id)}

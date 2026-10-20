@@ -86,7 +86,8 @@ describe('undo and redo', () => {
     const id = s().nodes[0].id
     const start = s().nodes[0].position
     s().beginDrag()
-    for (let i = 1; i <= 20; i++) s().onNodesChange([{ type: 'position', id, position: { x: i * 5, y: 0 }, dragging: true }])
+    for (let i = 1; i <= 20; i++)
+      s().onNodesChange([{ type: 'position', id, position: { x: i * 5, y: 0 }, dragging: true }])
     expect(s().nodes[0].position.x).toBe(100)
     s().undo()
     expect(s().nodes[0].position).toEqual(start)
@@ -115,7 +116,8 @@ describe('undo and redo', () => {
     s().addNode()
     s().addNode()
     const [a, b, c] = s().nodes.map((n) => n.id)
-    const link = (x: string, y: string) => s().onConnect({ source: x, target: y, sourceHandle: null, targetHandle: null })
+    const link = (x: string, y: string) =>
+      s().onConnect({ source: x, target: y, sourceHandle: null, targetHandle: null })
     link(a, b)
     link(b, c)
     link(a, a)

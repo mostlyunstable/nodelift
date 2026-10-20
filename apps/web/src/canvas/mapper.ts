@@ -12,8 +12,7 @@ export interface NodeData extends Record<string, unknown> {
 
 export type FlowNode = Node<NodeData, 'node'>
 
-export const DEFAULT_SOURCE =
-  'def main(input_data):\n    return {"message": "Hello from Nodecraft"}\n'
+export const DEFAULT_SOURCE = 'def main(input_data):\n    return {"message": "Hello from Nodecraft"}\n'
 
 /** React Flow state -> backend workflow format. Layout goes into `ui` only. */
 export function toWorkflow(nodes: FlowNode[], edges: Edge[], name = 'Untitled'): WorkflowDefinition {

@@ -28,13 +28,14 @@ export function RunPanel() {
         {runs.length === 0 && <div className="muted">No saved runs yet.</div>}
         <ul className="steps">
           {runs.map((r) => (
-            <li
-              key={r.id}
-              className={r.id === run?.id ? 'active' : ''}
-              onClick={() => useStore.getState().openRun(r.id)}
-            >
-              <span className={`dot dot-${r.status}`} /> v{r.version_no} {r.status}
-              <span className="muted"> {r.duration_ms}ms · {formatTime(r.created_at)}</span>
+            <li key={r.id} className={r.id === run?.id ? 'active' : ''}>
+              <button className="row-button" onClick={() => useStore.getState().openRun(r.id)}>
+                <span className={`dot dot-${r.status}`} /> v{r.version_no} {r.status}
+                <span className="muted">
+                  {' '}
+                  {r.duration_ms}ms · {formatTime(r.created_at)}
+                </span>
+              </button>
             </li>
           ))}
         </ul>
@@ -43,14 +44,21 @@ export function RunPanel() {
             <h4>Events</h4>
             <ol className="events">
               {events.map((e) => (
-                <li
-                  key={e.seq}
-                  className={e.node_id ? 'clickable' : undefined}
-                  onClick={() => e.node_id && useStore.getState().select(e.node_id)}
-                >
-                  <span className="muted">#{e.seq}</span> {e.type}
-                  {e.node_id && <span> · {nameOf(e.node_id)}</span>}
-                  {e.status && <span className={`pill pill-${e.status}`}> {e.status}</span>}
+                <li key={e.seq}>
+                  {e.node_id ? (
+                    <button
+                      className="row-button"
+                      onClick={() => useStore.getState().select(e.node_id as string)}
+                    >
+                      <span className="muted">#{e.seq}</span> {e.type}
+                      <span> · {nameOf(e.node_id)}</span>
+                      {e.status && <span className={`pill pill-${e.status}`}> {e.status}</span>}
+                    </button>
+                  ) : (
+                    <span className="row-static">
+                      <span className="muted">#{e.seq}</span> {e.type}
+                    </span>
+                  )}
                 </li>
               ))}
             </ol>
@@ -64,21 +72,29 @@ export function RunPanel() {
                 <li
                   key={`${n.node_id}-${n.attempt ?? 1}`}
                   className={n.node_id === selectedId ? 'active' : ''}
-                  onClick={() => useStore.getState().select(n.node_id)}
                 >
-                  <span className={`dot dot-${n.status}`} /> {nameOf(n.node_id)}
-                  <span className="muted">
-                    {' '}
-                    {n.status}
-                    {n.status === 'skipped' && n.skip_reason ? ` · ${n.skip_reason.replace(/_/g, ' ')}` : n.reused ? ' · reused' : ` · ${n.duration_ms}ms`}
-                    {(n.attempt ?? 1) > 1 ? ` · attempt ${n.attempt}` : ''}
-                  </span>
+                  <button className="row-button" onClick={() => useStore.getState().select(n.node_id)}>
+                    <span className={`dot dot-${n.status}`} /> {nameOf(n.node_id)}
+                    <span className="muted">
+                      {' '}
+                      {n.status}
+                      {n.status === 'skipped' && n.skip_reason
+                        ? ` · ${n.skip_reason.replace(/_/g, ' ')}`
+                        : n.reused
+                          ? ' · reused'
+                          : ` · ${n.duration_ms}ms`}
+                      {(n.attempt ?? 1) > 1 ? ` · attempt ${n.attempt}` : ''}
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
             {(run.status === 'failed' || run.status === 'cancelled') && (
-              <button onClick={() => void resume()} disabled={busy !== null}
-                title="New run that reuses nodes which already succeeded">
+              <button
+                onClick={() => void resume()}
+                disabled={busy !== null}
+                title="New run that reuses nodes which already succeeded"
+              >
                 ↻ Resume from failure
               </button>
             )}
@@ -98,7 +114,9 @@ export function RunPanel() {
             error={exec.error}
           />
         ) : (
-          <div className="muted">Select a node after a run to inspect its input, output, logs and errors.</div>
+          <div className="muted">
+            Select a node after a run to inspect its input, output, logs and errors.
+          </div>
         )}
       </div>
     </section>

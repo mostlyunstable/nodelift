@@ -6,7 +6,14 @@ import { RunPanel } from '../panels/RunPanel'
 import { jsonResponse, sseStream } from '../test-utils/sse'
 import { ResultView } from '../panels/ResultView'
 
-vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+vi.stubGlobal(
+  'ResizeObserver',
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+)
 
 describe('store', () => {
   beforeEach(() => {
@@ -25,8 +32,15 @@ describe('store', () => {
     expect(String(useStore.getState().nodes[0].data.config.source)).toContain('def main')
     useStore.setState({
       nodeDefs: [
-        { type: 'transform.json', version: 1, title: 'JSON transform', category: 'Data', description: '',
-          config_schema: {}, default_config: { mapping: { value: '$' } } },
+        {
+          type: 'transform.json',
+          version: 1,
+          title: 'JSON transform',
+          category: 'Data',
+          description: '',
+          config_schema: {},
+          default_config: { mapping: { value: '$' } },
+        },
       ],
     })
     useStore.getState().addNode('transform.json')
@@ -63,11 +77,15 @@ describe('persistence', () => {
     const s = useStore.getState()
     expect(s.workflowId).toBe('wf_1')
     expect(s.run?.id).toBe('run_1')
-    expect(calls.indexOf('POST /api/v1/workflows')).toBeLessThan(calls.indexOf('POST /api/v1/workflows/wf_1/runs'))
+    expect(calls.indexOf('POST /api/v1/workflows')).toBeLessThan(
+      calls.indexOf('POST /api/v1/workflows/wf_1/runs'),
+    )
   })
   it('explains a revision conflict', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify({ error: { code: 'revision_conflict', message: 'x' } }), { status: 409 })),
+      Promise.resolve(
+        new Response(JSON.stringify({ error: { code: 'revision_conflict', message: 'x' } }), { status: 409 }),
+      ),
     )
     useStore.setState({ workflowId: 'wf_1', revision: 1 })
     expect(await useStore.getState().save()).toBeNull()
@@ -90,7 +108,8 @@ describe('live run', () => {
         streamCalls.push(u)
         return Promise.resolve(stream.response())
       }
-      if (u.endsWith('/workflows') && init?.method === 'POST') return jsonResponse({ id: 'wf_1', revision: 1 }, 201)
+      if (u.endsWith('/workflows') && init?.method === 'POST')
+        return jsonResponse({ id: 'wf_1', revision: 1 }, 201)
       if (u.endsWith('/workflows/wf_1/runs') && init?.method === 'POST')
         return jsonResponse({ id: 'run_1', status: 'running', nodes: [], duration_ms: 0, version_no: 1 }, 202)
       if (u.endsWith('/runs/run_1'))
@@ -128,19 +147,53 @@ describe('failed runs', () => {
   it('selects the failing node and asks the editor to show the failing line', async () => {
     const stream = sseStream()
     const failedRun = {
-      id: 'run_1', status: 'failed', duration_ms: 9, version_no: 1,
+      id: 'run_1',
+      status: 'failed',
+      duration_ms: 9,
+      version_no: 1,
       nodes: [
-        { node_id: 'good', status: 'succeeded', attempt: 1, input: null, output: 1, logs: [], error: null, duration_ms: 1 },
-        { node_id: 'bad', status: 'failed', attempt: 1, input: 1, output: null, logs: [], duration_ms: 2,
-          error: { type: 'runtime_error', message: 'ZeroDivisionError: x',
-            traceback: 'Traceback (most recent call last):\n  File "<node>", line 4, in main\nZeroDivisionError: x' } },
-        { node_id: 'later', status: 'skipped', attempt: 1, input: null, output: null, logs: [], error: null, duration_ms: 0 },
+        {
+          node_id: 'good',
+          status: 'succeeded',
+          attempt: 1,
+          input: null,
+          output: 1,
+          logs: [],
+          error: null,
+          duration_ms: 1,
+        },
+        {
+          node_id: 'bad',
+          status: 'failed',
+          attempt: 1,
+          input: 1,
+          output: null,
+          logs: [],
+          duration_ms: 2,
+          error: {
+            type: 'runtime_error',
+            message: 'ZeroDivisionError: x',
+            traceback:
+              'Traceback (most recent call last):\n  File "<node>", line 4, in main\nZeroDivisionError: x',
+          },
+        },
+        {
+          node_id: 'later',
+          status: 'skipped',
+          attempt: 1,
+          input: null,
+          output: null,
+          logs: [],
+          error: null,
+          duration_ms: 0,
+        },
       ],
     }
     vi.spyOn(globalThis, 'fetch').mockImplementation((url, init) => {
       const u = String(url)
       if (u.includes('/events/stream')) return Promise.resolve(stream.response())
-      if (u.endsWith('/workflows') && init?.method === 'POST') return jsonResponse({ id: 'wf_1', revision: 1 }, 201)
+      if (u.endsWith('/workflows') && init?.method === 'POST')
+        return jsonResponse({ id: 'wf_1', revision: 1 }, 201)
       if (u.endsWith('/workflows/wf_1/runs') && init?.method === 'POST')
         return jsonResponse({ id: 'run_1', status: 'running', nodes: [], duration_ms: 0, version_no: 1 }, 202)
       if (u.endsWith('/runs/run_1')) return jsonResponse(failedRun)
@@ -160,10 +213,12 @@ describe('failed runs', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation((url, init) => {
       const u = String(url)
       if (u.includes('/events/stream')) return Promise.resolve(stream.response())
-      if (u.endsWith('/workflows') && init?.method === 'POST') return jsonResponse({ id: 'wf_1', revision: 1 }, 201)
+      if (u.endsWith('/workflows') && init?.method === 'POST')
+        return jsonResponse({ id: 'wf_1', revision: 1 }, 201)
       if (u.endsWith('/workflows/wf_1/runs') && init?.method === 'POST')
         return jsonResponse({ id: 'run_2', status: 'running', nodes: [], duration_ms: 0, version_no: 1 }, 202)
-      if (u.endsWith('/runs/run_2')) return jsonResponse({ id: 'run_2', status: 'succeeded', nodes: [], duration_ms: 1, version_no: 1 })
+      if (u.endsWith('/runs/run_2'))
+        return jsonResponse({ id: 'run_2', status: 'succeeded', nodes: [], duration_ms: 1, version_no: 1 })
       return jsonResponse([])
     })
     useStore.getState().addNode()
@@ -207,10 +262,15 @@ describe('cancel and resume', () => {
       const u = String(url)
       order.push(`${init?.method ?? 'GET'} ${u.replace(/^.*\/api\/v1/, '')}`)
       if (u.includes('/events/stream')) return Promise.resolve(stream.response())
-      if (u.endsWith('/workflows/wf_1') && init?.method === 'PUT') return jsonResponse({ id: 'wf_1', revision: 5 })
+      if (u.endsWith('/workflows/wf_1') && init?.method === 'PUT')
+        return jsonResponse({ id: 'wf_1', revision: 5 })
       return jsonResponse({ id: 'run_2', status: 'running', nodes: [], duration_ms: 0, version_no: 2 }, 202)
     })
-    useStore.setState({ workflowId: 'wf_1', revision: 4, run: { id: 'run_1', status: 'failed', nodes: [], duration_ms: 3 } })
+    useStore.setState({
+      workflowId: 'wf_1',
+      revision: 4,
+      run: { id: 'run_1', status: 'failed', nodes: [], duration_ms: 3 },
+    })
     await useStore.getState().resume()
     expect(useStore.getState().run?.id).toBe('run_2')
     expect(order.indexOf('PUT /workflows/wf_1')).toBeGreaterThanOrEqual(0)
@@ -225,7 +285,11 @@ describe('cancel and resume', () => {
       calls.push(`${init?.method ?? 'GET'} ${String(url)}`)
       return jsonResponse({ error: { message: 'disk full' } }, 500)
     })
-    useStore.setState({ workflowId: 'wf_1', revision: 1, run: { id: 'run_1', status: 'failed', nodes: [], duration_ms: 3 } })
+    useStore.setState({
+      workflowId: 'wf_1',
+      revision: 1,
+      run: { id: 'run_1', status: 'failed', nodes: [], duration_ms: 3 },
+    })
     await useStore.getState().resume()
     expect(calls.some((c) => c.includes('/resume'))).toBe(false)
     expect(useStore.getState().busy).toBeNull()
@@ -241,7 +305,11 @@ describe('cancel and resume', () => {
 
   it('keeps a node shown as running while it will be retried', () => {
     const ev = (seq: number, type: RunEvent['type'], extra: Partial<RunEvent> = {}): RunEvent => ({
-      seq, type, created_at: '', node_id: 'n1', ...extra,
+      seq,
+      type,
+      created_at: '',
+      node_id: 'n1',
+      ...extra,
     })
     applyEvent(ev(1, 'node.started', { attempt: 1 }))
     applyEvent(ev(2, 'node.finished', { status: 'failed', attempt: 1, will_retry: true }))
@@ -255,8 +323,13 @@ describe('cancel and resume', () => {
 describe('panels', () => {
   it('shows an error with its type', () => {
     render(
-      <ResultView status="failed" duration_ms={3} output={null} logs={[]}
-        error={{ type: 'syntax_error', message: 'invalid syntax', line: 1 }} />,
+      <ResultView
+        status="failed"
+        duration_ms={3}
+        output={null}
+        logs={[]}
+        error={{ type: 'syntax_error', message: 'invalid syntax', line: 1 }}
+      />,
     )
     expect(screen.getByRole('alert')).toHaveTextContent('syntax_error')
   })

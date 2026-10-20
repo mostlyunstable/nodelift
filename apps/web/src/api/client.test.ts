@@ -18,7 +18,14 @@ describe('api configuration', () => {
     expect(getApiConfig().baseUrl).toBe('http://127.0.0.1:51234') // trailing slash trimmed
     const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('[]', { status: 200 }))
     await api.listWorkflows()
-    await api.createWorkflow('x', { schema_version: 1, id: '', name: 'x', nodes: [], edges: [], ui: { positions: {} } })
+    await api.createWorkflow('x', {
+      schema_version: 1,
+      id: '',
+      name: 'x',
+      nodes: [],
+      edges: [],
+      ui: { positions: {} },
+    })
     for (const [url, init] of spy.mock.calls) {
       expect(String(url)).toMatch(/^http:\/\/127\.0\.0\.1:51234\/api\/v1\//)
       expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer abc')
@@ -28,7 +35,12 @@ describe('api configuration', () => {
 
   it('turns an error envelope into an ApiError with status, code and details', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ error: { code: 'validation_failed', message: 'bad', details: [{ code: 'cycle', message: 'c' }] } }), { status: 422 }),
+      new Response(
+        JSON.stringify({
+          error: { code: 'validation_failed', message: 'bad', details: [{ code: 'cycle', message: 'c' }] },
+        }),
+        { status: 422 },
+      ),
     )
     const err = await api.listWorkflows().catch((e: unknown) => e)
     expect(err).toBeInstanceOf(ApiError)

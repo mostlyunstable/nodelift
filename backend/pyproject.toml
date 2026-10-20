@@ -16,6 +16,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    "import-linter>=2.15",
     "mypy>=2.4.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
@@ -38,3 +39,36 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.mypy]
 strict = true
 packages = ["app"]
+
+# Architecture rules, checked by `lint-imports` (part of `make lint`). See docs/architecture.md.
+[tool.importlinter]
+root_package = "app"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "The domain and the engine know nothing about the web, databases or processes"
+type = "forbidden"
+source_modules = ["app.domain", "app.engine"]
+forbidden_modules = [
+    "fastapi", "starlette", "uvicorn", "sqlalchemy", "alembic", "httpcore", "keyring",
+    "app.api", "app.services", "app.storage", "app.runtime", "app.nodes",
+]
+
+[[tool.importlinter.contracts]]
+name = "Only the composition layer wires storage into the application"
+type = "forbidden"
+source_modules = ["app.api"]
+forbidden_modules = ["app.storage", "sqlalchemy"]
+allow_indirect_imports = true  # the API may use services, which use storage; it may not import it itself
+
+[[tool.importlinter.contracts]]
+name = "Lower layers never reach up into the API or the services"
+type = "forbidden"
+source_modules = ["app.storage", "app.runtime", "app.nodes", "app.examples"]
+forbidden_modules = ["app.api", "app.services"]
+
+[[tool.importlinter.contracts]]
+name = "Services do not depend on the HTTP layer"
+type = "forbidden"
+source_modules = ["app.services"]
+forbidden_modules = ["app.api", "fastapi", "starlette"]

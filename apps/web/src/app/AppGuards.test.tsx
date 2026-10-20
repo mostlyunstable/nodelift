@@ -56,7 +56,9 @@ describe('App unsaved-work protection', () => {
     await act(async () => {
       await useStore.getState().flush()
     })
-    await waitFor(() => expect(screen.getByRole('status', { name: 'Save status' })).toHaveTextContent('Saved'))
+    await waitFor(() =>
+      expect(screen.getByRole('status', { name: 'Save status' })).toHaveTextContent('Saved'),
+    )
     const clean = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(clean)
     expect(clean.defaultPrevented).toBe(false) // nothing to lose, no prompt
@@ -97,7 +99,12 @@ describe('App shell', () => {
   })
 
   const key = (k: string, mods: KeyboardEventInit = {}) =>
-    act(() => void window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...mods })))
+    act(
+      () =>
+        void window.dispatchEvent(
+          new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...mods }),
+        ),
+    )
 
   it('⌘K opens the command palette from anywhere, Escape closes it', async () => {
     backend()
@@ -109,7 +116,17 @@ describe('App shell', () => {
   })
 
   it('running a palette command works end to end (add a node)', async () => {
-    const defs = [{ type: 'code.python', version: 1, title: 'Python code', category: 'Code', description: '', config_schema: {}, default_config: { source: 'x' } }]
+    const defs = [
+      {
+        type: 'code.python',
+        version: 1,
+        title: 'Python code',
+        category: 'Code',
+        description: '',
+        config_schema: {},
+        default_config: { source: 'x' },
+      },
+    ]
     vi.spyOn(globalThis, 'fetch').mockImplementation((url) =>
       Promise.resolve(new Response(JSON.stringify(String(url).endsWith('/nodes/definitions') ? defs : []))),
     )
@@ -153,7 +170,13 @@ describe('App shell', () => {
 
   it('the Workflows menu lists saved workflows and disables the open one', () => {
     backend()
-    useStore.setState({ workflows: [{ id: 'a', name: 'Alpha', revision: 1, updated_at: '' }, { id: 'b', name: 'Beta', revision: 1, updated_at: '' }], workflowId: 'a' })
+    useStore.setState({
+      workflows: [
+        { id: 'a', name: 'Alpha', revision: 1, updated_at: '' },
+        { id: 'b', name: 'Beta', revision: 1, updated_at: '' },
+      ],
+      workflowId: 'a',
+    })
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Workflows' }))
     expect(screen.getByRole('menuitem', { name: 'Alpha' })).toBeDisabled()

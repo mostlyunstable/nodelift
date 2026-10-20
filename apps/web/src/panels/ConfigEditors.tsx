@@ -149,8 +149,8 @@ function HttpConfig({ node }: { node: FlowNode }) {
         Private, loopback and cloud-metadata addresses are blocked. Redirects are not followed.
       </div>
       <div className="muted" data-testid="credential-hint">
-        Never paste a secret into a header. Save it as a credential and write <code>{'{{credential:NAME}}'}</code> in the
-        value.{' '}
+        Never paste a secret into a header. Save it as a credential and write{' '}
+        <code>{'{{credential:NAME}}'}</code> in the value.{' '}
         {credentials.length > 0
           ? `Saved: ${credentials.map((c) => c.name).join(', ')}. `
           : 'None saved yet. '}
@@ -183,7 +183,11 @@ function BranchConfig({ node }: { node: FlowNode }) {
     <>
       <label className="field">
         Look at (a path into the input)
-        <input value={String(c.path ?? '')} placeholder="$.order.total" onChange={(e) => updateConfig(node.id, { path: e.target.value })} />
+        <input
+          value={String(c.path ?? '')}
+          placeholder="$.order.total"
+          onChange={(e) => updateConfig(node.id, { path: e.target.value })}
+        />
       </label>
       <label className="field">
         Send it down “true” when it
@@ -205,10 +209,16 @@ function BranchConfig({ node }: { node: FlowNode }) {
         />
       )}
       <label className="check">
-        <input type="checkbox" checked={c.strict === true} onChange={(e) => updateConfig(node.id, { strict: e.target.checked })} /> Fail when the path is missing
+        <input
+          type="checkbox"
+          checked={c.strict === true}
+          onChange={(e) => updateConfig(node.id, { strict: e.target.checked })}
+        />{' '}
+        Fail when the path is missing
       </label>
       <div className="muted">
-        Otherwise it goes down “false”. Connect each output to what should run next; the other side is skipped.
+        Otherwise it goes down “false”. Connect each output to what should run next; the other side is
+        skipped.
       </div>
     </>
   )

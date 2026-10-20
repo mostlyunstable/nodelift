@@ -6,7 +6,11 @@ import { useStore } from './store'
 
 const s = () => useStore.getState()
 const DEF = (source: string) => ({
-  schema_version: 1, id: 'wf_1', name: 'W', edges: [], ui: { positions: {} },
+  schema_version: 1,
+  id: 'wf_1',
+  name: 'W',
+  edges: [],
+  ui: { positions: {} },
   nodes: [{ id: 'n1', type: 'code.python', name: 'Step', config: { source } }],
 })
 
@@ -33,7 +37,16 @@ describe('versions', () => {
   it('restoring a version puts it in the editor as an undoable, unsaved edit', async () => {
     backend({
       'GET /workflows/wf_1/versions/2': () =>
-        new Response(JSON.stringify({ id: 'v', workflow_id: 'wf_1', version_no: 2, content_hash: 'h', created_at: '', definition: DEF('old code') })),
+        new Response(
+          JSON.stringify({
+            id: 'v',
+            workflow_id: 'wf_1',
+            version_no: 2,
+            content_hash: 'h',
+            created_at: '',
+            definition: DEF('old code'),
+          }),
+        ),
     })
     useStore.setState({ workflowId: 'wf_1' })
     s().addNode()
@@ -94,13 +107,31 @@ describe('export and import', () => {
     s().reset()
   })
   const file = (text: string) => new File([text], 'w.json', { type: 'application/json' })
-  const PREVIEW = { valid: true, issues: [], summary: { name: 'X', nodes: 1, edges: 0, node_types: { 'code.python': 1 }, code_nodes: 1, http_hosts: [], warnings: ['w'] } }
+  const PREVIEW = {
+    valid: true,
+    issues: [],
+    summary: {
+      name: 'X',
+      nodes: 1,
+      edges: 0,
+      node_types: { 'code.python': 1 },
+      code_nodes: 1,
+      http_hosts: [],
+      warnings: ['w'],
+    },
+  }
 
   it('exports the saved workflow through the file dialog', async () => {
     const save = vi.spyOn(files, 'saveTextFile').mockResolvedValue(true)
     backend({
-      'POST /workflows': () => jsonResponse({ id: 'wf_1', revision: 1, name: 'My flow', draft: DEF('x') }, 201),
-      'GET /workflows/wf_1/export': () => jsonResponse({ format: 'nodecraft-workflow', format_version: 1, workflow: { name: 'My flow', definition: DEF('x') } }),
+      'POST /workflows': () =>
+        jsonResponse({ id: 'wf_1', revision: 1, name: 'My flow', draft: DEF('x') }, 201),
+      'GET /workflows/wf_1/export': () =>
+        jsonResponse({
+          format: 'nodecraft-workflow',
+          format_version: 1,
+          workflow: { name: 'My flow', definition: DEF('x') },
+        }),
     })
     s().addNode()
     s().setName('My flow')
@@ -130,9 +161,12 @@ describe('export and import', () => {
   it('shows a preview first and creates nothing until the user confirms', async () => {
     const calls = backend({
       'POST /workflows/import/preview': () => jsonResponse(PREVIEW),
-      'POST /workflows/import': () => jsonResponse({ id: 'wf_9', name: 'X', revision: 1, draft: DEF('x') }, 201),
+      'POST /workflows/import': () =>
+        jsonResponse({ id: 'wf_9', name: 'X', revision: 1, draft: DEF('x') }, 201),
     })
-    await s().importFile(file(JSON.stringify({ format: 'nodecraft-workflow', format_version: 1, workflow: {} })))
+    await s().importFile(
+      file(JSON.stringify({ format: 'nodecraft-workflow', format_version: 1, workflow: {} })),
+    )
     expect(s().dialog).toBe('import')
     expect(calls.filter((c) => c === 'POST /workflows/import')).toHaveLength(0) // preview only
     await s().confirmImport()
@@ -145,14 +179,20 @@ describe('export and import', () => {
   it('never imports a file the server called invalid, and surfaces the server reason', async () => {
     const calls = backend({
       'POST /workflows/import/preview': () =>
-        jsonResponse({ error: { code: 'unsupported_format_version', message: 'made by a newer Nodecraft' } }, 422),
+        jsonResponse(
+          { error: { code: 'unsupported_format_version', message: 'made by a newer Nodecraft' } },
+          422,
+        ),
     })
     await s().importFile(file('{"format":"nodecraft-workflow","format_version":99,"workflow":{}}'))
     expect(s().message).toMatch(/newer Nodecraft/)
     await s().confirmImport()
     expect(calls.filter((c) => c === 'POST /workflows/import')).toHaveLength(0)
 
-    backend({ 'POST /workflows/import/preview': () => jsonResponse({ ...PREVIEW, valid: false, issues: [{ code: 'x', message: 'bad node' }] }) })
+    backend({
+      'POST /workflows/import/preview': () =>
+        jsonResponse({ ...PREVIEW, valid: false, issues: [{ code: 'x', message: 'bad node' }] }),
+    })
     await s().importFile(file('{"a":1}'))
     const calls2 = backend({})
     await s().confirmImport() // invalid preview: refused locally
@@ -175,7 +215,12 @@ describe('the first-run example and tour', () => {
     useStore.setState({ tour: null })
   })
 
-  const run = (status: ExecutionRun['status']): ExecutionRun => ({ id: 'run_1', status, nodes: [], duration_ms: 1 })
+  const run = (status: ExecutionRun['status']): ExecutionRun => ({
+    id: 'run_1',
+    status,
+    nodes: [],
+    duration_ms: 1,
+  })
 
   async function runToEnd(final: ExecutionRun) {
     const stream = sseStream()
@@ -184,7 +229,8 @@ describe('the first-run example and tour', () => {
       if (u.includes('/events/stream')) return Promise.resolve(stream.response())
       if (u.endsWith('/workflows/wf_ex/runs') && init?.method === 'POST')
         return jsonResponse({ id: 'run_1', status: 'running', nodes: [], duration_ms: 0, version_no: 1 }, 202)
-      if (u.endsWith('/workflows/wf_ex') && init?.method === 'PUT') return jsonResponse({ id: 'wf_ex', revision: 2 })
+      if (u.endsWith('/workflows/wf_ex') && init?.method === 'PUT')
+        return jsonResponse({ id: 'wf_ex', revision: 2 })
       if (u.endsWith('/runs/run_1')) return jsonResponse(final)
       return jsonResponse([])
     })
@@ -197,7 +243,15 @@ describe('the first-run example and tour', () => {
   async function loadExample() {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
       if (String(url).endsWith('/examples/debug-me/create') && init?.method === 'POST')
-        return new Response(JSON.stringify({ id: 'wf_ex', name: 'Debug me (example)', revision: 1, draft: { ...DEF('x'), name: 'Debug me (example)' } }), { status: 201 })
+        return new Response(
+          JSON.stringify({
+            id: 'wf_ex',
+            name: 'Debug me (example)',
+            revision: 1,
+            draft: { ...DEF('x'), name: 'Debug me (example)' },
+          }),
+          { status: 201 },
+        )
       return new Response('[]')
     })
     await s().createExample()
@@ -214,7 +268,9 @@ describe('the first-run example and tour', () => {
   it('other examples do not start the tutorial tour', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
       if (String(url).endsWith('/examples/route-orders/create') && init?.method === 'POST')
-        return new Response(JSON.stringify({ id: 'wf_r', name: 'Route', revision: 1, draft: DEF('x') }), { status: 201 })
+        return new Response(JSON.stringify({ id: 'wf_r', name: 'Route', revision: 1, draft: DEF('x') }), {
+          status: 201,
+        })
       return new Response('[]')
     })
     await s().createExample('route-orders')
@@ -240,7 +296,9 @@ describe('the first-run example and tour', () => {
   })
 
   it('reports a failure to create the example instead of throwing', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ error: { message: 'boom' } }), { status: 500 }))
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: 'boom' } }), { status: 500 }),
+    )
     await s().createExample()
     expect(s().message).toMatch(/Could not create the example: boom/)
     expect(s().tour).toBeNull()

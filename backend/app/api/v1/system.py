@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 
 from app.api.errors import AppError
-from app.storage.db import current_revision, head_revision
+from app.services.container import schema_status
 
 router = APIRouter(prefix="/system", tags=["system"])
 STARTED = time.monotonic()
@@ -26,11 +26,11 @@ def _backups(request: Request) -> list[str]:
 @router.get("/info")
 def info(request: Request) -> dict[str, Any]:
     s = request.app.state.settings
-    url = request.app.state.database_url
+    revision, head = schema_status(request.app.state.database_url)
     return {
         "version": VERSION,
-        "schema_revision": current_revision(url),
-        "schema_head": head_revision(),
+        "schema_revision": revision,
+        "schema_head": head,
         "data_dir": str(s.data_dir),
         "log_dir": str(s.log_dir) if s.log_dir else None,
         "backup_dir": str(s.effective_backup_dir),

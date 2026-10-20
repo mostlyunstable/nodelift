@@ -22,14 +22,19 @@ describe('wouldCreateCycle', () => {
   })
   it('handles disconnected graphs and diamonds without looping forever', () => {
     const diamond = [
-      { source: 'a', target: 'b' }, { source: 'a', target: 'c' },
-      { source: 'b', target: 'd' }, { source: 'c', target: 'd' },
+      { source: 'a', target: 'b' },
+      { source: 'a', target: 'c' },
+      { source: 'b', target: 'd' },
+      { source: 'c', target: 'd' },
     ]
     expect(wouldCreateCycle(diamond, 'x', 'a')).toBe(false)
     expect(wouldCreateCycle(diamond, 'd', 'a')).toBe(true)
   })
   it('copes with an already-cyclic input without hanging', () => {
-    const cyclic = [{ source: 'a', target: 'b' }, { source: 'b', target: 'a' }]
+    const cyclic = [
+      { source: 'a', target: 'b' },
+      { source: 'b', target: 'a' },
+    ]
     expect(wouldCreateCycle(cyclic, 'x', 'a')).toBe(false)
   })
 })
@@ -39,7 +44,10 @@ describe('checkConnection', () => {
     expect(checkConnection([], null, 'a')).toMatchObject({ ok: false })
     expect(checkConnection([], 'a', 'a')).toEqual({ ok: false, reason: 'A node cannot connect to itself' })
     expect(checkConnection(chain, 'a', 'b')).toEqual({ ok: false, reason: 'That connection already exists' })
-    expect(checkConnection(chain, 'd', 'a')).toEqual({ ok: false, reason: 'That connection would create a loop' })
+    expect(checkConnection(chain, 'd', 'a')).toEqual({
+      ok: false,
+      reason: 'That connection would create a loop',
+    })
     expect(checkConnection(chain, 'a', 'd')).toEqual({ ok: true })
   })
 })
@@ -51,7 +59,9 @@ describe('checkConnection with ports', () => {
   })
   it('still refuses an exact duplicate, treating missing handles as the defaults', () => {
     expect(checkConnection(branchEdges, 'b', 't', 'true', 'in')).toMatchObject({ ok: false })
-    expect(checkConnection([{ source: 'a', target: 'c' }], 'a', 'c', 'out', 'in')).toMatchObject({ ok: false })
+    expect(checkConnection([{ source: 'a', target: 'c' }], 'a', 'c', 'out', 'in')).toMatchObject({
+      ok: false,
+    })
     expect(checkConnection([{ source: 'a', target: 'c' }], 'a', 'c', null, null)).toMatchObject({ ok: false })
   })
   it('still refuses loops regardless of ports', () => {

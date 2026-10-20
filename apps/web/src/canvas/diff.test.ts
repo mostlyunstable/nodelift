@@ -3,11 +3,22 @@ import type { WorkflowDefinition, WorkflowNode } from '../types/workflow'
 import { diffWorkflows, isEmptyDiff } from './diff'
 
 const node = (id: string, source = 'x', extra: Partial<WorkflowNode> = {}): WorkflowNode => ({
-  id, type: 'code.python', name: id.toUpperCase(), config: { source }, ...extra,
+  id,
+  type: 'code.python',
+  name: id.toUpperCase(),
+  config: { source },
+  ...extra,
 })
 const wf = (nodes: WorkflowNode[], edges: [string, string][] = [], positions = {}): WorkflowDefinition => ({
-  schema_version: 1, id: '', name: 'w', nodes,
-  edges: edges.map(([a, b]) => ({ id: '', source: { node: a, port: 'out' }, target: { node: b, port: 'in' } })),
+  schema_version: 1,
+  id: '',
+  name: 'w',
+  nodes,
+  edges: edges.map(([a, b]) => ({
+    id: '',
+    source: { node: a, port: 'out' },
+    target: { node: b, port: 'in' },
+  })),
   ui: { positions },
 })
 
@@ -29,7 +40,16 @@ describe('diffWorkflows', () => {
     expect(diffWorkflows(before, after).changed).toEqual([{ name: 'Renamed', what: ['name', 'idempotent'] }])
   })
   it('counts edges added and removed', () => {
-    const d = diffWorkflows(wf([node('a'), node('b'), node('c')], [['a', 'b']]), wf([node('a'), node('b'), node('c')], [['b', 'c'], ['a', 'c']]))
+    const d = diffWorkflows(
+      wf([node('a'), node('b'), node('c')], [['a', 'b']]),
+      wf(
+        [node('a'), node('b'), node('c')],
+        [
+          ['b', 'c'],
+          ['a', 'c'],
+        ],
+      ),
+    )
     expect(d).toMatchObject({ edgesAdded: 2, edgesRemoved: 1 })
   })
 })
