@@ -21,6 +21,8 @@ ErrorType = Literal[
     "network_error",
     "http_error",
     "response_too_large",
+    "missing_credential",
+    "secrets_unavailable",
     "worker_crashed",
 ]
 

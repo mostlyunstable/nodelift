@@ -211,6 +211,17 @@ describe('the first-run example and tour', () => {
     expect(s().dirty).toBe(false) // an untouched example is not an unsaved edit
   })
 
+  it('other examples do not start the tutorial tour', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+      if (String(url).endsWith('/examples/route-orders/create') && init?.method === 'POST')
+        return new Response(JSON.stringify({ id: 'wf_r', name: 'Route', revision: 1, draft: DEF('x') }), { status: 201 })
+      return new Response('[]')
+    })
+    await s().createExample('route-orders')
+    expect(s().workflowId).toBe('wf_r')
+    expect(s().tour).toBeNull()
+  })
+
   it('a failed run moves the tour to "fix it", and a later success to "done"', async () => {
     await loadExample()
     await runToEnd(run('failed'))

@@ -8,6 +8,7 @@ from typing import Any
 
 from app.domain.nodes import NodeContext, NodeRegistry
 from app.domain.run import ExecutionRun, NodeExecution, NodeStatus, RunObserver, RunStatus
+from app.domain.secrets import Redactor, SecretResolver, SecretStore
 from app.domain.workflow import WorkflowDefinition, WorkflowEdge, retry_policy, topological_order
 
 # Deterministic failures are never retried: running the same code again cannot change them.
@@ -59,12 +60,14 @@ async def execute_workflow(
     cancel: asyncio.Event | None = None,
     max_run_s: float | None = None,
     completed: dict[str, NodeExecution] | None = None,
+    secrets: SecretStore | None = None,
 ) -> ExecutionRun:
     """Run nodes in dependency order. Fail-fast: downstream of a failed/skipped node is skipped.
 
     - `cancel`: when set, the running node is killed and the remaining nodes are skipped.
     - `max_run_s`: wall-clock budget for the whole run.
     - `completed`: earlier results; a node is reused only if it succeeded and gets the same input.
+    - `secrets`: where {{credential:NAME}} references are resolved; values are masked in results.
     - `node_inputs` overrides the computed input for entry nodes.
     """
     order = topological_order(wf)
@@ -78,6 +81,8 @@ async def execute_workflow(
     final: dict[str, NodeStatus] = {}
     reason: str | None = None
     start = time.monotonic()
+    redactor = Redactor()  # every secret value used in this run, masked wherever it could leak
+    resolver = SecretResolver(secrets, redactor) if secrets is not None else None
 
     async def emit_finished(rec: NodeExecution, will_retry: bool = False) -> None:
         records.append(rec)
@@ -130,7 +135,10 @@ async def execute_workflow(
                 await observer.node_started(nid, attempt)
             impl = registry.get(nodes[nid].type)
             assert impl is not None  # guaranteed by validate_workflow before execution
-            res = await impl.execute(NodeContext(node_timeout, cancel), inp, nodes[nid].config)
+            res = await impl.execute(
+                NodeContext(node_timeout, cancel, resolver), inp, nodes[nid].config
+            )
+            res = redactor.result(res)  # nothing secret is stored, streamed or shown
             cancelled = res.error is not None and res.error.type == "cancelled"
             status: NodeStatus = "cancelled" if cancelled else res.status
             budget_left = max_run_s is None or time.monotonic() - start < max_run_s

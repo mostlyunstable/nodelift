@@ -13,6 +13,7 @@ from app.api.v1.nodes import Registry
 from app.api.v1.stored import Service
 from app.domain.migrations import migrate_definition
 from app.domain.records import WorkflowRecord
+from app.domain.secrets import references
 from app.domain.workflow import ValidationIssue, WorkflowDefinition, validate_workflow
 from app.examples import load_examples
 
@@ -37,6 +38,7 @@ class ImportSummary(BaseModel):
     node_types: dict[str, int]
     code_nodes: int
     http_hosts: list[str]
+    credentials: list[str]
     warnings: list[str]
 
 
@@ -104,8 +106,14 @@ def _parse(
 def _summary(name: str, wf: WorkflowDefinition) -> ImportSummary:
     types: dict[str, int] = {}
     hosts: set[str] = set()
+    needed: set[str] = set()
     for n in wf.nodes:
         types[n.type] = types.get(n.type, 0) + 1
+        headers = n.config.get("headers") if n.type == "http.request" else None
+        if isinstance(headers, dict):
+            for value in headers.values():
+                if isinstance(value, str):
+                    needed.update(references(value))
         url = n.config.get("url") if n.type == "http.request" else None
         if isinstance(url, str) and (host := urlsplit(url).hostname):
             hosts.add(host)
@@ -117,9 +125,15 @@ def _summary(name: str, wf: WorkflowDefinition) -> ImportSummary:
         )
     if hosts:
         warnings.append("HTTP nodes will contact: " + ", ".join(sorted(hosts)))
+    if needed:
+        warnings.append(
+            "Needs credentials: "
+            + ", ".join(sorted(needed))
+            + ". Add them under Credentials; no secret is in the file."
+        )
     return ImportSummary(
         name=name, nodes=len(wf.nodes), edges=len(wf.edges), node_types=types, code_nodes=code,
-        http_hosts=sorted(hosts), warnings=warnings,
+        http_hosts=sorted(hosts), credentials=sorted(needed), warnings=warnings,
     )  # fmt: skip
 
 

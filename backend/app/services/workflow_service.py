@@ -10,6 +10,7 @@ from app.domain.nodes import NodeRegistry
 from app.domain.records import RunRecord, VersionRecord
 from app.domain.repositories import RunRepository, WorkflowRepository
 from app.domain.run import NodeExecution, RunStatus
+from app.domain.secrets import SecretStore
 from app.domain.workflow import WorkflowDefinition, validate_workflow
 from app.engine.executor import execute_workflow
 from app.services.gate import ExecutionGate
@@ -69,11 +70,13 @@ class WorkflowService:
         gate: ExecutionGate,
         max_run_seconds: int = 300,
         keep_runs: int = 200,
+        secrets: SecretStore | None = None,
     ) -> None:
         self.workflows, self.runs, self.registry, self.hub = workflows, runs, registry, hub
         self.gate = gate
         self.max_run_seconds = max_run_seconds
         self.keep_runs = keep_runs
+        self.secrets = secrets
 
     def snapshot(self, workflow_id: str) -> VersionRecord:
         """Create a version from the draft, or reuse the latest if the content is unchanged."""
@@ -199,6 +202,7 @@ class WorkflowService:
                 cancel=cancel,
                 max_run_s=self.max_run_seconds,
                 completed=completed,
+                secrets=self.secrets,
             )
             self.runs.finish(run_id, result.status, result.duration_ms)
             payload: dict[str, Any] = {"status": result.status, "duration_ms": result.duration_ms}

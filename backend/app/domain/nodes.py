@@ -7,6 +7,7 @@ from typing import Any, ClassVar, Protocol
 from pydantic import BaseModel
 
 from app.domain.ports import CodeRunResult, JsonValue
+from app.domain.secrets import SecretResolver
 
 NodeResult = CodeRunResult  # status, output, logs, error, duration_ms
 
@@ -34,6 +35,7 @@ class NodeDefinition(BaseModel):
 class NodeContext:
     timeout_s: float
     cancel: asyncio.Event | None = None
+    secrets: SecretResolver | None = None  # resolves {{credential:NAME}} for nodes that accept them
 
 
 class NodeImpl(Protocol):

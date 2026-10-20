@@ -20,6 +20,7 @@ import type {
   ExecutionRun,
   NodeDefinition,
   NodeLiveStatus,
+  Credential,
   ExampleInfo,
   ImportPreview,
   RunEvent,
@@ -110,7 +111,7 @@ let editSeq = 0 // bumped on every edit; a save only clears "dirty" if nothing c
 let generation = 0 // bumped when a different workflow is opened/reset; stale saves must not apply
 let inFlight: Promise<string | null> | null = null
 
-export type DialogName = 'palette' | 'versions' | 'diagnostics' | 'import' | 'shortcuts'
+export type DialogName = 'palette' | 'versions' | 'diagnostics' | 'import' | 'shortcuts' | 'credentials'
 export type ThemeChoice = 'dark' | 'light' | 'system'
 export type Tour = 'run' | 'fix' | 'done' | null
 
@@ -125,6 +126,10 @@ export const loadTheme = (): ThemeChoice => {
 }
 
 interface State {
+  credentials: Credential[]
+  loadCredentials: () => Promise<void>
+  saveCredential: (name: string, value: string, isNew: boolean) => Promise<boolean>
+  removeCredential: (name: string) => Promise<void>
   examples: ExampleInfo[]
   loadExamples: () => Promise<void>
   dialog: DialogName | null
@@ -321,6 +326,35 @@ function markDirty() {
 export const useStore = create<State>((set, get) => ({
   nodes: [],
   edges: [],
+  credentials: [],
+  loadCredentials: async () => {
+    try {
+      set({ credentials: await api.listCredentials() })
+    } catch {
+      /* the list is only a convenience; the dialog shows the error when it opens */
+    }
+  },
+  saveCredential: async (name, value, isNew) => {
+    try {
+      if (isNew) await api.createCredential({ name, value })
+      else await api.rotateCredential(name, value)
+      await get().loadCredentials()
+      set({ message: isNew ? `Saved credential “${name}”.` : `Replaced the value of “${name}”.` })
+      return true
+    } catch (e) {
+      set({ message: (e as Error).message })
+      return false
+    }
+  },
+  removeCredential: async (name) => {
+    try {
+      await api.deleteCredential(name)
+      await get().loadCredentials()
+      set({ message: `Deleted credential “${name}”. Workflows that use it will fail until it is added again.` })
+    } catch (e) {
+      set({ message: (e as Error).message })
+    }
+  },
   // the built-in tutorial is always offered, even before the list arrives or if it cannot be fetched
   examples: [{ id: 'debug-me', title: 'Debug me', description: 'Find and fix a bug', nodes: 4 }],
   loadExamples: async () => {
@@ -445,7 +479,7 @@ export const useStore = create<State>((set, get) => ({
     try {
       const rec = await api.createExample(id)
       await get().open(rec.id, rec)
-      set({ tour: 'run', dialog: null })
+      set({ tour: id === 'debug-me' ? 'run' : null, dialog: null }) // only the tutorial has a guided tour
     } catch (e) {
       set({ message: `Could not create the example: ${(e as Error).message}` })
     }

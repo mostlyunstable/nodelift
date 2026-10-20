@@ -188,3 +188,109 @@ export function ShortcutsDialog() {
     </Dialog>
   )
 }
+
+const NAME_PATTERN = /^[A-Za-z0-9_.-]{1,64}$/
+
+export function CredentialsDialog() {
+  const { credentials, loadCredentials, saveCredential, removeCredential, closeDialog } = useStore()
+  const [name, setName] = useState('')
+  const [value, setValue] = useState('')
+  const [replacing, setReplacing] = useState<string | null>(null)
+
+  useEffect(() => {
+    void loadCredentials()
+  }, [loadCredentials])
+
+  const target = replacing ?? name
+  const problem =
+    replacing === null && name !== '' && !NAME_PATTERN.test(name)
+      ? 'Use letters, digits, dot, dash or underscore (up to 64).'
+      : value !== '' && value.length < 8
+        ? 'A secret must be at least 8 characters.'
+        : null
+  const canSave = target !== '' && value.length >= 8 && !problem
+
+  const submit = async () => {
+    const ok = await saveCredential(target, value, replacing === null)
+    if (ok) {
+      setValue('') // the secret is never kept in the interface after saving
+      setName('')
+      setReplacing(null)
+    }
+  }
+
+  return (
+    <Dialog title="Credentials" onClose={closeDialog} wide>
+      <p className="muted">
+        Secrets are kept in your system keychain, never in workflows, exports or run history. In an HTTP node, write{' '}
+        <code>{'{{credential:NAME}}'}</code> inside a header value, for example <code>Bearer {'{{credential:github}}'}</code>.
+        Values cannot be read back here, only replaced.
+      </p>
+      <ul className="credential-list" aria-label="Saved credentials">
+        {credentials.length === 0 && <li className="muted">No credentials yet.</li>}
+        {credentials.map((c) => (
+          <li key={c.id}>
+            <code>{`{{credential:${c.name}}}`}</code>
+            <span className="muted">updated {formatTime(c.updated_at)}</span>
+            <button onClick={() => setReplacing(c.name)} aria-label={`Replace the value of ${c.name}`}>
+              Replace value
+            </button>
+            <button
+              className="danger"
+              aria-label={`Delete ${c.name}`}
+              onClick={() => {
+                if (window.confirm(`Delete “${c.name}”? Workflows that use it will fail until it is added again.`)) {
+                  void removeCredential(c.name)
+                }
+              }}
+            >
+              Delete
+            </button>
+          </li>
+        ))}
+      </ul>
+      <h3>{replacing ? `New value for “${replacing}”` : 'Add a credential'}</h3>
+      <form
+        className="credential-form"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (canSave) void submit()
+        }}
+      >
+        {replacing === null && (
+          <label className="field">
+            Name
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="github" autoComplete="off" />
+          </label>
+        )}
+        <label className="field">
+          Secret value
+          <input
+            type="password"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            autoComplete="new-password"
+            placeholder="paste the token or key"
+          />
+        </label>
+        {problem && <span className="field-error">{problem}</span>}
+        <div className="boot-actions">
+          <button className="primary" type="submit" disabled={!canSave}>
+            {replacing ? 'Replace value' : 'Save credential'}
+          </button>
+          {replacing && (
+            <button
+              type="button"
+              onClick={() => {
+                setReplacing(null)
+                setValue('')
+              }}
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      </form>
+    </Dialog>
+  )
+}

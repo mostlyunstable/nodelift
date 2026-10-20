@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     allowed_origins: str = (
         "http://localhost:5173,http://127.0.0.1:5173"  # browser Origin allowlist (+ CORS)
     )
+    secret_backend: str = (
+        "keyring"  # "keyring" (system keychain) or "memory" (tests, nothing persists)
+    )
     reload: bool = False  # dev only; the reloader child can outlive its parent
     log_dir: Path | None = None  # desktop: rotating backend.log lives here
     backup_dir: Path | None = None  # default: <data_dir>/backups

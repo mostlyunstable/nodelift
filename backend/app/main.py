@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import install_error_handlers
 from app.api.security import SecurityMiddleware
-from app.api.v1 import health, nodes, portability, stored, system, workflows
+from app.api.v1 import credentials, health, nodes, portability, stored, system, workflows
 from app.config import Settings, get_settings
 from app.nodes import default_registry, load_plugins
 from app.runtime.subprocess_runner import SubprocessRunner
@@ -14,6 +14,7 @@ from app.services.gate import ExecutionGate
 from app.services.run_hub import RunHub
 from app.storage.db import make_engine, make_session_factory, upgrade_with_backup
 from app.storage.repositories import SqlRunRepository
+from app.storage.secret_stores import make_secret_store
 
 
 def create_app(database_url: str | None = None, settings: Settings | None = None) -> FastAPI:
@@ -32,6 +33,7 @@ def create_app(database_url: str | None = None, settings: Settings | None = None
         registry = default_registry(app.state.runner, settings.http_allow_private)
         load_plugins(registry, settings.plugin_modules)
         app.state.registry = registry
+        app.state.secrets = make_secret_store(settings)
         app.state.run_hub = RunHub()
         app.state.gate = ExecutionGate(
             settings.max_concurrent_runs, settings.max_concurrent_node_tests
@@ -70,6 +72,7 @@ def create_app(database_url: str | None = None, settings: Settings | None = None
     app.include_router(portability.router, prefix="/api/v1")  # before stored: /workflows/import
     app.include_router(stored.router, prefix="/api/v1")
     app.include_router(system.router, prefix="/api/v1")
+    app.include_router(credentials.router, prefix="/api/v1")
     return app
 
 

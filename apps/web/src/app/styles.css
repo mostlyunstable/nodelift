@@ -193,3 +193,8 @@ h4 { margin: 10px 0 4px; font-size: 11px; color: var(--text-muted); text-transfo
 .port-label.dim { opacity: 0.4; }
 .react-flow__edge-textbg { fill: var(--surface); }
 .react-flow__edge-text { fill: var(--text-muted); font-size: 10px; }
+.credential-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.credential-list li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius); }
+.credential-list li code { flex: 1; font-family: var(--font-mono); }
+.credential-form { display: flex; flex-direction: column; gap: 8px; }
+code { font-family: var(--font-mono); font-size: 12px; background: var(--surface); padding: 0 4px; border-radius: 4px; }

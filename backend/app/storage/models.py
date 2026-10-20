@@ -100,6 +100,18 @@ class NodeExecutionRow(Base):
     skip_reason: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
+class CredentialRow(Base):
+    """Metadata only. The secret value is never stored here (see SecretStore)."""
+
+    __tablename__ = "credentials"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, unique=True)
+    kind: Mapped[str] = mapped_column(String, default="other")
+    description: Mapped[str] = mapped_column(String, default="")
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+
+
 class RunEventRow(Base):
     __tablename__ = "run_events"
     __table_args__ = (UniqueConstraint("run_id", "seq"),)

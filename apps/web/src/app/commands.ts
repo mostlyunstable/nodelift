@@ -40,6 +40,7 @@ export interface CommandContext {
     exportAll: () => void
     importFile: () => void
     diagnostics: () => void
+    credentials: () => void
     shortcuts: () => void
     theme: (t: 'dark' | 'light' | 'system') => void
   }
@@ -75,6 +76,7 @@ export function buildCommands(c: CommandContext): Command[] {
     if (w.id !== c.workflowId) add(`open:${w.id}`, `Open: ${w.name}`, 'Open', () => a.open(w.id))
   }
 
+  add('credentials', 'Manage credentials…', 'App', a.credentials)
   add('diagnostics', 'Diagnostics…', 'App', a.diagnostics)
   add('shortcuts', 'Keyboard shortcuts…', 'App', a.shortcuts)
   add('theme-dark', 'Theme: dark', 'App', () => a.theme('dark'))

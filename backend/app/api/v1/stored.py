@@ -35,6 +35,7 @@ def get_service(request: Request, registry: Registry) -> WorkflowService:
         request.app.state.gate,
         request.app.state.settings.max_run_seconds,
         request.app.state.settings.keep_runs_per_workflow,
+        request.app.state.secrets,
     )
 
 

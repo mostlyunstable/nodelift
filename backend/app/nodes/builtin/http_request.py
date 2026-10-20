@@ -1,8 +1,8 @@
 """HTTP request node. Outbound traffic goes through the SSRF guard (see runtime/net_guard.py).
 
 Redirects are NOT followed (the target would bypass URL review); 3xx is returned as the response.
-Do not put secrets in the config yet: workflows are stored in plain text and a credential store
-(CredentialReference) does not exist.
+Secrets belong in Credentials: reference one in a header value as {{credential:NAME}}. The value is
+read from the system keychain when the node runs and masked out of everything that is stored.
 """
 
 import asyncio
@@ -18,6 +18,7 @@ import httpcore
 
 from app.domain.nodes import NodeContext, NodeDefinition, NodeResult
 from app.domain.ports import JsonValue, LogLine, NodeError
+from app.domain.secrets import REFERENCE, MissingCredential, SecretsUnavailable
 from app.runtime.net_guard import BlockedAddress, GuardedBackend
 
 METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"}
@@ -66,7 +67,9 @@ class HttpRequestNode:
             problems.append("config.url must be a string")
         else:
             parts = urlsplit(url)
-            if parts.scheme not in ("http", "https") or not parts.hostname:
+            if "{{credential:" in url:
+                problems.append("credentials can only be used in header values, not in the URL")
+            elif parts.scheme not in ("http", "https") or not parts.hostname:
                 problems.append("config.url must be an absolute http(s) URL")
             elif parts.username or parts.password:
                 problems.append("config.url must not contain credentials")
@@ -81,6 +84,11 @@ class HttpRequestNode:
                     problems.append(f"invalid header {k!r}")
                 elif k.lower() in FORBIDDEN_HEADERS:
                     problems.append(f"header {k!r} cannot be set")
+                elif v.count("{{credential:") != len(REFERENCE.findall(v)):
+                    problems.append(
+                        f"header {k!r} has a malformed credential reference "
+                        "(use {{credential:NAME}})"
+                    )
         timeout = config.get("timeout_s", 10)
         if (
             isinstance(timeout, bool)
@@ -123,6 +131,21 @@ class HttpRequestNode:
                     headers["Content-Type"] = "application/json"
             if len(body) > MAX_REQUEST_BYTES:
                 return fail("invalid_config", "Request body exceeds 1 MB")
+
+        try:
+            if any(REFERENCE.search(v) for v in headers.values()):
+                if ctx.secrets is None:
+                    return fail(
+                        "missing_credential", "Credentials cannot be resolved in this context"
+                    )
+                headers = {k: ctx.secrets.resolve(v) for k, v in headers.items()}
+        except MissingCredential as e:
+            return fail(
+                "missing_credential",
+                f"Credential {e.name!r} does not exist. Add it under Credentials.",
+            )
+        except SecretsUnavailable as e:
+            return fail("secrets_unavailable", str(e))
 
         timeout = min(float(config.get("timeout_s", 10)), ctx.timeout_s)
         cap = int(config.get("max_response_kb", 1024)) * 1024

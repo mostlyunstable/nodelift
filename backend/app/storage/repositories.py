@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.domain.ports import LogLine, NodeError
 from app.domain.records import (
+    CredentialRecord,
     RunRecord,
     RunSummary,
     VersionRecord,
@@ -17,6 +18,7 @@ from app.domain.repositories import RevisionConflict
 from app.domain.run import NodeExecution, NodeStatus, RunEvent, RunStatus
 from app.domain.workflow import WorkflowDefinition
 from app.storage.models import (
+    CredentialRow,
     NodeExecutionRow,
     RunEventRow,
     RunRow,
@@ -319,3 +321,54 @@ class SqlRunRepository:
                 )
                 for r in rows
             ]
+
+
+class SqlCredentialRepository:
+    def __init__(self, sf: sessionmaker[Session]) -> None:
+        self.sf = sf
+
+    @staticmethod
+    def _rec(r: CredentialRow) -> CredentialRecord:
+        return CredentialRecord(
+            id=r.id, name=r.name, kind=r.kind, description=r.description,
+            created_at=r.created_at, updated_at=r.updated_at,
+        )  # fmt: skip
+
+    def list_all(self) -> list[CredentialRecord]:
+        with self.sf() as s:
+            return [
+                self._rec(r) for r in s.scalars(select(CredentialRow).order_by(CredentialRow.name))
+            ]
+
+    def get(self, name: str) -> CredentialRecord | None:
+        with self.sf() as s:
+            row = s.scalars(select(CredentialRow).where(CredentialRow.name == name)).first()
+            return self._rec(row) if row else None
+
+    def create(self, name: str, kind: str, description: str) -> CredentialRecord:
+        with self.sf.begin() as s:
+            row = CredentialRow(
+                id=f"cred_{uuid.uuid4().hex[:12]}", name=name, kind=kind, description=description
+            )
+            s.add(row)
+            s.flush()
+            return self._rec(row)
+
+    def touch(self, name: str, description: str | None = None) -> CredentialRecord | None:
+        with self.sf.begin() as s:
+            row = s.scalars(select(CredentialRow).where(CredentialRow.name == name)).first()
+            if row is None:
+                return None
+            row.updated_at = utcnow()
+            if description is not None:
+                row.description = description
+            s.flush()
+            return self._rec(row)
+
+    def delete(self, name: str) -> bool:
+        with self.sf.begin() as s:
+            row = s.scalars(select(CredentialRow).where(CredentialRow.name == name)).first()
+            if row is None:
+                return False
+            s.delete(row)
+            return True

@@ -60,6 +60,10 @@ export function explainError(error: NodeError): string {
       return `The request could not be completed: ${error.message}`
     case 'http_error':
       return `The server answered with an error: ${error.message}`
+    case 'missing_credential':
+      return `${error.message}`
+    case 'secrets_unavailable':
+      return `Saved credentials could not be read: ${error.message}`
     case 'response_too_large':
       return `The response was larger than allowed: ${error.message}`
     default:

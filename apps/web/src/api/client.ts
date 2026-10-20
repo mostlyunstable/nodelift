@@ -1,6 +1,7 @@
 import { apiUrl, authHeaders } from './config'
 import type {
   CodeRunResult,
+  Credential,
   ExampleInfo,
   ImportPreview,
   SystemInfo,
@@ -91,4 +92,10 @@ export const api = {
   createExample: (id: string) => request<WorkflowRecord>('POST', `/examples/${id}/create`),
   systemInfo: () => request<SystemInfo>('GET', '/system/info'),
   systemLogs: (lines = 200) => request<{ path: string | null; lines: string[] }>('GET', `/system/logs?lines=${lines}`),
+  listCredentials: () => request<Credential[]>('GET', '/credentials'),
+  createCredential: (c: { name: string; value: string; kind?: string; description?: string }) =>
+    request<Credential>('POST', '/credentials', c),
+  rotateCredential: (name: string, value: string) =>
+    request<Credential>('PUT', `/credentials/${encodeURIComponent(name)}`, { value }),
+  deleteCredential: (name: string) => request<null>('DELETE', `/credentials/${encodeURIComponent(name)}`),
 }

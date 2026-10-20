@@ -151,6 +151,7 @@ export interface ImportSummary {
   node_types: Record<string, number>
   code_nodes: number
   http_hosts: string[]
+  credentials?: string[]
   warnings: string[]
 }
 
@@ -177,4 +178,13 @@ export interface SystemInfo {
   backups: string[]
   python: string
   uptime_s: number
+}
+
+export interface Credential {
+  id: string
+  name: string
+  kind: string
+  description: string
+  created_at: string
+  updated_at: string
 }

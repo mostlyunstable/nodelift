@@ -7,7 +7,7 @@ import { RunPanel } from '../panels/RunPanel'
 import { loadTheme, useStore } from '../state/store'
 import { resolveTheme } from '../state/theme'
 import { CommandPalette } from '../ui/CommandPalette'
-import { DiagnosticsDialog, ImportDialog, ShortcutsDialog, VersionsDialog } from '../ui/Dialogs'
+import { CredentialsDialog, DiagnosticsDialog, ImportDialog, ShortcutsDialog, VersionsDialog } from '../ui/Dialogs'
 import { Menu, type MenuItem } from '../ui/Menu'
 import { EmptyCanvas, RunAnnouncer, Toast, TourBanner } from '../ui/Overlays'
 import { buildCommands, type CommandContext } from './commands'
@@ -47,6 +47,7 @@ export function App() {
     void st.refresh()
     void st.loadDefinitions()
     void st.loadExamples()
+    void st.loadCredentials()
     void st.restore() // reopen whatever the user was working on
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       const { dirty, saveState } = useStore.getState()
@@ -121,6 +122,7 @@ export function App() {
       exportCurrent: () => void s.exportCurrent(),
       exportAll: () => void s.exportAll(),
       importFile: () => fileInput.current?.click(),
+      credentials: () => s.openDialog('credentials'),
       diagnostics: () => s.openDialog('diagnostics'),
       shortcuts: () => s.openDialog('shortcuts'),
       theme: s.setTheme,
@@ -152,7 +154,8 @@ export function App() {
     { label: 'Export this workflow…', onSelect: () => void s.exportCurrent(), disabled: s.nodes.length === 0, separatorBefore: true },
     { label: 'Import a workflow…', onSelect: () => fileInput.current?.click() },
     { label: 'Export everything…', onSelect: () => void s.exportAll() },
-    { label: 'Diagnostics…', onSelect: () => s.openDialog('diagnostics'), separatorBefore: true },
+    { label: 'Credentials…', onSelect: () => s.openDialog('credentials'), separatorBefore: true },
+    { label: 'Diagnostics…', onSelect: () => s.openDialog('diagnostics') },
     { label: 'Keyboard shortcuts…', onSelect: () => s.openDialog('shortcuts') },
   ]
 
@@ -237,6 +240,7 @@ export function App() {
       {s.dialog === 'palette' && <CommandPalette commands={commands} onClose={s.closeDialog} />}
       {s.dialog === 'versions' && <VersionsDialog />}
       {s.dialog === 'diagnostics' && <DiagnosticsDialog />}
+      {s.dialog === 'credentials' && <CredentialsDialog />}
       {s.dialog === 'import' && <ImportDialog />}
       {s.dialog === 'shortcuts' && <ShortcutsDialog />}
     </div>

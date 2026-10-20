@@ -106,7 +106,7 @@ function TransformConfig({ node }: { node: FlowNode }) {
 }
 
 function HttpConfig({ node }: { node: FlowNode }) {
-  const { updateConfig } = useStore()
+  const { updateConfig, credentials, openDialog } = useStore()
   const c = node.data.config
   return (
     <>
@@ -145,9 +145,18 @@ function HttpConfig({ node }: { node: FlowNode }) {
         />{' '}
         Send the node input as the body
       </label>
-      <div className="muted">
-        Private, loopback and cloud-metadata addresses are blocked. Redirects are not followed. Don't put secrets in
-        headers yet — workflows are stored unencrypted.
+      <div className="muted" data-testid="http-hint">
+        Private, loopback and cloud-metadata addresses are blocked. Redirects are not followed.
+      </div>
+      <div className="muted" data-testid="credential-hint">
+        Never paste a secret into a header. Save it as a credential and write <code>{'{{credential:NAME}}'}</code> in the
+        value.{' '}
+        {credentials.length > 0
+          ? `Saved: ${credentials.map((c) => c.name).join(', ')}. `
+          : 'None saved yet. '}
+        <button className="link-button" onClick={() => openDialog('credentials')}>
+          Manage credentials
+        </button>
       </div>
     </>
   )

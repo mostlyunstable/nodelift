@@ -45,6 +45,17 @@ class RunRecord(ExecutionRun):
     created_at: datetime
 
 
+class CredentialRecord(BaseModel):
+    """What the API may show about a credential. There is deliberately no value field."""
+
+    id: str
+    name: str
+    kind: str
+    description: str
+    created_at: datetime
+    updated_at: datetime
+
+
 class RunSummary(BaseModel):
     id: str
     status: str

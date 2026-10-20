@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from app.api.errors import AppError
 from app.domain.nodes import NodeContext, NodeDefinition, NodeRegistry
 from app.domain.ports import CodeRunResult, JsonValue
+from app.domain.secrets import Redactor, SecretResolver, SecretStore
 from app.services.gate import ExecutionGate
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
@@ -27,6 +28,14 @@ def get_gate(request: Request) -> ExecutionGate:
 Gate = Annotated[ExecutionGate, Depends(get_gate)]
 
 
+def get_secrets(request: Request) -> SecretStore:
+    store: SecretStore = request.app.state.secrets
+    return store
+
+
+Secrets = Annotated[SecretStore, Depends(get_secrets)]
+
+
 class NodeTestRequest(BaseModel):
     type: str
     config: dict[str, Any] = {}
@@ -46,7 +55,9 @@ def list_definitions(registry: Registry) -> list[NodeDefinition]:
 
 
 @router.post("/test", response_model=CodeRunResult)
-async def test_node(req: NodeTestRequest, registry: Registry, gate: Gate) -> CodeRunResult:
+async def test_node(
+    req: NodeTestRequest, registry: Registry, gate: Gate, secrets: Secrets
+) -> CodeRunResult:
     """Run one node of any registered type in isolation."""
     impl = registry.get(req.type)
     if impl is None:
@@ -57,8 +68,10 @@ async def test_node(req: NodeTestRequest, registry: Registry, gate: Gate) -> Cod
             422, "validation_failed", "Invalid node config",
             [{"code": "invalid_config", "message": p} for p in problems],
         )  # fmt: skip
+    redactor = Redactor()
+    ctx = NodeContext(req.timeout_ms / 1000, None, SecretResolver(secrets, redactor))
     with gate.node_test():
-        return await impl.execute(NodeContext(req.timeout_ms / 1000), req.input, req.config)
+        return redactor.result(await impl.execute(ctx, req.input, req.config))
 
 
 @router.post("/code/test", response_model=CodeRunResult)
