@@ -215,7 +215,7 @@ class ExplorerService:
             )
             self.repo.replace_analysis(
                 rid, res.edges, res.symbols, res.diagnostics, res.statuses,
-                "partial" if res.partial else "done",
+                "partial" if res.partial else "done", res.references,
             )  # fmt: skip
         except Cancelled:
             self.repo.update_revision(rid, analysis_status="cancelled")

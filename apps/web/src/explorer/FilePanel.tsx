@@ -84,6 +84,8 @@ export function FilePanel({ theme }: { theme: 'dark' | 'light' }) {
           theme={theme}
           diagnostics={e.analysis?.diagnostics}
           target={e.target}
+          references={e.analysis?.references}
+          onGoTo={(path, line) => void e.goTo(path, line)}
           draft={draft && draft.path === e.file?.path ? draft.text : null}
           onDraftChange={(text) => setDraft((d) => (d ? { ...d, text } : d))}
         />

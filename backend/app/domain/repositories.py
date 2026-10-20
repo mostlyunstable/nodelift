@@ -9,6 +9,7 @@ from app.domain.records import (
     RepoEdgeRecord,
     RepoFileRecord,
     RepoPatchRecord,
+    RepoReferenceRecord,
     RepoRevisionRecord,
     RepoSymbolRecord,
     RunRecord,
@@ -77,6 +78,7 @@ class RepoRepository(Protocol):
         diagnostics: list[RepoDiagnosticRecord],
         statuses: dict[str, str],
         status: str,
+        references: list[RepoReferenceRecord] | None = None,
     ) -> None: ...
     def list_internal_edges(
         self, revision_id: str, limit: int

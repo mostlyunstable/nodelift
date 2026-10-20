@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 import threading
 from pathlib import Path
 
@@ -295,3 +296,125 @@ def test_path_escape_in_an_index_is_refused(tmp_path: Path) -> None:
     )  # fmt: skip
     res = analyze_files(root, files)
     assert res.statuses["../secret.py"] == "failed"
+
+
+# ---- call relationships -------------------------------------------------------------------------
+CALL_PY = {
+    "pkg/__init__.py": "",
+    "pkg/util.py": "def helper():\n    return 1\n\nclass Tool:\n    def run(self):\n        return self.step()\n    def step(self):\n        return helper()\n    @staticmethod\n    def make():\n        return Tool()\n",
+    "pkg/other.py": "def far():\n    pass\n",
+    "app.py": (
+        "import pkg.util\n"
+        "import pkg.other as o\n"
+        "from pkg import util\n"
+        "from pkg.util import helper, Tool as T\n"
+        "from pkg.other import far\n"
+        "\n"
+        "def local():\n"
+        "    pass\n"
+        "\n"
+        "def main():\n"
+        "    helper()\n"  # 11 resolved via from-import
+        "    util.helper()\n"  # 12 resolved via `from pkg import util`
+        "    pkg.util.helper()\n"  # 13 resolved via `import pkg.util`
+        "    o.far()\n"  # 14 alias module
+        "    far()\n"  # 15
+        "    T.make()\n"  # 16 Class.method through alias
+        "    local()\n"  # 17 same file
+        "    unknown()\n"  # 18 not defined anywhere
+        "    thing.method()\n"  # 19 call on a value
+        "    getattr(o, 'far')()\n"  # 20 dynamic: not followed
+        "\n"
+        "class K:\n"
+        "    def a(self):\n"
+        "        self.b()\n"
+        "    def b(self):\n"
+        "        pass\n"
+    ),
+}
+
+
+def refs(res: AnalysisResult, src: str) -> dict[int, tuple[str, str, str, str | None]]:
+    return {
+        r.line: (r.dst_path, r.dst_symbol, r.confidence, r.scope)
+        for r in res.references
+        if r.path == src
+    }
+
+
+def test_python_calls_resolve_through_imports_and_same_file(tmp_path: Path) -> None:
+    got = refs(run(tmp_path, CALL_PY), "app.py")
+    assert got[11] == ("pkg/util.py", "helper", "resolved", "main")
+    assert got[12] == ("pkg/util.py", "helper", "resolved", "main")
+    assert got[13] == ("pkg/util.py", "helper", "resolved", "main")
+    assert got[14] == ("pkg/other.py", "far", "resolved", "main")
+    assert got[15] == ("pkg/other.py", "far", "resolved", "main")
+    assert got[16] == ("pkg/util.py", "Tool.make", "resolved", "main")
+    assert got[17] == ("app.py", "local", "resolved", "main")
+
+
+def test_python_calls_that_cannot_be_shown_are_left_out_not_guessed(tmp_path: Path) -> None:
+    got = refs(run(tmp_path, CALL_PY), "app.py")
+    for line in (18, 19, 20):
+        assert line not in got  # undefined name, call on a value, getattr(...)()
+
+
+def test_python_self_calls_are_heuristic_and_say_why(tmp_path: Path) -> None:
+    res = run(tmp_path, CALL_PY)
+    m = [r for r in res.references if r.path == "app.py" and r.line == 24][0]
+    assert (m.dst_symbol, m.confidence, m.scope) == ("K.b", "heuristic", "K.a")
+    assert "overrides" in (m.note or "")
+    inner = refs(res, "pkg/util.py")
+    assert inner[6][:3] == ("pkg/util.py", "Tool.step", "heuristic")
+    assert inner[8][:3] == ("pkg/util.py", "helper", "resolved")
+
+
+def test_reference_positions_point_at_the_called_name(tmp_path: Path) -> None:
+    res = run(tmp_path, CALL_PY)
+    r = [x for x in res.references if x.path == "app.py" and x.line == 12][0]
+    line = CALL_PY["app.py"].splitlines()[11]
+    assert line[r.column - 1 : r.end_column - 1] == "helper"
+    r13 = [x for x in res.references if x.path == "app.py" and x.line == 13][0]
+    assert CALL_PY["app.py"].splitlines()[12][r13.column - 1 : r13.end_column - 1] == "helper"
+
+
+CALL_JS = {
+    "lib/math.js": "export function add(a, b) { return a + b }\nexport const mul = (a, b) => a * b\nexport class Calc { static of() { return new Calc() } run() { return add(1, 2) } }\nexport default function def() {}\n",
+    "main.js": (
+        "import { add, mul as times } from './lib/math'\n"
+        "import * as M from './lib/math'\n"
+        "import dflt from './lib/math'\n"
+        "const { Calc } = require('./lib/math')\n"
+        "function local() {}\n"
+        "function main() {\n"
+        "  add(1, 2)\n"  # 7
+        "  times(2, 3)\n"  # 8
+        "  M.add(1, 2)\n"  # 9
+        "  Calc.of()\n"  # 10
+        "  local()\n"  # 11
+        "  dflt()\n"  # 12 default export: not followed
+        "  obj.method()\n"  # 13
+        "  fn()()\n"  # 14
+        "}\n"
+    ),
+}
+
+
+def test_javascript_calls_resolve_through_named_namespace_and_require_bindings(
+    tmp_path: Path,
+) -> None:
+    got = refs(run(tmp_path, CALL_JS), "main.js")
+    assert got[7] == ("lib/math.js", "add", "resolved", "main")
+    assert got[8] == (
+        "lib/math.js",
+        "mul",
+        "resolved",
+        "main",
+    )  # aliased import resolves to the original name
+    assert got[9] == ("lib/math.js", "add", "resolved", "main")
+    assert got[10] == ("lib/math.js", "Calc.of", "resolved", "main")
+    assert got[11] == ("main.js", "local", "resolved", "main")
+    for line in (12, 13, 14):
+        assert line not in got
+    inner = refs(run(tmp_path / "x", CALL_JS), "lib/math.js")
+    assert any(v[1] == "add" for v in inner.values())

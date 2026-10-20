@@ -1,7 +1,7 @@
 import Editor from '@monaco-editor/react'
 import type * as Monaco from 'monaco-editor'
 import { useEffect, useRef, useState } from 'react'
-import type { RepoDiagnostic, RepoFileContent } from '../api/client'
+import type { RepoDiagnostic, RepoFileContent, RepoReference } from '../api/client'
 import { formatBytes } from './tree'
 
 const REASONS: Record<string, string> = {
@@ -21,6 +21,8 @@ export function FileViewer({
   target = null,
   draft = null,
   onDraftChange,
+  references = [],
+  onGoTo,
 }: {
   file: RepoFileContent | null
   error: string | null
@@ -29,9 +31,18 @@ export function FileViewer({
   target?: { path: string; line: number; n: number } | null
   draft?: string | null // when set, the editor shows this editable copy instead of the imported file
   onDraftChange?: (text: string) => void
+  references?: RepoReference[] // names in this file tied to a definition (for Go to Definition)
+  onGoTo?: (path: string, line: number) => void
 }) {
   const [handle, setHandle] = useState<EditorHandle | null>(null)
   const decorations = useRef<Monaco.editor.IEditorDecorationsCollection | null>(null)
+  const refDecorations = useRef<Monaco.editor.IEditorDecorationsCollection | null>(null)
+  const refsRef = useRef<RepoReference[]>(references)
+  const goRef = useRef(onGoTo)
+  useEffect(() => {
+    refsRef.current = references
+    goRef.current = onGoTo
+  })
   const path = file?.path
   const hasContent = file?.content != null
 
@@ -57,6 +68,49 @@ export function FileViewer({
         })),
     )
   }, [handle, path, hasContent, diagnostics])
+
+  // underline names we can tie to a definition; Cmd/Ctrl+click or F12 follows them
+  useEffect(() => {
+    if (!handle || !path || !hasContent) return
+    refDecorations.current?.clear()
+    refDecorations.current = handle.editor.createDecorationsCollection(
+      references
+        .filter((r) => r.path === path)
+        .map((r) => ({
+          range: new handle.monaco.Range(r.line, r.column, r.line, r.end_column),
+          options: {
+            inlineClassName: 'nc-ref',
+            hoverMessage: {
+              value: `**${r.dst_symbol}** — \`${r.dst_path}:${r.dst_line}\`\n\n${r.confidence}${r.note ? ` · ${r.note}` : ''}\n\n_Cmd/Ctrl+click or F12 to open_`,
+            },
+          },
+        })),
+    )
+  }, [handle, path, hasContent, references])
+
+  useEffect(() => {
+    if (!handle) return
+    const at = (line: number, col: number) =>
+      refsRef.current.find((r) => r.line === line && col >= r.column && col <= r.end_column)
+    const go = (r: RepoReference | undefined) => r && goRef.current?.(r.dst_path, r.dst_line)
+    const click = handle.editor.onMouseDown((e) => {
+      const p = e.target.position
+      if ((e.event.ctrlKey || e.event.metaKey) && p) go(at(p.lineNumber, p.column))
+    })
+    const action = handle.editor.addAction({
+      id: 'nodecraft.goToDefinition',
+      label: 'Go to Definition',
+      keybindings: [handle.monaco.KeyCode.F12],
+      run: (ed) => {
+        const p = ed.getPosition()
+        if (p) go(at(p.lineNumber, p.column))
+      },
+    })
+    return () => {
+      click.dispose()
+      action.dispose()
+    }
+  }, [handle])
 
   // jump to a requested line and highlight it
   useEffect(() => {

@@ -65,6 +65,22 @@ class Resolver:
                 return hit
         return None
 
+    def python_module(self, src: str, raw: str, level: int) -> str | None:
+        """The file an import of `raw` (with `level` leading dots) refers to, if it is in the repository."""
+        if level > 0:
+            base = posixpath.dirname(src)
+            for _ in range(level - 1):
+                base = posixpath.dirname(base)
+            hit = self._py_module_file(base, raw)
+            if raw == "" and f"{base}/__init__.py".lstrip("/") in self.files:
+                hit = f"{base}/__init__.py".lstrip("/")
+            return hit if hit != src else None
+        return self._py_search(src, raw) if raw else None
+
+    def js_module(self, src: str, raw: str) -> str | None:
+        edges = self.javascript(src, Ref(raw, "import", 1), "calls")
+        return next((e.dst for e in edges if e.dst), None)
+
     def python(self, src: str, ref: Ref, provenance: str) -> list[RepoEdgeRecord]:
         if ref.dynamic:
             return [

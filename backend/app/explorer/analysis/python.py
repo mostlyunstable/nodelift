@@ -2,7 +2,7 @@
 import ast
 
 from app.domain.records import RepoDiagnosticRecord, RepoSymbolRecord
-from app.explorer.analysis.base import FileAnalysis, Ref
+from app.explorer.analysis.base import Binding, CallSite, FileAnalysis, Ref
 
 SOURCE = "python.ast"
 
@@ -14,6 +14,7 @@ class _Visitor(ast.NodeVisitor):
         self.type_checking = 0
         self.optional = 0
         self.scope: list[str] = []  # enclosing class names
+        self.funcs: list[str] = []  # enclosing qualified function names
 
     def _note(self) -> str | None:
         if self.type_checking:
@@ -25,9 +26,18 @@ class _Visitor(ast.NodeVisitor):
     def visit_Import(self, node: ast.Import) -> None:
         for a in node.names:
             self.out.refs.append(Ref(a.name, "import", node.lineno, note=self._note()))
+            if a.asname:
+                self.out.bindings.append(Binding(a.asname, a.name, 0, None))
+            else:  # `import a.b.c` binds only `a`
+                self.out.bindings.append(Binding(a.name.split(".")[0], a.name, 0, None, True))
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         names = tuple(a.name for a in node.names)
+        for a in node.names:
+            if a.name != "*":
+                self.out.bindings.append(
+                    Binding(a.asname or a.name, node.module or "", node.level, a.name)
+                )
         self.out.refs.append(
             Ref(node.module or "", "import", node.lineno, names, node.level, self._note())
         )
@@ -98,7 +108,29 @@ class _Visitor(ast.NodeVisitor):
                         dynamic=True,
                     )
                 )
+        self._record_call(node)
         self.generic_visit(node)
+
+    def _record_call(self, node: ast.Call) -> None:
+        chain: list[str] = []
+        f: ast.expr = node.func
+        last_end = f.end_col_offset or 0
+        while isinstance(f, ast.Attribute):
+            chain.append(f.attr)
+            f = f.value
+        if not isinstance(f, ast.Name):
+            return  # calls on call results, subscripts, etc.: not followed
+        chain.append(f.id)
+        chain.reverse()
+        end_line = node.func.end_lineno or node.lineno
+        name_len = len(chain[-1])
+        self.out.calls.append(
+            CallSite(
+                chain=tuple(chain), line=end_line, column=last_end - name_len + 1,
+                end_column=last_end + 1, scope=self.funcs[-1] if self.funcs else None,
+                cls=self.scope[-1] if self.scope else None,
+            )
+        )  # fmt: skip
 
     def _sym(self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef, kind: str) -> None:
         parent = self.scope[-1] if self.scope else None
@@ -113,7 +145,10 @@ class _Visitor(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self._sym(node, "method" if self.scope else "function")
+        qual = f"{self.scope[-1]}.{node.name}" if self.scope else node.name
+        self.funcs.append(qual)
         self.generic_visit(node)
+        self.funcs.pop()
 
     visit_AsyncFunctionDef = visit_FunctionDef  # type: ignore[assignment]  # noqa: N815
 

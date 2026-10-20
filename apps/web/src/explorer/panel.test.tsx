@@ -9,6 +9,9 @@ import { buildPreviewDoc, PREVIEW_CSP } from './preview'
 const calls = vi.hoisted(() => ({
   markers: [] as { path: string; line: number; message: string; severity: number }[],
   revealed: [] as number[],
+  mouse: null as null | ((e: unknown) => void),
+  action: null as null | { run: (ed: unknown) => void },
+  decorations: [] as unknown[],
 }))
 
 vi.mock('@monaco-editor/react', () => ({
@@ -27,11 +30,31 @@ vi.mock('@monaco-editor/react', () => ({
         getModel: () => model,
         revealLineInCenter: (n: number) => calls.revealed.push(n),
         setPosition: () => {},
-        createDecorationsCollection: () => ({ clear: () => {} }),
+        getPosition: () => ({ lineNumber: 1, column: 1 }),
+        createDecorationsCollection: (d: unknown[]) => {
+          calls.decorations.push(...d)
+          return { clear: () => {} }
+        },
+        onMouseDown: (h: (e: unknown) => void) => {
+          calls.mouse = h
+          return { dispose: () => {} }
+        },
+        addAction: (a: { run: (ed: unknown) => void }) => {
+          calls.action = a
+          return { dispose: () => {} }
+        },
       }
       const monaco = {
         MarkerSeverity: { Error: 8, Warning: 4, Info: 2 },
-        Range: class {},
+        KeyCode: { F12: 69 },
+        Range: class {
+          constructor(
+            public a: number,
+            public b: number,
+            public c: number,
+            public d: number,
+          ) {}
+        },
         editor: {
           setModelMarkers: (
             _m: unknown,
@@ -110,6 +133,8 @@ const edge = (src: string, dst: string | null, over = {}) => ({
 const analysisFor = (path: string): FileAnalysis => ({
   path,
   status: 'analyzed',
+  references: [],
+  called_by: [],
   symbols: [
     { path, name: 'main', kind: 'function', line: 10, end_line: 20, parent: null, exported: true },
     { path, name: 'run', kind: 'method', line: 30, end_line: 35, parent: 'App', exported: true },
@@ -147,6 +172,9 @@ beforeEach(() => {
   vi.restoreAllMocks()
   calls.markers.length = 0
   calls.revealed.length = 0
+  calls.decorations.length = 0
+  calls.mouse = null
+  calls.action = null
   useExplorer.setState({
     mode: 'explorer',
     revision: rev,
@@ -231,6 +259,8 @@ describe('file details', () => {
     vi.spyOn(api, 'explorerAnalysis').mockResolvedValue({
       path: 'x',
       status: 'unsupported',
+      references: [],
+      called_by: [],
       symbols: [],
       imports: [],
       dependents: [],
@@ -304,5 +334,74 @@ describe('html preview', () => {
     expect(doc.startsWith('<meta http-equiv="Content-Security-Policy"')).toBe(true)
     expect(PREVIEW_CSP).toContain("default-src 'none'")
     expect(PREVIEW_CSP).not.toMatch(/script-src|connect-src|http/)
+  })
+})
+
+describe('call relationships and Go to Definition', () => {
+  const callRef = {
+    path: 'main.py',
+    line: 4,
+    column: 5,
+    end_column: 11,
+    name: 'helper',
+    kind: 'call',
+    scope: 'main',
+    dst_path: 'utils.py',
+    dst_symbol: 'helper',
+    dst_line: 20,
+    confidence: 'resolved',
+    provenance: 'python.ast',
+    note: null,
+  }
+  const withCalls = () =>
+    vi.spyOn(api, 'explorerAnalysis').mockImplementation(async (_id, path) => ({
+      ...analysisFor(path),
+      references: path === 'main.py' ? [callRef] : [],
+      called_by: path === 'utils.py' ? [{ ...callRef, path: 'main.py' }] : [],
+    }))
+
+  it('Details lists what a file calls and who calls into it', async () => {
+    withCalls()
+    render(<ExplorerView theme="dark" />)
+    await open('main.py')
+    fireEvent.click(screen.getByRole('tab', { name: /Details/ }))
+    expect(screen.getByText('Calls to definitions in this repository')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'helper' }))
+    await waitFor(() => expect(useExplorer.getState().target).toMatchObject({ path: 'utils.py', line: 20 }))
+    expect(await screen.findByText('Called from other files')).toBeInTheDocument()
+  })
+
+  it('underlines the name, and Cmd+click on it opens the definition', async () => {
+    withCalls()
+    render(<ExplorerView theme="dark" />)
+    await open('main.py')
+    await waitFor(() => expect(calls.mouse).not.toBeNull())
+    expect(calls.decorations).toHaveLength(1)
+    act(() =>
+      calls.mouse!({
+        event: { metaKey: false, ctrlKey: false },
+        target: { position: { lineNumber: 4, column: 6 } },
+      }),
+    )
+    expect(useExplorer.getState().selectedPath).toBe('main.py') // a plain click does nothing
+    act(() =>
+      calls.mouse!({
+        event: { metaKey: true, ctrlKey: false },
+        target: { position: { lineNumber: 4, column: 6 } },
+      }),
+    )
+    await waitFor(() => expect(useExplorer.getState().selectedPath).toBe('utils.py'))
+    expect(useExplorer.getState().target).toMatchObject({ line: 20 })
+  })
+
+  it('F12 follows the name under the cursor and ignores anything else', async () => {
+    withCalls()
+    render(<ExplorerView theme="dark" />)
+    await open('main.py')
+    await waitFor(() => expect(calls.action).not.toBeNull())
+    act(() => calls.action!.run({ getPosition: () => ({ lineNumber: 1, column: 1 }) }))
+    expect(useExplorer.getState().selectedPath).toBe('main.py')
+    act(() => calls.action!.run({ getPosition: () => ({ lineNumber: 4, column: 8 }) }))
+    await waitFor(() => expect(useExplorer.getState().selectedPath).toBe('utils.py'))
   })
 })

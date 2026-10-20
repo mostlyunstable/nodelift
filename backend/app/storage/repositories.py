@@ -12,6 +12,7 @@ from app.domain.records import (
     RepoEdgeRecord,
     RepoFileRecord,
     RepoPatchRecord,
+    RepoReferenceRecord,
     RepoRevisionRecord,
     RepoSymbolRecord,
     RunRecord,
@@ -31,6 +32,7 @@ from app.storage.models import (
     RepoEdgeRow,
     RepoFileRow,
     RepoPatchRow,
+    RepoReferenceRow,
     RepoRevisionRow,
     RepoSymbolRow,
     RunEventRow,
@@ -479,6 +481,7 @@ class SqlRepoRepository:
                 RepoEdgeRow,
                 RepoSymbolRow,
                 RepoDiagnosticRow,
+                RepoReferenceRow,
                 RepoFileRow,
                 RepoPatchRow,
             ):
@@ -518,14 +521,19 @@ class SqlRepoRepository:
         diagnostics: list[RepoDiagnosticRecord],
         statuses: dict[str, str],
         status: str,
+        references: list[RepoReferenceRecord] | None = None,
     ) -> None:
         with self.sf.begin() as s:
-            for table in (RepoEdgeRow, RepoSymbolRow, RepoDiagnosticRow):
+            for table in (RepoEdgeRow, RepoSymbolRow, RepoDiagnosticRow, RepoReferenceRow):
                 s.execute(delete(table).where(table.revision_id == revision_id))
             s.add_all(RepoEdgeRow(revision_id=revision_id, **e.model_dump()) for e in edges)
             s.add_all(RepoSymbolRow(revision_id=revision_id, **x.model_dump()) for x in symbols)
             s.add_all(
                 RepoDiagnosticRow(revision_id=revision_id, **d.model_dump()) for d in diagnostics
+            )
+            s.add_all(
+                RepoReferenceRow(revision_id=revision_id, **r.model_dump())
+                for r in references or []
             )
             for f in s.scalars(select(RepoFileRow).where(RepoFileRow.revision_id == revision_id)):
                 f.analysis_status = statuses.get(f.path, "not_analyzed")
@@ -543,6 +551,14 @@ class SqlRepoRepository:
         return RepoEdgeRecord(
             src=r.src, dst=r.dst, kind=r.kind, confidence=r.confidence, line=r.line, raw=r.raw,
             provenance=r.provenance, note=r.note,
+        )  # fmt: skip
+
+    @staticmethod
+    def _ref(r: RepoReferenceRow) -> RepoReferenceRecord:
+        return RepoReferenceRecord(
+            path=r.path, line=r.line, column=r.column, end_column=r.end_column, name=r.name,
+            kind=r.kind, scope=r.scope, dst_path=r.dst_path, dst_symbol=r.dst_symbol,
+            dst_line=r.dst_line, confidence=r.confidence, provenance=r.provenance, note=r.note,
         )  # fmt: skip
 
     @staticmethod
@@ -600,6 +616,21 @@ class SqlRepoRepository:
                 .where(RepoEdgeRow.revision_id == revision_id, RepoEdgeRow.dst == path)
                 .order_by(RepoEdgeRow.src, RepoEdgeRow.line)
             )
+            refs = s.scalars(
+                select(RepoReferenceRow)
+                .where(RepoReferenceRow.revision_id == revision_id, RepoReferenceRow.path == path)
+                .order_by(RepoReferenceRow.line, RepoReferenceRow.column)
+            )
+            called = s.scalars(
+                select(RepoReferenceRow)
+                .where(
+                    RepoReferenceRow.revision_id == revision_id,
+                    RepoReferenceRow.dst_path == path,
+                    RepoReferenceRow.path != path,
+                )
+                .order_by(RepoReferenceRow.path, RepoReferenceRow.line)
+                .limit(300)
+            )
             diags = s.scalars(
                 select(RepoDiagnosticRow)
                 .where(RepoDiagnosticRow.revision_id == revision_id, RepoDiagnosticRow.path == path)
@@ -615,6 +646,8 @@ class SqlRepoRepository:
                     )
                     for x in syms
                 ],
+                references=[self._ref(r) for r in refs],
+                called_by=[self._ref(r) for r in called],
                 imports=[self._edge(r) for r in out],
                 dependents=[self._edge(r) for r in inc],
                 diagnostics=[self._diag(r) for r in diags],

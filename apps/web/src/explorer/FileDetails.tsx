@@ -45,6 +45,8 @@ export function FileDetails({ analysis, path }: { analysis: FileAnalysis | null;
   const [symbolFilter, setSymbolFilter] = useState('')
   if (!analysis) return <div className="viewer-empty muted">Analysis for this file is not available yet.</div>
 
+  const calls = analysis.references
+  const callers = analysis.called_by
   const internal = analysis.imports.filter((e) => e.dst && e.kind !== 'tests')
   const external = analysis.imports.filter((e) => !e.dst && e.confidence === 'external')
   const unresolved = analysis.imports.filter((e) => !e.dst && e.confidence === 'unresolved')
@@ -109,6 +111,51 @@ export function FileDetails({ analysis, path }: { analysis: FileAnalysis | null;
                 <span className="muted">
                   {s.kind} · line {s.line}
                   {s.exported ? '' : ' · private'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {calls.length > 0 && (
+        <Section title="Calls to definitions in this repository" count={calls.length}>
+          <ul className="detail-list">
+            {calls.map((r, i) => (
+              <li key={i}>
+                <button className="link-button" onClick={() => void goTo(path, r.line)}>
+                  line {r.line}
+                </button>{' '}
+                <span className="muted">{r.scope ?? 'module'}</span> →{' '}
+                <button className="link-button path-link" onClick={() => void goTo(r.dst_path, r.dst_line)}>
+                  {r.dst_symbol}
+                </button>{' '}
+                <span className="muted">
+                  {r.dst_path}:{r.dst_line}
+                  {r.confidence !== 'resolved' && (
+                    <span className={`conf conf-${r.confidence}`}> {r.confidence}</span>
+                  )}
+                  {r.note ? ` · ${r.note}` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {callers.length > 0 && (
+        <Section title="Called from other files" count={callers.length}>
+          <ul className="detail-list">
+            {callers.map((r, i) => (
+              <li key={i}>
+                <button className="link-button path-link" onClick={() => void goTo(r.path, r.line)}>
+                  {r.path}:{r.line}
+                </button>{' '}
+                <span className="muted">
+                  in {r.scope ?? 'module'} calls {r.dst_symbol}
+                  {r.confidence !== 'resolved' && (
+                    <span className={`conf conf-${r.confidence}`}> {r.confidence}</span>
+                  )}
                 </span>
               </li>
             ))}

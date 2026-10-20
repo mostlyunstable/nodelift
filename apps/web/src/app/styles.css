@@ -1446,3 +1446,9 @@ path.xe-dep.xe-heuristic {
   margin: 8px 0;
   border: 1px solid var(--border);
 }
+
+.nc-ref {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}

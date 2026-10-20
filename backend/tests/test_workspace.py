@@ -321,3 +321,17 @@ def test_unconfined_machines_need_an_explicit_acknowledgement(
 def test_risky_commands_are_flagged_in_the_record(api: TestClient, ws: str) -> None:
     r = run_cmd(api, ws, "python3 -m pip install nothing-here")
     assert any("Installs packages" in n for n in r["notes"])
+
+
+def test_call_relationships_are_served_per_file_both_ways(api: TestClient, rev: str) -> None:
+    base = f"/api/v1/explorer/revisions/{rev}"
+    tc = api.get(f"{base}/analysis", params={"path": "test_calc.py"}).json()
+    ref = [r for r in tc["references"] if r["name"] == "add"][0]
+    assert (ref["dst_path"], ref["dst_symbol"], ref["confidence"]) == ("calc.py", "add", "resolved")
+    assert ref["scope"] == "T.test_add" and ref["line"] == 6
+    line = TEST.splitlines()[ref["line"] - 1]
+    assert line[ref["column"] - 1 : ref["end_column"] - 1] == "add"  # the span is exactly the name
+    calc = api.get(f"{base}/analysis", params={"path": "calc.py"}).json()
+    assert [(c["path"], c["scope"], c["dst_symbol"]) for c in calc["called_by"]] == [
+        ("test_calc.py", "T.test_add", "add")
+    ]

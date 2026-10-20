@@ -372,6 +372,14 @@
       },
       "FileAnalysisRecord": {
         "properties": {
+          "called_by": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RepoReferenceRecord"
+            },
+            "title": "Called By",
+            "type": "array"
+          },
           "dependents": {
             "items": {
               "$ref": "#/components/schemas/RepoEdgeRecord"
@@ -396,6 +404,14 @@
           "path": {
             "title": "Path",
             "type": "string"
+          },
+          "references": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RepoReferenceRecord"
+            },
+            "title": "References",
+            "type": "array"
           },
           "status": {
             "title": "Status",
@@ -1214,6 +1230,93 @@
           "applied_at"
         ],
         "title": "RepoPatchRecord",
+        "type": "object"
+      },
+      "RepoReferenceRecord": {
+        "description": "A name use that static analysis tied to a definition (here or in another file).",
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "integer"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "string"
+          },
+          "dst_line": {
+            "title": "Dst Line",
+            "type": "integer"
+          },
+          "dst_path": {
+            "title": "Dst Path",
+            "type": "string"
+          },
+          "dst_symbol": {
+            "title": "Dst Symbol",
+            "type": "string"
+          },
+          "end_column": {
+            "title": "End Column",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "provenance": {
+            "title": "Provenance",
+            "type": "string"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          }
+        },
+        "required": [
+          "path",
+          "line",
+          "column",
+          "end_column",
+          "name",
+          "kind",
+          "scope",
+          "dst_path",
+          "dst_symbol",
+          "dst_line",
+          "confidence",
+          "provenance"
+        ],
+        "title": "RepoReferenceRecord",
         "type": "object"
       },
       "RepoRevisionRecord": {

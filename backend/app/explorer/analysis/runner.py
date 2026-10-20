@@ -9,9 +9,11 @@ from app.domain.records import (
     RepoDiagnosticRecord,
     RepoEdgeRecord,
     RepoFileRecord,
+    RepoReferenceRecord,
     RepoSymbolRecord,
 )
-from app.explorer.analysis.base import Analyzer
+from app.explorer.analysis.base import Analyzer, FileAnalysis
+from app.explorer.analysis.calls import resolve_calls
 from app.explorer.analysis.registry import default_analyzers
 from app.explorer.analysis.resolve import Resolver
 from app.explorer.archive import Cancelled
@@ -22,6 +24,7 @@ class AnalysisResult:
     edges: list[RepoEdgeRecord] = field(default_factory=list)
     symbols: list[RepoSymbolRecord] = field(default_factory=list)
     diagnostics: list[RepoDiagnosticRecord] = field(default_factory=list)
+    references: list[RepoReferenceRecord] = field(default_factory=list)
     statuses: dict[str, str] = field(
         default_factory=dict
     )  # path -> analyzed|failed|unsupported|skipped|timeout
@@ -74,6 +77,8 @@ def analyze_files(
     res = AnalysisResult()
     deadline = time.monotonic() + budget_seconds
     lang_of = {f.path: f.language for f in files}
+    analyses: dict[str, FileAnalysis] = {}
+    providers: dict[str, str] = {}
     base = root.resolve()
     for f in files:
         if cancel is not None and cancel.is_set():
@@ -105,6 +110,8 @@ def analyze_files(
             )  # fmt: skip
             continue
         res.statuses[f.path] = "analyzed"
+        analyses[f.path] = result
+        providers[f.path] = an.id
         res.symbols.extend(result.symbols)
         res.diagnostics.extend(result.diagnostics)
         seen: set[tuple[str, str | None, str, int, str]] = set()
@@ -127,6 +134,8 @@ def analyze_files(
                             message=f"Cannot find {edge.raw or 'this module'} in the repository", source=an.id,
                         )
                     )  # fmt: skip
+
+    res.references = resolve_calls(analyses, lang_of, providers, resolver)
 
     # name-based test association, only where no import already links the pair
     linked = {(e.src, e.dst) for e in res.edges if e.dst}

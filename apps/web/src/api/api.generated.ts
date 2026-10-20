@@ -1019,6 +1019,11 @@ export interface components {
         };
         /** FileAnalysisRecord */
         FileAnalysisRecord: {
+            /**
+             * Called By
+             * @default []
+             */
+            called_by: components["schemas"]["RepoReferenceRecord"][];
             /** Dependents */
             dependents: components["schemas"]["RepoEdgeRecord"][];
             /** Diagnostics */
@@ -1027,6 +1032,11 @@ export interface components {
             imports: components["schemas"]["RepoEdgeRecord"][];
             /** Path */
             path: string;
+            /**
+             * References
+             * @default []
+             */
+            references: components["schemas"]["RepoReferenceRecord"][];
             /** Status */
             status: string;
             /** Symbols */
@@ -1367,6 +1377,38 @@ export interface components {
             revision_id: string;
             /** Title */
             title: string;
+        };
+        /**
+         * RepoReferenceRecord
+         * @description A name use that static analysis tied to a definition (here or in another file).
+         */
+        RepoReferenceRecord: {
+            /** Column */
+            column: number;
+            /** Confidence */
+            confidence: string;
+            /** Dst Line */
+            dst_line: number;
+            /** Dst Path */
+            dst_path: string;
+            /** Dst Symbol */
+            dst_symbol: string;
+            /** End Column */
+            end_column: number;
+            /** Kind */
+            kind: string;
+            /** Line */
+            line: number;
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            /** Path */
+            path: string;
+            /** Provenance */
+            provenance: string;
+            /** Scope */
+            scope: string | null;
         };
         /**
          * RepoRevisionRecord

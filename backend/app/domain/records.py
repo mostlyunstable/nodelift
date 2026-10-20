@@ -138,10 +138,30 @@ class RepoDiagnosticRecord(BaseModel):
     source: str
 
 
+class RepoReferenceRecord(BaseModel):
+    """A name use that static analysis tied to a definition (here or in another file)."""
+
+    path: str
+    line: int
+    column: int  # 1-based start of the name
+    end_column: int
+    name: str
+    kind: str  # call
+    scope: str | None  # the function/method (qualified) that contains it; None at module level
+    dst_path: str
+    dst_symbol: str  # qualified, e.g. "Session.request"
+    dst_line: int
+    confidence: str  # resolved | heuristic
+    provenance: str
+    note: str | None = None
+
+
 class FileAnalysisRecord(BaseModel):
     path: str
     status: str
     symbols: list[RepoSymbolRecord]
+    references: list[RepoReferenceRecord] = []  # names in this file tied to a definition
+    called_by: list[RepoReferenceRecord] = []  # call sites elsewhere that resolve into this file
     imports: list[RepoEdgeRecord]  # outgoing, including external and unresolved
     dependents: list[RepoEdgeRecord]  # incoming, resolved inside the repository
     diagnostics: list[RepoDiagnosticRecord]

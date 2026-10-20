@@ -230,3 +230,24 @@ class RepoPatchRow(Base):
     applied: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
     applied_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+
+class RepoReferenceRow(Base):
+    __tablename__ = "repo_references"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    revision_id: Mapped[str] = mapped_column(
+        ForeignKey("repo_revisions.id", ondelete="CASCADE"), index=True
+    )
+    path: Mapped[str] = mapped_column(String, index=True)
+    line: Mapped[int] = mapped_column(Integer)
+    column: Mapped[int] = mapped_column(Integer)
+    end_column: Mapped[int] = mapped_column(Integer)
+    name: Mapped[str] = mapped_column(String)
+    kind: Mapped[str] = mapped_column(String)
+    scope: Mapped[str | None] = mapped_column(String, nullable=True)
+    dst_path: Mapped[str] = mapped_column(String, index=True)
+    dst_symbol: Mapped[str] = mapped_column(String)
+    dst_line: Mapped[int] = mapped_column(Integer)
+    confidence: Mapped[str] = mapped_column(String)
+    provenance: Mapped[str] = mapped_column(String)
+    note: Mapped[str | None] = mapped_column(String, nullable=True)

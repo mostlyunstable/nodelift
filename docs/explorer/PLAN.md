@@ -139,3 +139,12 @@ unittest repo fails, a proposed fix is applied to the workspace, the same comman
 again; confinement checked from inside (network, home read, writes outside the workspace, inherited secrets); cancel kills a grandchild.
 Real run on `psf/requests`: full 128-file workspace, confined `python3` ran; `pytest` failed honestly because it is not installed.
 **Not done:** AI-assisted explanations/fix suggestions (no provider configured); parsing test results into per-test pass/fail; Git history.
+
+## Call relationships and Go to Definition (2026-10-20): implemented
+Python (`ast`) and JavaScript/TypeScript (tree-sitter) call sites are tied to definitions through import bindings (`from x import f`, `import x as m`,
+`import * as M`, `require`), same-file functions, `Class.method`, and (heuristic, flagged) `self.method()` / `this.method()`. Calls on values, dynamic
+dispatch, decorators, callbacks, `getattr`, default exports are left out, not guessed. Stored in `repo_references` (migration 0009); each file's
+analysis lists what it calls and who calls into it. The editor underlines resolvable names; Cmd/Ctrl+click or F12 opens the definition; Details lists both directions.
+Cross-checked on `psf/requests`: `sessions.Session()` in api.py:70 resolves to sessions.py:395; the seven `request(...)` wrappers resolve to api.py:24;
+`session.request(...)` (a call on a local variable) is correctly not resolved.
+**Not done:** a function-level call graph view; call resolution for other languages; type-based dispatch.
