@@ -1,3 +1,4 @@
+import type { components } from './api.generated'
 import { apiUrl, authHeaders } from './config'
 import type {
   CodeRunResult,
@@ -49,7 +50,20 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
   return data as T
 }
 
+type Schemas = components['schemas']
+export type RepoRevision = Schemas['RepoRevisionRecord']
+export type RepoFile = Schemas['RepoFileRecord']
+export type RepoFileContent = Schemas['FileContent']
+
 export const api = {
+  explorerImport: (url: string) => request<RepoRevision>('POST', '/explorer/imports', { url }),
+  explorerRevisions: () => request<RepoRevision[]>('GET', '/explorer/revisions'),
+  explorerRevision: (id: string) => request<RepoRevision>('GET', `/explorer/revisions/${id}`),
+  explorerCancel: (id: string) => request<RepoRevision>('POST', `/explorer/revisions/${id}/cancel`),
+  explorerDelete: (id: string) => request<null>('DELETE', `/explorer/revisions/${id}`),
+  explorerFiles: (id: string) => request<RepoFile[]>('GET', `/explorer/revisions/${id}/files`),
+  explorerFile: (id: string, path: string) =>
+    request<RepoFileContent>('GET', `/explorer/revisions/${id}/file?path=${encodeURIComponent(path)}`),
   nodeDefinitions: () => request<NodeDefinition[]>('GET', '/nodes/definitions'),
   testNode: (type: string, config: unknown, input: unknown, signal?: AbortSignal) =>
     request<CodeRunResult>('POST', '/nodes/test', { type, config, input }, signal),

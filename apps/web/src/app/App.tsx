@@ -2,8 +2,10 @@ import { Background, Controls, MiniMap, ReactFlow } from '@xyflow/react'
 import { useEffect, useRef, useState } from 'react'
 import { checkConnection } from '../canvas/graph'
 import { CodeNode } from '../nodes/CodeNode'
+import { ExplorerView } from '../explorer/ExplorerView'
 import { Inspector } from '../panels/Inspector'
 import { RunPanel } from '../panels/RunPanel'
+import { useExplorer } from '../state/explorer'
 import { loadTheme, useStore } from '../state/store'
 import { resolveTheme } from '../state/theme'
 import { CommandPalette } from '../ui/CommandPalette'
@@ -45,6 +47,8 @@ function useResolvedTheme(): 'dark' | 'light' {
 export function App() {
   const s = useStore()
   const theme = useResolvedTheme()
+  const mode = useExplorer((x) => x.mode)
+  const setMode = useExplorer((x) => x.setMode)
   const fileInput = useRef<HTMLInputElement>(null)
   const [importRequests, setImportRequests] = useState(0)
 
@@ -182,83 +186,107 @@ export function App() {
   ]
 
   return (
-    <div className="app">
+    <div className={`app${mode === 'explorer' ? ' explorer-mode' : ''}`}>
       <header className="toolbar">
         <strong className="brand">Nodecraft</strong>
-        <input
-          className="wf-name"
-          aria-label="Workflow name"
-          value={s.workflowName}
-          onChange={(e) => s.setName(e.target.value)}
-        />
-        <span
-          className={`save-state save-${s.saveState}`}
-          role="status"
-          aria-label="Save status"
-          aria-live="polite"
-          title={s.saveState === 'error' ? (s.message ?? undefined) : undefined}
-        >
-          {SAVE_LABEL[s.saveState]}
-        </span>
-        <span className="sep" />
-        <button
-          className="primary"
-          onClick={() => void s.runWorkflow()}
-          disabled={s.busy !== null || s.nodes.length === 0}
-          title="Run (⌘↵)"
-        >
-          {s.busy === 'run' ? 'Running…' : '▶ Run'}
-        </button>
-        <button
-          onClick={() => void s.cancel()}
-          disabled={s.busy !== 'run' || s.run?.status !== 'running'}
-          title="Stop (⌘.)"
-        >
-          Stop
-        </button>
-        <span className="spacer" />
-        <Menu label="+ Node" ariaLabel="Add node" items={addItems} />
-        <Menu label="Workflows" ariaLabel="Workflows" items={workflowItems} align="right" />
-        <button
-          onClick={() => s.openDialog('palette')}
-          title="Command palette (⌘K)"
-          aria-label="Command palette"
-        >
-          ⌘K
-        </button>
-        <Menu label="⋯" ariaLabel="More actions" items={moreItems} align="right" />
-      </header>
-      <main className="workspace">
-        <div className="canvas">
-          <TourBanner />
-          <EmptyCanvas />
-          <ReactFlow
-            nodes={s.nodes}
-            edges={s.edges}
-            nodeTypes={nodeTypes}
-            onNodesChange={s.onNodesChange}
-            onEdgesChange={s.onEdgesChange}
-            onConnect={s.onConnect}
-            isValidConnection={(c) =>
-              checkConnection(useStore.getState().edges, c.source, c.target, c.sourceHandle, c.targetHandle)
-                .ok
-            }
-            onNodeDragStart={s.beginDrag}
-            onNodeClick={(_, n) => s.select(n.id)}
-            onPaneClick={() => s.select(null)}
-            colorMode={theme}
-            fitView
-            minZoom={0.1} // the default 0.5 made graphs wider than the canvas impossible to see whole
-            deleteKeyCode={['Backspace', 'Delete']}
-          >
-            <Background />
-            <Controls />
-            {s.nodes.length > 12 && <MiniMap pannable zoomable />}
-          </ReactFlow>
+        <div className="mode-switch" role="tablist" aria-label="Mode">
+          <button role="tab" aria-selected={mode === 'build'} onClick={() => setMode('build')}>
+            Build
+          </button>
+          <button role="tab" aria-selected={mode === 'explorer'} onClick={() => setMode('explorer')}>
+            Explorer
+          </button>
         </div>
-        <Inspector />
-      </main>
-      <RunPanel />
+        {mode === 'explorer' && <span className="spacer" />}
+        {mode === 'build' && (
+          <>
+            <input
+              className="wf-name"
+              aria-label="Workflow name"
+              value={s.workflowName}
+              onChange={(e) => s.setName(e.target.value)}
+            />
+            <span
+              className={`save-state save-${s.saveState}`}
+              role="status"
+              aria-label="Save status"
+              aria-live="polite"
+              title={s.saveState === 'error' ? (s.message ?? undefined) : undefined}
+            >
+              {SAVE_LABEL[s.saveState]}
+            </span>
+            <span className="sep" />
+            <button
+              className="primary"
+              onClick={() => void s.runWorkflow()}
+              disabled={s.busy !== null || s.nodes.length === 0}
+              title="Run (⌘↵)"
+            >
+              {s.busy === 'run' ? 'Running…' : '▶ Run'}
+            </button>
+            <button
+              onClick={() => void s.cancel()}
+              disabled={s.busy !== 'run' || s.run?.status !== 'running'}
+              title="Stop (⌘.)"
+            >
+              Stop
+            </button>
+            <span className="spacer" />
+            <Menu label="+ Node" ariaLabel="Add node" items={addItems} />
+            <Menu label="Workflows" ariaLabel="Workflows" items={workflowItems} align="right" />
+            <button
+              onClick={() => s.openDialog('palette')}
+              title="Command palette (⌘K)"
+              aria-label="Command palette"
+            >
+              ⌘K
+            </button>
+            <Menu label="⋯" ariaLabel="More actions" items={moreItems} align="right" />
+          </>
+        )}
+      </header>
+      {mode === 'explorer' ? (
+        <ExplorerView theme={theme} />
+      ) : (
+        <>
+          <main className="workspace">
+            <div className="canvas">
+              <TourBanner />
+              <EmptyCanvas />
+              <ReactFlow
+                nodes={s.nodes}
+                edges={s.edges}
+                nodeTypes={nodeTypes}
+                onNodesChange={s.onNodesChange}
+                onEdgesChange={s.onEdgesChange}
+                onConnect={s.onConnect}
+                isValidConnection={(c) =>
+                  checkConnection(
+                    useStore.getState().edges,
+                    c.source,
+                    c.target,
+                    c.sourceHandle,
+                    c.targetHandle,
+                  ).ok
+                }
+                onNodeDragStart={s.beginDrag}
+                onNodeClick={(_, n) => s.select(n.id)}
+                onPaneClick={() => s.select(null)}
+                colorMode={theme}
+                fitView
+                minZoom={0.1} // the default 0.5 made graphs wider than the canvas impossible to see whole
+                deleteKeyCode={['Backspace', 'Delete']}
+              >
+                <Background />
+                <Controls />
+                {s.nodes.length > 12 && <MiniMap pannable zoomable />}
+              </ReactFlow>
+            </div>
+            <Inspector />
+          </main>
+          <RunPanel />
+        </>
+      )}
       <Toast />
       <RunAnnouncer />
       <input

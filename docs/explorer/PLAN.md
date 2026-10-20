@@ -72,3 +72,12 @@ tarball/zipball endpoint (one request) or require a token. I therefore now recom
 extraction** (cap entries/size, reject unsafe paths and links) over per-blob REST. Tree-sitter wheels in the bundled runtime are
 unverified. Static analysis will miss dynamic imports and generated code; the UI will say so. Private repos are out of scope until a
 keychain-backed token flow is built.
+
+## R2 status (2026-10-20): implemented
+Backend `app/explorer/` (URL allowlist parser, GitHub client limited to `api.github.com`/`codeload.github.com` with a
+redirect budget, safe tarball extraction with file-count/size/total limits, language detection), `services/explorer_service.py`
+(pinned-commit imports as background tasks, cancel, cache by commit, read only indexed paths), migration 0006
+(`repo_revisions`, `repo_files`), API `/api/v1/explorer/*`. Frontend: Build/Explorer switch, import form with *Show Nodes*,
+progress, repository card, searchable file tree, read-only Monaco viewer. Not in R2: the graph (R3), dependency analysis (R4),
+symlinks are skipped (counted in neither total), private repositories, token support.
+Verified against real GitHub: `psf/requests@611c616` imported 128 files = GitHub's 130 blobs minus 2 symlinks.

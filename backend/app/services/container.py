@@ -8,10 +8,12 @@ from typing import Any
 
 from app.domain.nodes import NodeRegistry
 from app.domain.repositories import CredentialRepository
+from app.services.explorer_service import ExplorerService
 from app.services.workflow_service import WorkflowService
 from app.storage.db import current_revision, head_revision
 from app.storage.repositories import (
     SqlCredentialRepository,
+    SqlRepoRepository,
     SqlRunRepository,
     SqlWorkflowRepository,
 )
@@ -28,6 +30,15 @@ def workflow_service(state: Any, registry: NodeRegistry) -> WorkflowService:
         state.settings.max_run_seconds,
         state.settings.keep_runs_per_workflow,
         state.secrets,
+    )
+
+
+def explorer_service(state: Any) -> ExplorerService:
+    return ExplorerService(
+        SqlRepoRepository(state.session_factory),
+        state.settings,
+        state.import_jobs,
+        getattr(state, "github_transport", None),
     )
 
 

@@ -39,6 +39,8 @@ Not signed with a Developer ID, not notarized, no auto-update: sharing the build
 - Branching by output ports, fail-fast, cancel, retries (opt-in), run budgets, resume from failure.
 - SQLite persistence, immutable versions, run history, live events over SSE with recovery, pre-migration backups.
 - Import/export with preview; credentials in the system keychain, masked in all results.
+- Repository Explorer (R2): paste a public GitHub URL, press *Show Nodes*, browse the files at a pinned commit and read them
+  in a read-only editor. No dependency graph yet ([plan](docs/explorer/PLAN.md)).
 - Local API protection: Host/Origin checks and a per-launch bearer token ([docs/security.md](docs/security.md)).
 
 ## Limits (read these)

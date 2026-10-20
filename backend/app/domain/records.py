@@ -62,3 +62,40 @@ class RunSummary(BaseModel):
     version_no: int
     duration_ms: int
     created_at: datetime
+
+
+class RepoRevisionRecord(BaseModel):
+    """One repository at one commit. Graphs and files always belong to exactly one revision."""
+
+    schema_version: int = 1
+    id: str
+    owner: str
+    repo: str
+    full_name: str
+    branch: str
+    default_branch: str
+    commit_sha: str
+    description: str
+    status: str  # importing | ready | failed | cancelled
+    phase: str  # human-readable progress message
+    file_count: int
+    text_count: int
+    binary_count: int
+    skipped_count: int
+    total_bytes: int
+    analyzed_count: int
+    error_code: str | None
+    error_message: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class RepoFileRecord(BaseModel):
+    path: str
+    language: str
+    size: int
+    lines: int
+    binary: bool
+    stored: bool
+    skip_reason: str | None
+    analysis_status: str  # not_analyzed until a language analyzer runs (R4)

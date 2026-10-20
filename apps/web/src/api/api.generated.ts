@@ -77,6 +77,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/explorer/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Import
+         * @description 202 while a new import runs in the background; 200 if this exact commit is already known.
+         */
+        post: operations["start_import_api_v1_explorer_imports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Revisions */
+        get: operations["list_revisions_api_v1_explorer_revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions/{revision_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Revision */
+        get: operations["get_revision_api_v1_explorer_revisions__revision_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Revision */
+        delete: operations["delete_revision_api_v1_explorer_revisions__revision_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions/{revision_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Import */
+        post: operations["cancel_import_api_v1_explorer_revisions__revision_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions/{revision_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read File */
+        get: operations["read_file_api_v1_explorer_revisions__revision_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions/{revision_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Files */
+        get: operations["list_files_api_v1_explorer_revisions__revision_id__files_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -585,6 +691,23 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** FileContent */
+        FileContent: {
+            /** Binary */
+            binary: boolean;
+            /** Content */
+            content: string | null;
+            /** Language */
+            language: string;
+            /** Lines */
+            lines: number;
+            /** Path */
+            path: string;
+            /** Reason */
+            reason: string | null;
+            /** Size */
+            size: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -604,6 +727,11 @@ export interface components {
             summary: components["schemas"]["ImportSummary"];
             /** Valid */
             valid: boolean;
+        };
+        /** ImportRequest */
+        ImportRequest: {
+            /** Url */
+            url: string;
         };
         /** ImportSummary */
         ImportSummary: {
@@ -792,6 +920,82 @@ export interface components {
             description: string;
             /** Name */
             name: string;
+        };
+        /** RepoFileRecord */
+        RepoFileRecord: {
+            /** Analysis Status */
+            analysis_status: string;
+            /** Binary */
+            binary: boolean;
+            /** Language */
+            language: string;
+            /** Lines */
+            lines: number;
+            /** Path */
+            path: string;
+            /** Size */
+            size: number;
+            /** Skip Reason */
+            skip_reason: string | null;
+            /** Stored */
+            stored: boolean;
+        };
+        /**
+         * RepoRevisionRecord
+         * @description One repository at one commit. Graphs and files always belong to exactly one revision.
+         */
+        RepoRevisionRecord: {
+            /** Analyzed Count */
+            analyzed_count: number;
+            /** Binary Count */
+            binary_count: number;
+            /** Branch */
+            branch: string;
+            /** Commit Sha */
+            commit_sha: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Default Branch */
+            default_branch: string;
+            /** Description */
+            description: string;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** File Count */
+            file_count: number;
+            /** Full Name */
+            full_name: string;
+            /** Id */
+            id: string;
+            /** Owner */
+            owner: string;
+            /** Phase */
+            phase: string;
+            /** Repo */
+            repo: string;
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version: number;
+            /** Skipped Count */
+            skipped_count: number;
+            /** Status */
+            status: string;
+            /** Text Count */
+            text_count: number;
+            /** Total Bytes */
+            total_bytes: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** ResumeRun */
         ResumeRun: {
@@ -1225,6 +1429,214 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_import_api_v1_explorer_imports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepoRevisionRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_revisions_api_v1_explorer_revisions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepoRevisionRecord"][];
+                };
+            };
+        };
+    };
+    get_revision_api_v1_explorer_revisions__revision_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepoRevisionRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_revision_api_v1_explorer_revisions__revision_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_import_api_v1_explorer_revisions__revision_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepoRevisionRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_file_api_v1_explorer_revisions__revision_id__file_get: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileContent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_files_api_v1_explorer_revisions__revision_id__files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepoFileRecord"][];
                 };
             };
             /** @description Validation Error */

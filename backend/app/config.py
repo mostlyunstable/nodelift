@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     keep_runs_per_workflow: int = 200  # older finished runs are deleted
     legacy_data_dir: Path | None = None  # desktop: older location to import a database from
     parent_pid: int | None = None  # desktop: exit if this process disappears
+    explorer_max_download_mb: int = 100
+    explorer_max_files: int = 20_000
+    explorer_max_file_kb: int = 1024
+    explorer_max_total_mb: int = 300
     shutdown_endpoint: bool = False  # desktop shell stops the backend through this
 
     @computed_field  # type: ignore[prop-decorator]

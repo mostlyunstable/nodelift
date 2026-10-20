@@ -121,3 +121,46 @@ class RunEventRow(Base):
     type: Mapped[str] = mapped_column(String)
     payload: Mapped[dict[str, Any]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+
+
+class RepoRevisionRow(Base):
+    __tablename__ = "repo_revisions"
+    __table_args__ = (UniqueConstraint("owner", "repo", "commit_sha"),)
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    schema_version: Mapped[int] = mapped_column(Integer, default=1)
+    owner: Mapped[str] = mapped_column(String)
+    repo: Mapped[str] = mapped_column(String)
+    full_name: Mapped[str] = mapped_column(String)
+    branch: Mapped[str] = mapped_column(String)
+    default_branch: Mapped[str] = mapped_column(String)
+    commit_sha: Mapped[str] = mapped_column(String)
+    description: Mapped[str] = mapped_column(String, default="")
+    status: Mapped[str] = mapped_column(String)
+    phase: Mapped[str] = mapped_column(String, default="")
+    file_count: Mapped[int] = mapped_column(Integer, default=0)
+    text_count: Mapped[int] = mapped_column(Integer, default=0)
+    binary_count: Mapped[int] = mapped_column(Integer, default=0)
+    skipped_count: Mapped[int] = mapped_column(Integer, default=0)
+    total_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    analyzed_count: Mapped[int] = mapped_column(Integer, default=0)
+    error_code: Mapped[str | None] = mapped_column(String, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+
+
+class RepoFileRow(Base):
+    __tablename__ = "repo_files"
+    __table_args__ = (UniqueConstraint("revision_id", "path"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    revision_id: Mapped[str] = mapped_column(
+        ForeignKey("repo_revisions.id", ondelete="CASCADE"), index=True
+    )
+    path: Mapped[str] = mapped_column(String)
+    language: Mapped[str] = mapped_column(String)
+    size: Mapped[int] = mapped_column(Integer)
+    lines: Mapped[int] = mapped_column(Integer)
+    binary: Mapped[bool] = mapped_column(Boolean)
+    stored: Mapped[bool] = mapped_column(Boolean)
+    skip_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    analysis_status: Mapped[str] = mapped_column(String, default="not_analyzed")

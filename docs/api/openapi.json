@@ -194,6 +194,63 @@
         "title": "ExampleInfo",
         "type": "object"
       },
+      "FileContent": {
+        "properties": {
+          "binary": {
+            "title": "Binary",
+            "type": "boolean"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "lines": {
+            "title": "Lines",
+            "type": "integer"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "path",
+          "language",
+          "size",
+          "lines",
+          "binary",
+          "content",
+          "reason"
+        ],
+        "title": "FileContent",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -248,6 +305,20 @@
           "summary"
         ],
         "title": "ImportPreview",
+        "type": "object"
+      },
+      "ImportRequest": {
+        "properties": {
+          "url": {
+            "maxLength": 300,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "ImportRequest",
         "type": "object"
       },
       "ImportSummary": {
@@ -638,6 +709,191 @@
           "name"
         ],
         "title": "Port",
+        "type": "object"
+      },
+      "RepoFileRecord": {
+        "properties": {
+          "analysis_status": {
+            "title": "Analysis Status",
+            "type": "string"
+          },
+          "binary": {
+            "title": "Binary",
+            "type": "boolean"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "lines": {
+            "title": "Lines",
+            "type": "integer"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "skip_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skip Reason"
+          },
+          "stored": {
+            "title": "Stored",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "language",
+          "size",
+          "lines",
+          "binary",
+          "stored",
+          "skip_reason",
+          "analysis_status"
+        ],
+        "title": "RepoFileRecord",
+        "type": "object"
+      },
+      "RepoRevisionRecord": {
+        "description": "One repository at one commit. Graphs and files always belong to exactly one revision.",
+        "properties": {
+          "analyzed_count": {
+            "title": "Analyzed Count",
+            "type": "integer"
+          },
+          "binary_count": {
+            "title": "Binary Count",
+            "type": "integer"
+          },
+          "branch": {
+            "title": "Branch",
+            "type": "string"
+          },
+          "commit_sha": {
+            "title": "Commit Sha",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "default_branch": {
+            "title": "Default Branch",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "file_count": {
+            "title": "File Count",
+            "type": "integer"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "owner": {
+            "title": "Owner",
+            "type": "string"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "repo": {
+            "title": "Repo",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "skipped_count": {
+            "title": "Skipped Count",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "text_count": {
+            "title": "Text Count",
+            "type": "integer"
+          },
+          "total_bytes": {
+            "title": "Total Bytes",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "owner",
+          "repo",
+          "full_name",
+          "branch",
+          "default_branch",
+          "commit_sha",
+          "description",
+          "status",
+          "phase",
+          "file_count",
+          "text_count",
+          "binary_count",
+          "skipped_count",
+          "total_bytes",
+          "analyzed_count",
+          "error_code",
+          "error_message",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RepoRevisionRecord",
         "type": "object"
       },
       "ResumeRun": {
@@ -1440,6 +1696,288 @@
         "summary": "Create Example",
         "tags": [
           "portability"
+        ]
+      }
+    },
+    "/api/v1/explorer/imports": {
+      "post": {
+        "description": "202 while a new import runs in the background; 200 if this exact commit is already known.",
+        "operationId": "start_import_api_v1_explorer_imports_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoRevisionRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Import",
+        "tags": [
+          "explorer"
+        ]
+      }
+    },
+    "/api/v1/explorer/revisions": {
+      "get": {
+        "operationId": "list_revisions_api_v1_explorer_revisions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RepoRevisionRecord"
+                  },
+                  "title": "Response List Revisions Api V1 Explorer Revisions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Revisions",
+        "tags": [
+          "explorer"
+        ]
+      }
+    },
+    "/api/v1/explorer/revisions/{revision_id}": {
+      "delete": {
+        "operationId": "delete_revision_api_v1_explorer_revisions__revision_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "title": "Revision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Revision",
+        "tags": [
+          "explorer"
+        ]
+      },
+      "get": {
+        "operationId": "get_revision_api_v1_explorer_revisions__revision_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "title": "Revision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoRevisionRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Revision",
+        "tags": [
+          "explorer"
+        ]
+      }
+    },
+    "/api/v1/explorer/revisions/{revision_id}/cancel": {
+      "post": {
+        "operationId": "cancel_import_api_v1_explorer_revisions__revision_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "title": "Revision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoRevisionRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Import",
+        "tags": [
+          "explorer"
+        ]
+      }
+    },
+    "/api/v1/explorer/revisions/{revision_id}/file": {
+      "get": {
+        "operationId": "read_file_api_v1_explorer_revisions__revision_id__file_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "maxLength": 400,
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileContent"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read File",
+        "tags": [
+          "explorer"
+        ]
+      }
+    },
+    "/api/v1/explorer/revisions/{revision_id}/files": {
+      "get": {
+        "operationId": "list_files_api_v1_explorer_revisions__revision_id__files_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "title": "Revision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RepoFileRecord"
+                  },
+                  "title": "Response List Files Api V1 Explorer Revisions  Revision Id  Files Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Files",
+        "tags": [
+          "explorer"
         ]
       }
     },

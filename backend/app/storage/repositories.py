@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.domain.ports import LogLine, NodeError
 from app.domain.records import (
     CredentialRecord,
+    RepoFileRecord,
+    RepoRevisionRecord,
     RunRecord,
     RunSummary,
     VersionRecord,
@@ -20,6 +22,8 @@ from app.domain.workflow import WorkflowDefinition
 from app.storage.models import (
     CredentialRow,
     NodeExecutionRow,
+    RepoFileRow,
+    RepoRevisionRow,
     RunEventRow,
     RunRow,
     WorkflowRow,
@@ -372,3 +376,111 @@ class SqlCredentialRepository:
                 return False
             s.delete(row)
             return True
+
+
+class SqlRepoRepository:
+    def __init__(self, sf: sessionmaker[Session]) -> None:
+        self.sf = sf
+
+    @staticmethod
+    def _rev(r: RepoRevisionRow) -> RepoRevisionRecord:
+        return RepoRevisionRecord(
+            schema_version=r.schema_version, id=r.id, owner=r.owner, repo=r.repo,
+            full_name=r.full_name, branch=r.branch, default_branch=r.default_branch,
+            commit_sha=r.commit_sha, description=r.description, status=r.status, phase=r.phase,
+            file_count=r.file_count, text_count=r.text_count, binary_count=r.binary_count,
+            skipped_count=r.skipped_count, total_bytes=r.total_bytes,
+            analyzed_count=r.analyzed_count, error_code=r.error_code,
+            error_message=r.error_message, created_at=r.created_at, updated_at=r.updated_at,
+        )  # fmt: skip
+
+    @staticmethod
+    def _file(r: RepoFileRow) -> RepoFileRecord:
+        return RepoFileRecord(
+            path=r.path, language=r.language, size=r.size, lines=r.lines, binary=r.binary,
+            stored=r.stored, skip_reason=r.skip_reason, analysis_status=r.analysis_status,
+        )  # fmt: skip
+
+    def create_revision(self, **fields: Any) -> RepoRevisionRecord:
+        with self.sf.begin() as s:
+            row = RepoRevisionRow(id=f"rev_{uuid.uuid4().hex[:12]}", **fields)
+            s.add(row)
+            s.flush()
+            return self._rev(row)
+
+    def get_revision(self, revision_id: str) -> RepoRevisionRecord | None:
+        with self.sf() as s:
+            row = s.get(RepoRevisionRow, revision_id)
+            return self._rev(row) if row else None
+
+    def find_revision(self, owner: str, repo: str, sha: str) -> RepoRevisionRecord | None:
+        with self.sf() as s:
+            row = s.scalars(
+                select(RepoRevisionRow).where(
+                    RepoRevisionRow.owner == owner,
+                    RepoRevisionRow.repo == repo,
+                    RepoRevisionRow.commit_sha == sha,
+                )
+            ).first()
+            return self._rev(row) if row else None
+
+    def list_revisions(self) -> list[RepoRevisionRecord]:
+        with self.sf() as s:
+            rows = s.scalars(select(RepoRevisionRow).order_by(RepoRevisionRow.created_at.desc()))
+            return [self._rev(r) for r in rows]
+
+    def update_revision(self, revision_id: str, **fields: Any) -> RepoRevisionRecord | None:
+        with self.sf.begin() as s:
+            row = s.get(RepoRevisionRow, revision_id)
+            if row is None:
+                return None
+            for k, v in fields.items():
+                setattr(row, k, v)
+            row.updated_at = utcnow()
+            s.flush()
+            return self._rev(row)
+
+    def add_files(self, revision_id: str, files: list[RepoFileRecord]) -> None:
+        with self.sf.begin() as s:
+            s.add_all(RepoFileRow(revision_id=revision_id, **f.model_dump()) for f in files)
+
+    def list_files(self, revision_id: str) -> list[RepoFileRecord]:
+        with self.sf() as s:
+            rows = s.scalars(
+                select(RepoFileRow)
+                .where(RepoFileRow.revision_id == revision_id)
+                .order_by(RepoFileRow.path)
+            )
+            return [self._file(r) for r in rows]
+
+    def get_file(self, revision_id: str, path: str) -> RepoFileRecord | None:
+        with self.sf() as s:
+            row = s.scalars(
+                select(RepoFileRow).where(
+                    RepoFileRow.revision_id == revision_id, RepoFileRow.path == path
+                )
+            ).first()
+            return self._file(row) if row else None
+
+    def delete_revision(self, revision_id: str) -> bool:
+        with self.sf.begin() as s:
+            s.execute(delete(RepoFileRow).where(RepoFileRow.revision_id == revision_id))
+            row = s.get(RepoRevisionRow, revision_id)
+            if row is None:
+                return False
+            s.delete(row)
+            return True
+
+    def fail_stale_imports(self) -> int:
+        """Imports left running by a crash can never finish; mark them failed."""
+        with self.sf.begin() as s:
+            rows = list(
+                s.scalars(select(RepoRevisionRow).where(RepoRevisionRow.status == "importing"))
+            )
+            for r in rows:
+                r.status = "failed"
+                r.error_code = "server_restarted"
+                r.error_message = "Nodecraft was closed before the import finished."
+                r.phase = "Failed"
+                r.updated_at = utcnow()
+            return len(rows)
