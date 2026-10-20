@@ -2,7 +2,7 @@ import json
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -34,6 +34,7 @@ def get_service(request: Request, registry: Registry) -> WorkflowService:
         request.app.state.run_hub,
         request.app.state.gate,
         request.app.state.settings.max_run_seconds,
+        request.app.state.settings.keep_runs_per_workflow,
     )
 
 
@@ -131,10 +132,24 @@ def get_run(run_id: str, svc: Service) -> RunRecord:
 
 
 @router.get("/runs/{run_id}/events", response_model=list[RunEvent])
-def list_events(run_id: str, svc: Service, after: int = 0) -> list[RunEvent]:
-    """Catch-up for a client that missed events: everything with seq > `after`."""
+def list_events(
+    run_id: str,
+    svc: Service,
+    response: Response,
+    after: int = 0,
+    limit: Annotated[int, Query(ge=1, le=2000)] = 500,
+) -> list[RunEvent]:
+    """Catch-up for a client that missed events: events with seq > `after`, at most `limit`.
+
+    When more remain, `X-Has-More: 1` and `X-Next-After: <seq>` say where to continue.
+    """
     _must(svc.runs.get(run_id), "Run")
-    return svc.runs.list_events(run_id, after)
+    rows = svc.runs.list_events(run_id, after, limit + 1)
+    if len(rows) > limit:
+        rows = rows[:limit]
+        response.headers["X-Has-More"] = "1"
+        response.headers["X-Next-After"] = str(rows[-1].seq)
+    return rows
 
 
 def _frame(e: RunEvent) -> str:

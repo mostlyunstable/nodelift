@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     log_dir: Path | None = None  # desktop: rotating backend.log lives here
     backup_dir: Path | None = None  # default: <data_dir>/backups
     keep_backups: int = 5
+    keep_runs_per_workflow: int = 200  # older finished runs are deleted
     legacy_data_dir: Path | None = None  # desktop: older location to import a database from
     parent_pid: int | None = None  # desktop: exit if this process disappears
     shutdown_endpoint: bool = False  # desktop shell stops the backend through this

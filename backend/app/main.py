@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import install_error_handlers
 from app.api.security import SecurityMiddleware
-from app.api.v1 import health, nodes, stored, system, workflows
+from app.api.v1 import health, nodes, portability, stored, system, workflows
 from app.config import Settings, get_settings
 from app.nodes import default_registry, load_plugins
 from app.runtime.subprocess_runner import SubprocessRunner
@@ -61,11 +61,13 @@ def create_app(database_url: str | None = None, settings: Settings | None = None
         allow_origins=settings.origin_list,
         allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["Authorization", "Content-Type", "Accept", "Last-Event-ID"],
+        expose_headers=["X-Has-More", "X-Next-After"],
         max_age=600,
     )
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(nodes.router, prefix="/api/v1")
     app.include_router(workflows.router, prefix="/api/v1")  # validate
+    app.include_router(portability.router, prefix="/api/v1")  # before stored: /workflows/import
     app.include_router(stored.router, prefix="/api/v1")
     app.include_router(system.router, prefix="/api/v1")
     return app

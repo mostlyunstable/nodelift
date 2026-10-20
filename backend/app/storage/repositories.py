@@ -244,6 +244,18 @@ class SqlRunRepository:
                 for r in rows
             ]
 
+    def prune_runs(self, workflow_id: str, keep: int) -> int:
+        with self.sf.begin() as s:
+            stale = s.scalars(
+                select(RunRow.id)
+                .where(RunRow.workflow_id == workflow_id, RunRow.status != "running")
+                .order_by(RunRow.created_at.desc(), RunRow.id.desc())
+                .offset(keep)
+            ).all()
+            if stale:
+                s.execute(delete(RunRow).where(RunRow.id.in_(stale)))  # events/executions cascade
+            return len(stale)
+
     def mark_stale_running(self) -> list[str]:
         with self.sf.begin() as s:
             rows = s.scalars(select(RunRow).where(RunRow.status == "running")).all()

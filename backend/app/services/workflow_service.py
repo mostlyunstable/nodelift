@@ -66,10 +66,12 @@ class WorkflowService:
         hub: RunHub,
         gate: ExecutionGate,
         max_run_seconds: int = 300,
+        keep_runs: int = 200,
     ) -> None:
         self.workflows, self.runs, self.registry, self.hub = workflows, runs, registry, hub
         self.gate = gate
         self.max_run_seconds = max_run_seconds
+        self.keep_runs = keep_runs
 
     def snapshot(self, workflow_id: str) -> VersionRecord:
         """Create a version from the draft, or reuse the latest if the content is unchanged."""
@@ -193,4 +195,8 @@ class WorkflowService:
             await recorder.emit("run.finished", {"status": status, "reason": "internal_error"})
         finally:
             self.gate.close_run(run_id)
+            try:
+                self.runs.prune_runs(version.workflow_id, self.keep_runs)
+            except Exception:
+                log.exception("could not prune old runs")
             self.hub.forget(run_id)

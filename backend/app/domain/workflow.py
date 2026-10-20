@@ -1,9 +1,10 @@
 """Workflow definition (schema_version 1) and semantic validation. Layout lives in `ui`."""
 
-from typing import Any, Literal
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.domain.migrations import CURRENT_SCHEMA_VERSION, unsupported_message
 from app.domain.nodes import NodeRegistry
 
 MAX_NODES = 200
@@ -34,12 +35,19 @@ class WorkflowEdge(Strict):
 
 
 class WorkflowDefinition(Strict):
-    schema_version: Literal[1] = 1
+    schema_version: int = CURRENT_SCHEMA_VERSION
     id: str = ""
     name: str = "Untitled"
     nodes: list[WorkflowNode] = []
     edges: list[WorkflowEdge] = []
     ui: dict[str, Any] = {}  # layout only; ignored by the engine
+
+    @field_validator("schema_version")
+    @classmethod
+    def _known_version(cls, v: int) -> int:
+        if v != CURRENT_SCHEMA_VERSION:
+            raise ValueError(unsupported_message(v, CURRENT_SCHEMA_VERSION))
+        return v
 
 
 class ValidationIssue(BaseModel):
@@ -130,6 +138,7 @@ def validate_workflow(wf: WorkflowDefinition, registry: NodeRegistry) -> list[Va
             ValidationIssue(code="duplicate_node_id", message=f"Duplicate id {dup}", node_id=dup)
         )
     known = set(ids)
+    by_id = {n.id: n for n in wf.nodes}
     for n in wf.nodes:
         impl = registry.get(n.type)
         if impl is None:
@@ -156,6 +165,23 @@ def validate_workflow(wf: WorkflowDefinition, registry: NodeRegistry) -> list[Va
                     code="self_loop", message="Node connected to itself", node_id=e.source.node
                 )
             )
+        for end, ports_of in ((e.source, "outputs"), (e.target, "inputs")):
+            node = by_id.get(end.node)
+            impl = registry.get(node.type) if node else None
+            if node is None or impl is None:
+                continue  # already reported as dangling / unknown type
+            valid = {p.name for p in getattr(impl.definition, ports_of)}
+            if end.port not in valid:
+                kind = "output" if ports_of == "outputs" else "input"
+                issues.append(
+                    ValidationIssue(
+                        code="unknown_port",
+                        message=(
+                            f"{node.type} has no {kind} port {end.port!r} (has {sorted(valid)})"
+                        ),
+                        node_id=node.id,
+                    )
+                )
     if (
         not any(i.code in {"duplicate_node_id", "dangling_edge"} for i in issues)
         and topological_order(wf) is None
