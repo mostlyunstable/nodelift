@@ -119,6 +119,8 @@ fn launch_spec(app: &AppHandle, port: u16, token: &str) -> Result<Launch, String
             "tauri://localhost,http://tauri.localhost,http://localhost:5173,http://127.0.0.1:5173".into(),
         ),
         ("PYTHONUTF8".into(), "1".into()),
+        // Never write bytecode into the (signed) app bundle: it would break the signature seal after the first launch.
+        ("PYTHONDONTWRITEBYTECODE".into(), "1".into()),
     ];
     let runtime = app.path().resource_dir().ok().map(|d| d.join("runtime"));
     if let Some(runtime) = runtime.filter(|r| r.join("python").exists()) {

@@ -54,6 +54,31 @@ jobs:
           pnpm gen:api
           git diff --exit-code -- src/api/api.generated.ts
 
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+        working-directory: backend
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: apps/web/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: apps/web
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: pnpm e2e # offline specs only; the GitHub ones need E2E_NETWORK=1
+        working-directory: apps/web
+
   desktop:
     name: Desktop app (macOS, manual)
     if: github.event_name == 'workflow_dispatch'

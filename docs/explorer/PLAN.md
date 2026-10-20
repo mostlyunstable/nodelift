@@ -167,3 +167,12 @@ Verified: the generated source of `from_key_val_list` from `psf/requests@611c616
 nodes in the real worker and compare with the original function.
 **Not done:** methods/classes, JS/TS functions, "callable function" and "generated wrapper" modes that import the repository's own code at run time
 (they would need the worker to read the workspace; deliberately not offered), multi-node drafts (e.g. a test workflow).
+
+## End-to-end tests and the installed app (2026-10-20)
+`pnpm e2e` (Playwright, Chromium) starts its own backend (throw-away data folder, port 8765) and dev server (5199) and drives the real UI: runs the
+"Debug me" example and checks the statuses the backend reports, reload persistence, code-node confinement from the UI's API, an invalid link. With
+`E2E_NETWORK=1` it also pastes `octocat/Spoon-Knife` (real GitHub), checks 3 file nodes, 1 dependency edge, read-only source, then prepare workspace,
+review, cancel (nothing runs), approve, output `42`. CI runs the offline specs. `scripts/check_installed_app.sh` launches `/Applications/Nodecraft.app`
+and checks: signature still verifies after a launch, UI reached the bundled backend, bundled runtime process, database at the newest schema, no process
+left after quitting. It found a real bug: the app wrote `.pyc` files into its own bundle, breaking the code signature on first launch (fixed: bytecode
+precompiled with `unchecked-hash` and `PYTHONDONTWRITEBYTECODE=1`).

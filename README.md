@@ -18,13 +18,15 @@ Stop with Ctrl+C (or `make stop`). Config: copy `.env.example` to `.env`.
 
 ## Test
 ```bash
-make check   # ruff, mypy, pytest, tsc, vitest
+make check          # ruff, mypy, import-linter, pytest, tsc, eslint, vitest
+cd apps/web && pnpm e2e   # Playwright end-to-end (E2E_NETWORK=1 adds the real-GitHub specs)
 ```
 
 ## Desktop app (macOS)
 ```bash
 make app           # builds the bundled runtime + Nodecraft.app (ad-hoc signed)
 make install-app   # copies it to /Applications
+scripts/check_installed_app.sh   # launches it and checks the backend, schema, signature and clean quit
 ```
 Data lives in `~/Library/Application Support/Nodecraft` (an existing `~/.nodecraft` database is copied, never moved).
 Not signed with a Developer ID, not notarized, no auto-update: sharing the build needs right-click → Open.

@@ -104,7 +104,8 @@ def main() -> int:
     )  # fmt: skip
     for cache in site.rglob("__pycache__"):  # stale caches from the install step
         shutil.rmtree(cache, ignore_errors=True)
-    run([str(python), "-m", "compileall", "-q", str(site), str(py_dir / "lib")], capture_output=True)
+    # unchecked-hash: the cached bytecode is trusted as it is and never rewritten, so the signed bundle stays intact
+    run([str(python), "-m", "compileall", "-q", "--invalidation-mode", "unchecked-hash", str(site), str(py_dir / "lib")], capture_output=True)
 
     # smoke: the stdlib user code needs, plus the backend importing from a different directory
     check = (

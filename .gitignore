@@ -13,3 +13,7 @@ dist/
 apps/web/src-tauri/target/
 apps/web/src-tauri/resources/runtime/
 apps/web/src-tauri/gen/
+
+# Playwright
+apps/web/test-results/
+apps/web/playwright-report/
