@@ -203,7 +203,9 @@ export function App() {
   return (
     <div className={`app${mode === 'explorer' ? ' explorer-mode' : ''}`}>
       <header className="toolbar">
-        <strong className="brand">Nodecraft</strong>
+        <strong className="brand" title={`Build ${typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : 'dev'}`}>
+          Nodecraft
+        </strong>
         <div className="mode-switch" role="tablist" aria-label="Mode">
           <button role="tab" aria-selected={mode === 'build'} onClick={() => setMode('build')}>
             Build

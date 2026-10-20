@@ -99,6 +99,7 @@ export function DiagnosticsDialog() {
 
   const report = [
     info ? `Nodecraft ${info.version} · Python ${info.python} · schema ${info.schema_revision}` : '',
+    `interface build: ${typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : 'dev'}`,
     info ? `data: ${info.data_dir}` : '',
     info ? `logs: ${info.log_dir ?? 'not written to a file'}` : '',
     info ? `backups: ${info.backups.length} in ${info.backup_dir}` : '',
