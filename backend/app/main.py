@@ -5,13 +5,13 @@ from fastapi import FastAPI
 
 from app.api.errors import install_error_handlers
 from app.api.security import SecurityMiddleware
-from app.api.v1 import health, nodes, stored, workflows
+from app.api.v1 import health, nodes, stored, system, workflows
 from app.config import Settings, get_settings
 from app.nodes import default_registry, load_plugins
 from app.runtime.subprocess_runner import SubprocessRunner
 from app.services.gate import ExecutionGate
 from app.services.run_hub import RunHub
-from app.storage.db import make_engine, make_session_factory, upgrade_to_head
+from app.storage.db import make_engine, make_session_factory, upgrade_with_backup
 from app.storage.repositories import SqlRunRepository
 
 
@@ -21,10 +21,12 @@ def create_app(database_url: str | None = None, settings: Settings | None = None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        upgrade_to_head(url)  # fail fast on a bad/unmigratable database
+        # fail fast on a bad/unmigratable database; an existing one is backed up first
+        upgrade_with_backup(url, settings.effective_backup_dir, settings.keep_backups)
         engine = make_engine(url)
         app.state.session_factory = make_session_factory(engine)
         app.state.settings = settings
+        app.state.database_url = url
         app.state.runner = SubprocessRunner(settings.node_memory_mb, settings.node_max_file_mb)
         registry = default_registry(app.state.runner, settings.http_allow_private)
         load_plugins(registry, settings.plugin_modules)
@@ -55,6 +57,7 @@ def create_app(database_url: str | None = None, settings: Settings | None = None
     app.include_router(nodes.router, prefix="/api/v1")
     app.include_router(workflows.router, prefix="/api/v1")  # validate
     app.include_router(stored.router, prefix="/api/v1")
+    app.include_router(system.router, prefix="/api/v1")
     return app
 
 

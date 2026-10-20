@@ -24,11 +24,21 @@ class Settings(BaseSettings):
     allowed_hosts: str = "127.0.0.1,localhost,[::1]"  # Host header allowlist (DNS-rebinding guard)
     allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"  # browser Origin allowlist
     reload: bool = False  # dev only; the reloader child can outlive its parent
+    log_dir: Path | None = None  # desktop: rotating backend.log lives here
+    backup_dir: Path | None = None  # default: <data_dir>/backups
+    keep_backups: int = 5
+    legacy_data_dir: Path | None = None  # desktop: older location to import a database from
+    parent_pid: int | None = None  # desktop: exit if this process disappears
+    shutdown_endpoint: bool = False  # desktop shell stops the backend through this
 
     @computed_field  # type: ignore[prop-decorator]
     @property
     def effective_database_url(self) -> str:
         return self.database_url or f"sqlite:///{self.data_dir / 'nodecraft.db'}"
+
+    @property
+    def effective_backup_dir(self) -> Path:
+        return self.backup_dir or self.data_dir / "backups"
 
     @property
     def plugin_modules(self) -> list[str]:
