@@ -71,7 +71,7 @@ export function EmptyCanvas() {
 
 const TOUR: Record<'run' | 'fix' | 'done', string> = {
   run: 'This example has a bug on purpose. Press Run (⌘↵) and watch what happens.',
-  fix: 'It stopped at the node that failed, and the failing line is underlined. Fix it (the comment shows how), then press “Resume from failure”: the nodes that already worked will not run again.',
+  fix: 'It stopped at the node that failed, and the failing line is underlined. Fix it (the comment shows how), then press “Resume from failure”: steps whose code and input did not change are reused, not run again.',
   done: 'Fixed. Look at the Run history: the first nodes were reused, not re-run. Everything here works the same on your own workflows.',
 }
 

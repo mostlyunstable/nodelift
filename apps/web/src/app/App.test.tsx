@@ -200,21 +200,36 @@ describe('cancel and resume', () => {
     expect(spy).not.toHaveBeenCalled()
   })
 
-  it('resumes a failed run as a new run and follows it', async () => {
+  it('saves the latest edits first, then resumes as a new run and follows it', async () => {
     const stream = sseStream()
-    const streamCalls: string[] = []
-    vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
-      if (String(url).includes('/events/stream')) {
-        streamCalls.push(String(url))
-        return Promise.resolve(stream.response())
-      }
-      return jsonResponse({ id: 'run_2', status: 'running', nodes: [], duration_ms: 0, version_no: 1 }, 202)
+    const order: string[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url, init) => {
+      const u = String(url)
+      order.push(`${init?.method ?? 'GET'} ${u.replace(/^.*\/api\/v1/, '')}`)
+      if (u.includes('/events/stream')) return Promise.resolve(stream.response())
+      if (u.endsWith('/workflows/wf_1') && init?.method === 'PUT') return jsonResponse({ id: 'wf_1', revision: 5 })
+      return jsonResponse({ id: 'run_2', status: 'running', nodes: [], duration_ms: 0, version_no: 2 }, 202)
     })
-    useStore.setState({ run: { id: 'run_1', status: 'failed', nodes: [], duration_ms: 3 } })
+    useStore.setState({ workflowId: 'wf_1', revision: 4, run: { id: 'run_1', status: 'failed', nodes: [], duration_ms: 3 } })
     await useStore.getState().resume()
     expect(useStore.getState().run?.id).toBe('run_2')
-    await vi.waitFor(() => expect(streamCalls[0]).toContain('/runs/run_2/events/stream'))
+    expect(order.indexOf('PUT /workflows/wf_1')).toBeGreaterThanOrEqual(0)
+    expect(order.indexOf('PUT /workflows/wf_1')).toBeLessThan(order.indexOf('POST /runs/run_1/resume')) // fix is saved BEFORE resuming
+    await vi.waitFor(() => expect(order.some((o) => o.includes('/runs/run_2/events/stream'))).toBe(true))
     stream.close()
+  })
+
+  it('does not resume if the edits could not be saved', async () => {
+    const calls: string[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url, init) => {
+      calls.push(`${init?.method ?? 'GET'} ${String(url)}`)
+      return jsonResponse({ error: { message: 'disk full' } }, 500)
+    })
+    useStore.setState({ workflowId: 'wf_1', revision: 1, run: { id: 'run_1', status: 'failed', nodes: [], duration_ms: 3 } })
+    await useStore.getState().resume()
+    expect(calls.some((c) => c.includes('/resume'))).toBe(false)
+    expect(useStore.getState().busy).toBeNull()
+    expect(useStore.getState().message).toMatch(/Could not save/)
   })
 
   it('refuses to resume a succeeded run', async () => {

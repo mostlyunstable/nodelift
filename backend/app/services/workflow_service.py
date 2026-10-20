@@ -98,21 +98,36 @@ class WorkflowService:
         return await self._launch(workflow_id, version, run_input, timeout_s)
 
     async def resume_run(self, run_id: str, timeout_s: float) -> RunRecord:
-        """New run on the same pinned version that reuses nodes which already succeeded.
+        """Run the workflow as it is NOW, reusing earlier results that are still valid.
 
-        Only succeeded nodes are reused, never re-run. A node that was in flight when the run
-        died has no stored result and runs again, so its side effects may repeat unless it is
-        idempotent.
+        A node is reused only if it succeeded, its type and settings (including code) are unchanged,
+        and it receives exactly the input it had before. After fixing a bug you do not pay again
+        for steps that already worked, and a change upstream correctly re-runs what depends on it.
+        Reused nodes are never executed. A node that was in flight when the run died has no stored
+        result and runs again, so its side effects may repeat unless it is idempotent.
         """
         src = self.runs.get(run_id)
         if src is None:
             raise AppError(404, "not_found", "Run not found")
         if src.status in ("running", "succeeded"):
             raise AppError(409, "not_resumable", f"A {src.status} run cannot be resumed")
-        version = self.workflows.get_version(src.workflow_id, src.version_no)
-        if version is None:
+        before = self.workflows.get_version(src.workflow_id, src.version_no)
+        if before is None:
             raise AppError(404, "not_found", "Version not found")
-        done = {n.node_id: n for n in src.nodes if n.status == "succeeded"}
+        version = self.snapshot(
+            src.workflow_id
+        )  # the current draft; a new version only if it changed
+        old_nodes = {n.id: n for n in before.definition.nodes}
+        unchanged = {
+            n.id
+            for n in version.definition.nodes
+            if n.id in old_nodes
+            and old_nodes[n.id].type == n.type
+            and old_nodes[n.id].config == n.config
+        }
+        done = {
+            n.node_id: n for n in src.nodes if n.status == "succeeded" and n.node_id in unchanged
+        }
         return await self._launch(
             src.workflow_id, version, src.input, timeout_s, completed=done, resumed_from=run_id
         )

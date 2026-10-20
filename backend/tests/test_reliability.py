@@ -309,7 +309,9 @@ def test_crashed_run_is_closed_on_restart_and_can_be_resumed(tmp_path: Path) -> 
     runs.add_event("run_crashed", "run.started", {})
     # n0 finished and was persisted before the server died; n1 was in flight
     runs.add_node_execution(
-        "run_crashed", 0, NodeExecution(node_id="n0", status="succeeded", output={"v": 6})
+        "run_crashed",
+        0,
+        NodeExecution(node_id="n0", status="succeeded", input={"v": 3}, output={"v": 6}),
     )
     with TestClient(create_app(url, Settings(data_dir=tmp_path))) as c:
         assert c.get("/api/v1/runs/run_crashed").json()["status"] == "failed"

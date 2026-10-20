@@ -1,6 +1,7 @@
 """Sequential workflow executor. Independent of FastAPI, DB and React Flow."""
 
 import asyncio
+import json
 import time
 import uuid
 from typing import Any
@@ -22,6 +23,10 @@ def _node_input(
     if len(sources) == 1:
         return outputs[sources[0]]
     return {s: outputs[s] for s in sources}  # fan-in: keyed by upstream node id
+
+
+def _same_json(a: Any, b: Any) -> bool:
+    return json.dumps(a, sort_keys=True, default=str) == json.dumps(b, sort_keys=True, default=str)
 
 
 async def _sleep_or_cancel(seconds: float, cancel: asyncio.Event | None) -> None:
@@ -50,7 +55,7 @@ async def execute_workflow(
 
     - `cancel`: when set, the running node is killed and the remaining nodes are skipped.
     - `max_run_s`: wall-clock budget for the whole run.
-    - `completed`: nodes that already succeeded in an earlier run; their outputs are reused.
+    - `completed`: earlier results; a node is reused only if it succeeded and gets the same input.
     - `node_inputs` overrides the computed input for entry nodes.
     """
     order = topological_order(wf)
@@ -71,14 +76,6 @@ async def execute_workflow(
 
     for nid in order:
         upstream = [e.source.node for e in wf.edges if e.target.node == nid]
-        if completed and nid in completed and completed[nid].status == "succeeded":
-            reused = completed[nid].model_copy(
-                update={"reused": True, "attempt": 1, "duration_ms": 0, "logs": []}
-            )
-            outputs[nid] = reused.output
-            final[nid] = "succeeded"
-            await emit_finished(reused)
-            continue
         if reason is None and cancel is not None and cancel.is_set():
             reason = "cancelled"
         if reason is None and max_run_s is not None and time.monotonic() - start >= max_run_s:
@@ -92,6 +89,17 @@ async def execute_workflow(
         inp = _node_input(wf, nid, outputs, run_input)
         if node_inputs and nid in node_inputs and not upstream:
             inp = node_inputs[nid]
+        previous = completed.get(nid) if completed else None
+        if previous and previous.status == "succeeded" and _same_json(previous.input, inp):
+            # Same code (the caller only offers nodes whose settings are unchanged) and same input:
+            # the earlier result is still valid, so don't run it again.
+            reused = previous.model_copy(
+                update={"reused": True, "attempt": 1, "duration_ms": 0, "logs": []}
+            )
+            outputs[nid] = reused.output
+            final[nid] = "succeeded"
+            await emit_finished(reused)
+            continue
         max_attempts, backoff_ms = retry_policy(nodes[nid])
         for attempt in range(1, max_attempts + 1):
             remaining = None if max_run_s is None else max_run_s - (time.monotonic() - start)

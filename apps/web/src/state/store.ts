@@ -608,6 +608,8 @@ export const useStore = create<State>((set, get) => ({
     stopFollowing?.()
     set({ busy: 'run', message: null, events: [], liveStatus: {} })
     try {
+      // resume runs the workflow as it is now, so make sure the latest edits are saved first
+      if (!(await get().save())) return set({ busy: null })
       const next = await api.resumeRun(run.id)
       set({ run: next })
       follow(next.id)
