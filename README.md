@@ -3,7 +3,7 @@
 Local-first, node-based visual automation IDE. Build workflows on a canvas, write Python code nodes in Monaco,
 run them and inspect each node's input, output, logs, errors and timing.
 
-> Code nodes run **unsandboxed** on your machine. See [docs/security.md](docs/security.md).
+> On macOS, code nodes are confined by the OS (no network unless enabled, no home-folder access, temp-folder writes only). Elsewhere they run with your permissions. See [docs/security.md](docs/security.md).
 
 ## Requirements
 Python 3.12 (via [uv](https://docs.astral.sh/uv/)), Node 20+, pnpm.
@@ -45,7 +45,7 @@ Not signed with a Developer ID, not notarized, no auto-update: sharing the build
 - Local API protection: Host/Origin checks and a per-launch bearer token ([docs/security.md](docs/security.md)).
 
 ## Limits (read these)
-- Code nodes run **unsandboxed** as you. The memory limit is Linux-only.
+- Code-node confinement uses macOS Seatbelt (deprecated by Apple, not a VM); Linux/Windows have none yet.
 - No Developer ID signing, notarization or auto-update; no Windows/Linux builds.
 - No scheduling/triggers, parallel execution, hosted mode or Postgres.
 - Playwright end-to-end tests are not written; the native window itself is verified by logs and HTTP, not screenshots.

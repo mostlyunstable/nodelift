@@ -12,14 +12,14 @@ Nodecraft.app (Tauri)  ──spawns──▶  Python runtime  ──serves──
 
 ## Backend layers (`backend/app`, enforced by import-linter)
 
-| Layer | Responsibility | May import |
-|---|---|---|
-| `domain` | Models, validation, ports/protocols, errors, migrations of the workflow format | nothing else in the app |
-| `engine` | Planner and executor: ordering, branching, retries, cancel, budgets, redaction | `domain` |
-| `nodes`, `runtime` | Node implementations and registry; subprocess worker, net guard | `domain`, `engine` |
-| `services` | Use cases: run lifecycle, versions, resume, prune, run hub, execution gate | `domain`, `engine`, `nodes` |
-| `storage` | SQLAlchemy repositories, Alembic migrations, backups, secret stores | `domain` |
-| `api` | HTTP only: routing, security middleware, error mapping, SSE | everything below |
+| Layer              | Responsibility                                                                 | May import                  |
+| ------------------ | ------------------------------------------------------------------------------ | --------------------------- |
+| `domain`           | Models, validation, ports/protocols, errors, migrations of the workflow format | nothing else in the app     |
+| `engine`           | Planner and executor: ordering, branching, retries, cancel, budgets, redaction | `domain`                    |
+| `nodes`, `runtime` | Node implementations and registry; subprocess worker, net guard                | `domain`, `engine`          |
+| `services`         | Use cases: run lifecycle, versions, resume, prune, run hub, execution gate     | `domain`, `engine`, `nodes` |
+| `storage`          | SQLAlchemy repositories, Alembic migrations, backups, secret stores            | `domain`                    |
+| `api`              | HTTP only: routing, security middleware, error mapping, SSE                    | everything below            |
 
 `main.py` and `services/container.py` are the composition roots.
 

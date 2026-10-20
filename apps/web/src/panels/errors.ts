@@ -22,6 +22,8 @@ const PYTHON_ERRORS: Record<string, (detail: string) => string> = {
   AssertionError: () => 'An assertion in the code failed',
   RecursionError: () => 'The code recursed too deeply',
   MemoryError: () => 'The code ran out of memory',
+  PermissionError: (d) =>
+    `The code was not allowed to do that (${d}). Code nodes are confined: no network unless “Allow network access” is ticked, and no access to your home folder.`,
 }
 
 /** A plain-language sentence for a failed node, with the technical message still available below it. */
@@ -46,6 +48,8 @@ export function explainError(error: NodeError): string {
       return 'The node returned more data than the 5 MB limit.'
     case 'timeout':
       return `The node took too long and was stopped. ${error.message}.`
+    case 'memory_limit':
+      return `The node used too much memory and was stopped. ${error.message}.`
     case 'cancelled':
       return 'The run was cancelled while this node was working.'
     case 'worker_crashed':

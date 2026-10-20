@@ -102,6 +102,9 @@ export function DiagnosticsDialog() {
     info ? `data: ${info.data_dir}` : '',
     info ? `logs: ${info.log_dir ?? 'not written to a file'}` : '',
     info ? `backups: ${info.backups.length} in ${info.backup_dir}` : '',
+    info?.sandbox
+      ? `code sandbox: ${info.sandbox.active ? `on (${info.sandbox.kind})` : 'off'} · memory limit: ${info.sandbox.memory_limit}`
+      : '',
     error ? `error: ${error}` : '',
     '',
     ...logs,

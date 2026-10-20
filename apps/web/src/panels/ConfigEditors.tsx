@@ -78,6 +78,18 @@ function CodeConfig({ node }: { node: FlowNode }) {
           options={{ minimap: { enabled: false }, fontSize: 13, scrollBeyondLastLine: false }}
         />
       </div>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={node.data.config.allow_network === true}
+          onChange={(e) => updateConfig(node.id, { allow_network: e.target.checked })}
+        />
+        Allow network access
+      </label>
+      <p className="muted small">
+        On macOS this code runs confined: no network (unless ticked), it can write only to a temporary folder,
+        and it cannot read your home folder.
+      </p>
     </>
   )
 }

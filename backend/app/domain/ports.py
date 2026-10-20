@@ -15,6 +15,7 @@ ErrorType = Literal[
     "output_too_large",
     "timeout",
     "cancelled",
+    "memory_limit",
     "invalid_config",
     "transform_error",
     "blocked_request",
@@ -56,4 +57,5 @@ class CodeRunner(Protocol):
         input_data: JsonValue,
         timeout_s: float,
         cancel: asyncio.Event | None = None,
+        allow_network: bool = False,
     ) -> CodeRunResult: ...

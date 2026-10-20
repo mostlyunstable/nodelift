@@ -93,3 +93,20 @@ describe('firstFailedNodeId', () => {
     expect(firstFailedNodeId(null)).toBeNull()
   })
 })
+
+describe('confinement errors', () => {
+  it('explains a memory-limit stop', () => {
+    expect(explainError({ type: 'memory_limit', message: 'Exceeded the 1024 MB memory limit' })).toMatch(
+      /too much memory/,
+    )
+  })
+  it('explains a denied operation and how to allow network access', () => {
+    const text = explainError({
+      type: 'runtime_error',
+      message: 'PermissionError: [Errno 1] Operation not permitted',
+      traceback: 'File "<node>", line 3',
+    })
+    expect(text).toMatch(/not allowed to do that/)
+    expect(text).toMatch(/Allow network access/)
+  })
+})

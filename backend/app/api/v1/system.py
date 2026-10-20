@@ -37,6 +37,7 @@ def info(request: Request) -> dict[str, Any]:
         "backups": _backups(request),
         "python": sys.version.split()[0],
         "uptime_s": round(time.monotonic() - STARTED, 1),
+        "sandbox": request.app.state.runner.status(),
         "limits": {
             "max_concurrent_runs": s.max_concurrent_runs,
             "max_run_seconds": s.max_run_seconds,

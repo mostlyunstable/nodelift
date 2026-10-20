@@ -1,7 +1,9 @@
-"""Runs user Python in a child process. NOT a sandbox: trusted local-dev mode only.
+"""Runs user Python in a child process.
 
-Safeguards: scrubbed env, isolated interpreter (-I), temp cwd, own process group
-(killed on timeout), CPU/core rlimits, capped output and log sizes.
+Safeguards: scrubbed env, isolated interpreter (-I), temp cwd, own process group (killed on
+timeout), CPU/core rlimits, capped output and log sizes, a memory watchdog on macOS, and on macOS
+OS-level confinement (see `sandbox.py`) unless disabled. Without the sandbox the code runs with
+the user's full permissions.
 """
 
 import asyncio
@@ -10,6 +12,7 @@ import json
 import os
 import resource
 import signal
+import subprocess
 import sys
 import tempfile
 import time
@@ -17,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from app.domain.ports import CodeRunResult, JsonValue, LogLine, NodeError
+from app.runtime import sandbox
 
 WORKER = Path(__file__).with_name("worker_entry.py")
 MAX_RESULT_BYTES = 5 * 1024 * 1024
@@ -56,10 +60,53 @@ def _kill_group(proc: asyncio.subprocess.Process) -> None:
         pass
 
 
+def _group_rss_mb(pgid: int) -> float:
+    """Resident memory of every process in a group, in MB (macOS/BSD `ps`)."""
+    try:
+        out = subprocess.run(
+            ["/bin/ps", "-A", "-o", "pgid=,rss="], capture_output=True, text=True, timeout=3
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return 0.0
+    total_kb = 0
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[0] == str(pgid) and parts[1].isdigit():
+            total_kb += int(parts[1])
+    return total_kb / 1024
+
+
+async def _watch_memory(
+    proc: asyncio.subprocess.Process, limit_mb: int, tripped: asyncio.Event
+) -> None:
+    """macOS ignores RLIMIT_AS, so poll the group's memory and kill it past the limit."""
+    while proc.returncode is None:
+        await asyncio.sleep(0.2)
+        if await asyncio.to_thread(_group_rss_mb, proc.pid) > limit_mb:
+            tripped.set()
+            _kill_group(proc)
+            return
+
+
 class SubprocessRunner:
-    def __init__(self, memory_mb: int | None = None, max_file_mb: int = 10) -> None:
-        self.memory_mb = memory_mb  # enforced on Linux only
+    def __init__(
+        self, memory_mb: int | None = None, max_file_mb: int = 10, sandbox_mode: str = "auto"
+    ) -> None:
+        self.memory_mb = memory_mb
         self.max_file_mb = max_file_mb
+        self.sandbox_mode = sandbox_mode  # "auto" (use it if available), "off", "required"
+
+    @property
+    def sandboxed(self) -> bool:
+        return self.sandbox_mode != "off" and sandbox.available()
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "mode": self.sandbox_mode,
+            "active": self.sandboxed,
+            "kind": "macos-seatbelt" if self.sandboxed else None,
+            "memory_limit": "rlimit" if sys.platform == "linux" else "watchdog",
+        }
 
     async def run(
         self,
@@ -67,6 +114,7 @@ class SubprocessRunner:
         input_data: JsonValue,
         timeout_s: float,
         cancel: asyncio.Event | None = None,
+        allow_network: bool = False,
     ) -> CodeRunResult:
         start = time.monotonic()
 
@@ -88,14 +136,26 @@ class SubprocessRunner:
         except (TypeError, ValueError) as e:
             return done(NodeError(type="invalid_output", message=f"Input is not JSON: {e}"))
 
+        if self.sandbox_mode == "required" and not sandbox.available():
+            return done(
+                NodeError(
+                    type="invalid_config",
+                    message="Sandboxing is required but is not available on this machine",
+                )
+            )
         r_fd, w_fd = os.pipe()
         with tempfile.TemporaryDirectory(prefix="nodecraft-") as cwd:
+            argv = [sys.executable, "-I", str(WORKER), str(w_fd)]
+            if self.sandboxed:
+                profile = sandbox.build_profile(
+                    Path(cwd),
+                    [*sandbox.python_read_roots(), WORKER.parent],
+                    allow_network=allow_network,
+                )
+                argv = sandbox.wrap(argv, profile)
             try:
                 proc = await asyncio.create_subprocess_exec(
-                    sys.executable,
-                    "-I",
-                    str(WORKER),
-                    str(w_fd),
+                    *argv,
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
@@ -138,6 +198,12 @@ class SubprocessRunner:
                 )
             )
             cancel_wait = asyncio.ensure_future(cancel.wait()) if cancel else None
+            mem_tripped = asyncio.Event()
+            watchdog = (
+                asyncio.ensure_future(_watch_memory(proc, self.memory_mb, mem_tripped))
+                if self.memory_mb and sys.platform == "darwin"
+                else None
+            )
             try:
                 waiting: set[asyncio.Future[Any]] = {work}
                 if cancel_wait:
@@ -158,10 +224,19 @@ class SubprocessRunner:
             finally:
                 if cancel_wait:
                     cancel_wait.cancel()
+                if watchdog:
+                    watchdog.cancel()
                 _kill_group(proc)  # reap any grandchildren
                 transport.close()
 
         logs = (_logs("stdout", out) + _logs("stderr", err))[:MAX_LOG_LINES]
+        if mem_tripped.is_set():
+            return done(
+                NodeError(
+                    type="memory_limit", message=f"Exceeded the {self.memory_mb} MB memory limit"
+                ),
+                logs=logs,
+            )
         if res_trunc:
             return done(
                 NodeError(type="output_too_large", message="Output exceeds 5 MB"), logs=logs

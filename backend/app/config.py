@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     max_run_seconds: int = 300
     node_memory_mb: int | None = 1024  # enforced on Linux only
     node_max_file_mb: int = 10
+    sandbox: str = "auto"  # code nodes: "auto" (macOS Seatbelt if available), "off", "required"
     node_plugins: str = ""  # comma-separated module paths exposing register(registry)
     http_allow_private: bool = False  # dev only: lets http.request reach localhost/LAN
     max_concurrent_node_tests: int = 4

@@ -917,7 +917,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "syntax_error" | "missing_main" | "runtime_error" | "invalid_output" | "output_too_large" | "timeout" | "cancelled" | "invalid_config" | "transform_error" | "blocked_request" | "network_error" | "http_error" | "response_too_large" | "missing_credential" | "secrets_unavailable" | "worker_crashed";
+            type: "syntax_error" | "missing_main" | "runtime_error" | "invalid_output" | "output_too_large" | "timeout" | "cancelled" | "memory_limit" | "invalid_config" | "transform_error" | "blocked_request" | "network_error" | "http_error" | "response_too_large" | "missing_credential" | "secrets_unavailable" | "worker_crashed";
         };
         /** NodeExecution */
         NodeExecution: {

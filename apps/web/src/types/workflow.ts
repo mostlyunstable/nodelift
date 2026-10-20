@@ -178,6 +178,7 @@ export interface SystemInfo {
   backups: string[]
   python: string
   uptime_s: number
+  sandbox?: { mode: string; active: boolean; kind: string | null; memory_limit: string }
 }
 
 export interface Credential {

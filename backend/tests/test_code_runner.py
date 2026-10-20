@@ -56,7 +56,9 @@ async def test_timeout_kills_child(tmp_path) -> None:  # type: ignore[no-untyped
         "import os\ndef main(i):\n"
         f"    open({str(pidfile)!r}, 'w').write(str(os.getpid()))\n    while True: pass"
     )
-    r = await run(src, timeout=0.8)
+    # the pid file lives outside the worker's scratch folder, so use an unconfined runner here;
+    # kill-on-timeout is the same code path with or without the sandbox (see test_sandbox.py)
+    r = await SubprocessRunner(sandbox_mode="off").run(src, None, 0.8)
     assert r.error and r.error.type == "timeout"
     pid = int(pidfile.read_text())
     for _ in range(30):

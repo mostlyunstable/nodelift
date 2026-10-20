@@ -18,14 +18,21 @@ from app.runtime.subprocess_runner import SubprocessRunner
 from tests.test_run_events import start_run
 from tests.test_storage_api import BOOM, DOUBLE, create, wait_run
 
-REG = default_registry(SubprocessRunner())
+REG = default_registry(SubprocessRunner(sandbox_mode="off"))  # see make_client
 BACKEND = Path(__file__).resolve().parents[1]
 
 
 def make_client(tmp_path: Path, **overrides: Any) -> Iterator[TestClient]:
-    settings = Settings(data_dir=tmp_path, **overrides)
+    # workers here write pid/counter files outside the sandbox scratch folder to expose real
+    # processes; confinement itself is covered in test_sandbox.py
+    settings = Settings(data_dir=tmp_path, **{"sandbox": "off", **overrides})
     with TestClient(create_app(f"sqlite:///{tmp_path / 'r.db'}", settings)) as c:
         yield c
+
+
+@pytest.fixture
+def client(tmp_path: Path) -> Iterator[TestClient]:
+    yield from make_client(tmp_path)
 
 
 def chain(*sources: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -94,7 +101,9 @@ def wait_dead(pid: int, timeout: float = 8) -> bool:
 async def test_runner_cancel_kills_the_worker(tmp_path: Path) -> None:
     pidfile = tmp_path / "pid"
     cancel = asyncio.Event()
-    task = asyncio.create_task(SubprocessRunner().run(sleeper(pidfile, 30), {}, 60, cancel))
+    task = asyncio.create_task(
+        SubprocessRunner(sandbox_mode="off").run(sleeper(pidfile, 30), {}, 60, cancel)
+    )
     pid = await asyncio.to_thread(read_pid, pidfile)
     assert alive(pid)
     cancel.set()
@@ -249,12 +258,20 @@ async def test_file_size_limit() -> None:
     assert res.status == "failed"  # killed by SIGXFSZ or OSError
 
 
-@pytest.mark.skipif(sys.platform != "linux", reason="RLIMIT_AS is only enforced on Linux")
-async def test_memory_limit_linux() -> None:
-    res = await SubprocessRunner(memory_mb=256).run(
-        "def main(i):\n    return len(bytearray(1 << 30))", None, 10
+async def test_memory_limit() -> None:
+    """Linux enforces it with RLIMIT_AS, macOS with the watchdog; either way the node fails."""
+    src = (
+        "def main(i):\n"
+        "    blocks = []\n"
+        "    while True:\n"
+        "        b = bytearray(32 << 20)\n"
+        "        b[::4096] = b'x' * len(b[::4096])  # touch every page so it is really resident\n"
+        "        blocks.append(b)\n"
     )
-    assert res.status == "failed"
+    res = await SubprocessRunner(memory_mb=256, sandbox_mode="off").run(src, None, 30)
+    assert res.status == "failed" and res.error is not None
+    if sys.platform == "darwin":
+        assert res.error.type == "memory_limit"
 
 
 # ---------------------------------------------------------------- resume / crash recovery
@@ -326,7 +343,7 @@ def test_worker_exits_when_the_server_is_killed(tmp_path: Path) -> None:
     script = (
         "import asyncio\nfrom app.runtime.subprocess_runner import SubprocessRunner\n"
         f"src = {sleeper(pidfile, 60)!r}\n"
-        "asyncio.run(SubprocessRunner().run(src, None, 120))\n"
+        "asyncio.run(SubprocessRunner(sandbox_mode='off').run(src, None, 120))\n"
     )
     parent = subprocess.Popen([sys.executable, "-c", script], cwd=BACKEND)
     worker = 0

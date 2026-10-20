@@ -30,7 +30,9 @@ def create_app(database_url: str | None = None, settings: Settings | None = None
         app.state.session_factory = make_session_factory(engine)
         app.state.settings = settings
         app.state.database_url = url
-        app.state.runner = SubprocessRunner(settings.node_memory_mb, settings.node_max_file_mb)
+        app.state.runner = SubprocessRunner(
+            settings.node_memory_mb, settings.node_max_file_mb, settings.sandbox
+        )
         registry = default_registry(app.state.runner, settings.http_allow_private)
         load_plugins(registry, settings.plugin_modules)
         app.state.registry = registry

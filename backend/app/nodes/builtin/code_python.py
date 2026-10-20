@@ -11,11 +11,18 @@ class CodePythonNode:
         type="code.python",
         title="Python code",
         category="Code",
-        description="Runs main(input_data) in a separate process (trusted local mode, no sandbox).",
+        description=(
+            "Runs main(input_data) in a separate process. On macOS it is confined by the OS: "
+            "no network (unless enabled), writes only to a temp folder, no access to your "
+            "home folder."
+        ),
         config_schema={
             "type": "object",
             "required": ["source"],
-            "properties": {"source": {"type": "string", "title": "Python source"}},
+            "properties": {
+                "source": {"type": "string", "title": "Python source"},
+                "allow_network": {"type": "boolean", "title": "Allow network access"},
+            },
         },
         default_config={"source": DEFAULT_SOURCE},
     )
@@ -29,4 +36,10 @@ class CodePythonNode:
     async def execute(
         self, ctx: NodeContext, input_data: JsonValue, config: dict[str, Any]
     ) -> NodeResult:
-        return await self.runner.run(config["source"], input_data, ctx.timeout_s, ctx.cancel)
+        return await self.runner.run(
+            config["source"],
+            input_data,
+            ctx.timeout_s,
+            ctx.cancel,
+            allow_network=config.get("allow_network") is True,
+        )
