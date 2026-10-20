@@ -112,7 +112,7 @@ describe('Repository Explorer', () => {
     })
     await waitFor(() => expect(api.explorerImport).toHaveBeenCalledWith('https://github.com/octo/hello'))
     // ...and the file is already a node, with no folder to open first
-    expect(await screen.findByText('main.py', { selector: '.xn-name' })).toBeInTheDocument()
+    expect(await screen.findByText('main.py', { selector: '.xn-open' })).toBeInTheDocument()
   })
 
   it('does not import when pasting something that is not a GitHub link', () => {
@@ -183,9 +183,9 @@ describe('Repository Explorer', () => {
     it('shows real files as nodes and folders collapsed, with a structure-only legend', () => {
       ready()
       render(<ExplorerView theme="dark" />)
-      expect(screen.getByText('main.py', { selector: '.xn-name' })).toBeInTheDocument()
-      expect(screen.getByLabelText('Expand src')).toBeInTheDocument()
-      expect(screen.queryByText('app.py', { selector: '.xn-name' })).not.toBeInTheDocument()
+      expect(screen.getByText('main.py', { selector: '.xn-open' })).toBeInTheDocument()
+      expect(screen.getByLabelText(/^Expand src/)).toBeInTheDocument()
+      expect(screen.queryByText('app.py', { selector: '.xn-open' })).not.toBeInTheDocument()
       expect(screen.getByText(/Folder contains item/)).toBeInTheDocument()
       expect(screen.getByText(/No dependencies between the visible nodes/)).toBeInTheDocument()
     })
@@ -193,9 +193,9 @@ describe('Repository Explorer', () => {
     it('expands a folder on demand', () => {
       ready()
       render(<ExplorerView theme="dark" />)
-      fireEvent.click(screen.getByLabelText('Expand src'))
-      expect(screen.getByText('app.py', { selector: '.xn-name' })).toBeInTheDocument()
-      expect(screen.getByLabelText('Collapse src')).toBeInTheDocument()
+      fireEvent.click(screen.getByLabelText(/^Expand src/))
+      expect(screen.getByText('app.py', { selector: '.xn-open' })).toBeInTheDocument()
+      expect(screen.getByLabelText(/^Collapse src/)).toBeInTheDocument()
     })
 
     it('clicking a file node opens its source in the dock', async () => {
@@ -210,7 +210,7 @@ describe('Repository Explorer', () => {
         reason: null,
       })
       render(<ExplorerView theme="dark" />)
-      fireEvent.click(screen.getByText('main.py', { selector: '.xn-name' }))
+      fireEvent.click(screen.getByText('main.py', { selector: '.xn-open' }))
       expect(await screen.findByTestId('editor')).toHaveTextContent('print(1)')
       expect(api.explorerFile).toHaveBeenCalledWith('rev_1', 'main.py')
     })
@@ -229,7 +229,7 @@ describe('Repository Explorer', () => {
       render(<ExplorerView theme="dark" />)
       fireEvent.change(screen.getByLabelText('Find a file in the graph'), { target: { value: 'x.json' } })
       fireEvent.click(screen.getByRole('button', { name: 'src/deep/x.json' }))
-      await waitFor(() => expect(screen.getByText('x.json', { selector: '.xn-name' })).toBeInTheDocument())
+      await waitFor(() => expect(screen.getByText('x.json', { selector: '.xn-open' })).toBeInTheDocument())
       expect(useExplorer.getState().selectedPath).toBe('src/deep/x.json')
     })
 
@@ -237,15 +237,15 @@ describe('Repository Explorer', () => {
       ready()
       render(<ExplorerView theme="dark" />)
       fireEvent.click(screen.getByRole('button', { name: /^python/ }))
-      expect(screen.getByText('main.py', { selector: '.xn-name' })).toBeInTheDocument()
-      expect(screen.queryByLabelText('Expand docs')).not.toBeInTheDocument()
+      expect(screen.getByText('main.py', { selector: '.xn-open' })).toBeInTheDocument()
+      expect(screen.queryByLabelText(/^Expand docs/)).not.toBeInTheDocument()
     })
 
     it('selecting an edge explains it is structure, not a dependency', () => {
       ready()
       render(<ExplorerView theme="dark" />)
       act(() => useExplorerEdge())
-      expect(screen.getByRole('status')).toHaveTextContent(/not a dependency/)
+      expect(screen.getByText(/not a dependency/)).toBeInTheDocument()
     })
   })
 })

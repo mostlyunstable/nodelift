@@ -11,6 +11,7 @@ export interface Command {
 
 /** What the command list needs to know and be able to do. The store satisfies this; tests fake it. */
 export interface CommandContext {
+  mode?: 'build' | 'explorer' // in the Explorer, commands for editing and running workflows are not offered
   hasNodes: boolean
   busy: 'node' | 'run' | null
   runStatus: 'running' | 'succeeded' | 'failed' | 'cancelled' | null
@@ -97,7 +98,7 @@ export function buildCommands(c: CommandContext): Command[] {
   add('theme-dark', 'Theme: dark', 'App', () => a.theme('dark'))
   add('theme-light', 'Theme: light', 'App', () => a.theme('light'))
   add('theme-system', 'Theme: follow the system', 'App', () => a.theme('system'))
-  return out
+  return c.mode === 'explorer' ? out.filter((x) => x.group === 'Explorer' || x.group === 'App') : out
 }
 
 export function filterCommands(commands: Command[], query: string): Command[] {

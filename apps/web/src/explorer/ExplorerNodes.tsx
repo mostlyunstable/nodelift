@@ -1,4 +1,5 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { useId } from 'react'
 import { useExplorer } from '../state/explorer'
 import type { ExplorerNode } from './graph'
 import { formatBytes } from './tree'
@@ -23,6 +24,7 @@ const BADGES: Record<string, string> = {
 }
 
 export function FileNode({ data, selected }: NodeProps<ExplorerNode>) {
+  const metaId = useId()
   return (
     <div
       className={`xn xn-file${selected ? ' selected' : ''}${data.note ? ' unreadable' : ''}`}
@@ -33,17 +35,21 @@ export function FileNode({ data, selected }: NodeProps<ExplorerNode>) {
         <span className="xn-badge" aria-hidden="true">
           {BADGES[data.language] ?? data.language.slice(0, 3)}
         </span>
-        <span className="xn-name">{data.name}</span>
+        <button
+          className="xn-open"
+          aria-pressed={selected}
+          aria-describedby={metaId}
+          onClick={() => void useExplorer.getState().selectFile(data.path)}
+        >
+          {data.name}
+        </button>
       </div>
-      <div className="xn-meta">
+      <div id={metaId} className="xn-meta">
         {data.note ? data.note : `${data.language} · ${data.lines} lines`} · {formatBytes(data.size)}
         {data.problems > 0 && (
-          <span
-            className="xn-problems"
-            title={`${data.problems} problem${data.problems === 1 ? '' : 's'} found by analysis`}
-          >
+          <span className="xn-problems">
             {' '}
-            ⚠ {data.problems}
+            ⚠ {data.problems} problem{data.problems === 1 ? '' : 's'}
           </span>
         )}
       </div>
@@ -61,7 +67,7 @@ export function DirNode({ data }: NodeProps<ExplorerNode>) {
         <button
           className="xn-toggle nodrag nopan"
           aria-expanded={data.expanded}
-          aria-label={`${data.expanded ? 'Collapse' : 'Expand'} ${data.name}`}
+          aria-label={`${data.expanded ? 'Collapse' : 'Expand'} ${data.name}, ${data.count} files`}
           onClick={(e) => {
             e.stopPropagation()
             toggle(data.path)

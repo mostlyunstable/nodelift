@@ -8,6 +8,7 @@ import { RunPanel } from '../panels/RunPanel'
 import { useExplorer } from '../state/explorer'
 import { loadTheme, useStore } from '../state/store'
 import { resolveTheme } from '../state/theme'
+import { Tabs } from '../ui/Tabs'
 import { CommandPalette } from '../ui/CommandPalette'
 import {
   CredentialsDialog,
@@ -105,6 +106,7 @@ export function App() {
   }
 
   const context: CommandContext = {
+    mode,
     hasNodes: s.nodes.length > 0,
     busy: s.busy,
     runStatus: s.run?.status ?? null,
@@ -202,25 +204,39 @@ export function App() {
 
   return (
     <div className={`app${mode === 'explorer' ? ' explorer-mode' : ''}`}>
+      <a
+        className="skip-link"
+        href="#main"
+        onClick={(e) => {
+          e.preventDefault()
+          document.getElementById('main')?.focus()
+        }}
+      >
+        Skip to the workspace
+      </a>
       <header className="toolbar">
-        <strong className="brand" title={`Build ${typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : 'dev'}`}>
+        <h1 className="brand" title={`Build ${typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : 'dev'}`}>
           Nodecraft
-        </strong>
-        <div className="mode-switch" role="tablist" aria-label="Mode">
-          <button role="tab" aria-selected={mode === 'build'} onClick={() => setMode('build')}>
-            Build
-          </button>
-          <button role="tab" aria-selected={mode === 'explorer'} onClick={() => setMode('explorer')}>
-            Explorer
-          </button>
-        </div>
+        </h1>
+        <Tabs
+          className="mode-switch"
+          label="Mode"
+          prefix="mode"
+          controls={false}
+          value={mode}
+          onChange={(id) => setMode(id as 'build' | 'explorer')}
+          tabs={[
+            { id: 'build', label: 'Build' },
+            { id: 'explorer', label: 'Explorer' },
+          ]}
+        />
         {mode === 'explorer' && (
           <>
             <span className="spacer" />
             <button
               onClick={() => s.openDialog('palette')}
               title="Command palette (⌘K)"
-              aria-label="Command palette"
+              aria-label="⌘K command palette"
             >
               ⌘K
             </button>
@@ -269,12 +285,12 @@ export function App() {
               Stop
             </button>
             <span className="spacer" />
-            <Menu label="+ Node" ariaLabel="Add node" items={addItems} />
+            <Menu label="+ Node" ariaLabel="+ Node (add a node)" items={addItems} />
             <Menu label="Workflows" ariaLabel="Workflows" items={workflowItems} align="right" />
             <button
               onClick={() => s.openDialog('palette')}
               title="Command palette (⌘K)"
-              aria-label="Command palette"
+              aria-label="⌘K command palette"
             >
               ⌘K
             </button>
@@ -286,7 +302,7 @@ export function App() {
         <ExplorerView theme={theme} />
       ) : (
         <>
-          <main className="workspace">
+          <main className="workspace" id="main" tabIndex={-1}>
             <div className="canvas">
               <TourBanner />
               <EmptyCanvas />

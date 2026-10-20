@@ -26,7 +26,7 @@ export function ProblemsView() {
       </div>
     )
   return (
-    <div className="problems">
+    <div className="problems" role="region" tabIndex={0} aria-label="Problems">
       {groups.length === 0 && (
         <p className="muted small">
           No problems found. Analysis only reports syntax errors and unresolved relative imports; it is not a
@@ -35,9 +35,9 @@ export function ProblemsView() {
       )}
       {groups.map(([path, list]) => (
         <section key={path}>
-          <h4>
+          <h2>
             {path} <span className="muted">{list.length}</span>
-          </h4>
+          </h2>
           <ul className="detail-list">
             {list.map((d, i) => (
               <li key={i}>

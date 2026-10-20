@@ -5,6 +5,7 @@ import { FileTree } from './FileTree'
 import { FilePanel } from './FilePanel'
 import { ProblemsView } from './ProblemsView'
 import { RunView } from './RunView'
+import { panelProps, Tabs } from '../ui/Tabs'
 import { formatBytes } from './tree'
 
 const EXAMPLES = [
@@ -12,15 +13,39 @@ const EXAMPLES = [
   { label: 'pallets/flask (a Python web framework)', url: 'https://github.com/pallets/flask' },
 ]
 
+/** Back to the list of repositories, with the cursor in the link box so a different one can be pasted. */
+function goBackToRepositories() {
+  const st = useExplorer.getState()
+  st.closeRevision()
+  useExplorer.setState({ sidebarOpen: true })
+  setTimeout(() => document.getElementById('repo-url')?.focus(), 0)
+}
+
 export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
   const e = useExplorer()
   useEffect(() => {
     void useExplorer.getState().loadRevisions()
   }, [])
   const rev = e.revision
+  const announce = !rev
+    ? ''
+    : rev.status === 'importing'
+      ? `${rev.phase}${rev.file_count > 0 ? `, ${rev.file_count} files so far` : ''}`
+      : rev.status === 'ready'
+        ? `${rev.full_name} imported: ${rev.file_count} files.${
+            rev.analysis_status === 'analyzing'
+              ? ' Analyzing dependencies.'
+              : rev.analysis_status === 'done'
+                ? ` Analysis finished: ${rev.edge_count} relations, ${rev.diagnostic_count} problems.`
+                : ''
+          }`
+        : ''
 
   return (
-    <main className={`explorer${e.sidebarOpen ? '' : ' side-collapsed'}`}>
+    <main id="main" tabIndex={-1} className={`explorer${e.sidebarOpen ? '' : ' side-collapsed'}`}>
+      <div className="visually-hidden" role="status" aria-live="polite">
+        {announce}
+      </div>
       <aside className="explorer-side" hidden={!e.sidebarOpen}>
         <form
           className="import-form"
@@ -71,19 +96,6 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
               {rev.branch} @ <code title={rev.commit_sha}>{rev.commit_sha.slice(0, 7)}</code>
             </div>
             {rev.description && <div className="small">{rev.description}</div>}
-            <div className="row-actions">
-              <button className="link-button" onClick={() => e.closeRevision()}>
-                ◂ All imports
-              </button>
-              <button
-                className="link-button"
-                title="Look for a newer commit of this branch and open it"
-                disabled={e.starting}
-                onClick={() => void e.refreshLatest()}
-              >
-                Check for newer commit
-              </button>
-            </div>
             {e.notice && (
               <div className="small" role="status">
                 {e.notice}
@@ -139,7 +151,7 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
 
         {e.revisions.length > 0 && (!rev || rev.status !== 'ready') && (
           <section className="recent" aria-label="Recent imports">
-            <h4>Recent</h4>
+            <h2>Recent</h2>
             <ul>
               {e.revisions.map((r) => (
                 <li key={r.id}>
@@ -166,7 +178,7 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
       <section className="explorer-main">
         {rev?.status === 'ready' ? (
           <>
-            <div className="tabs" role="tablist" aria-label="View">
+            <nav className="crumbs" aria-label="Breadcrumb">
               <button
                 className="icon-button"
                 aria-label={e.sidebarOpen ? 'Hide the file list' : 'Show the file list'}
@@ -176,38 +188,77 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
               >
                 ◧
               </button>
-              <button role="tab" aria-selected={e.tab === 'graph'} onClick={() => e.setTab('graph')}>
-                Graph
+              <button className="back-button" onClick={goBackToRepositories}>
+                ← All repositories
               </button>
-              <button role="tab" aria-selected={e.tab === 'code'} onClick={() => e.setTab('code')}>
-                Code
+              <span aria-hidden="true" className="muted">
+                /
+              </span>
+              <span className="crumb-current" aria-current="page">
+                {rev.full_name}
+              </span>
+              <code title={rev.commit_sha}>{rev.commit_sha.slice(0, 7)}</code>
+              <button
+                className="link-button"
+                title="Look for a newer commit of this branch and open it"
+                disabled={e.starting}
+                onClick={() => void e.refreshLatest()}
+              >
+                Check for newer commit
               </button>
-              <button role="tab" aria-selected={e.tab === 'run'} onClick={() => e.setTab('run')}>
-                Run
-              </button>
-              <button role="tab" aria-selected={e.tab === 'problems'} onClick={() => e.setTab('problems')}>
-                Problems
-                {rev.diagnostic_count > 0 && <span className="xn-problems"> ⚠ {rev.diagnostic_count}</span>}
-              </button>
-            </div>
-            {e.tab === 'graph' ? (
-              <div className={`graph-split${e.selectedPath ? ' with-viewer' : ''}`}>
-                <div className="graph-pane">
-                  <ExplorerGraph repoName={rev.full_name} theme={theme} />
-                </div>
-                {e.selectedPath && (
-                  <div className="graph-viewer">
-                    <FilePanel theme={theme} />
+            </nav>
+            <Tabs
+              className="tabs"
+              label="View"
+              prefix="xv"
+              value={e.tab}
+              onChange={(id) => e.setTab(id as typeof e.tab)}
+              tabs={[
+                { id: 'graph', label: 'Graph' },
+                { id: 'code', label: 'Code' },
+                { id: 'run', label: 'Run' },
+                {
+                  id: 'problems',
+                  label: (
+                    <>
+                      Problems
+                      {rev.diagnostic_count > 0 && (
+                        <span className="xn-problems"> ⚠ {rev.diagnostic_count}</span>
+                      )}
+                    </>
+                  ),
+                },
+              ]}
+            />
+            <div className="tab-panel" {...panelProps('xv', e.tab)}>
+              {e.tab === 'graph' ? (
+                <div className={`graph-split${e.selectedPath ? ' with-viewer' : ''}`}>
+                  <div
+                    className="graph-pane"
+                    role="region"
+                    aria-label="Repository graph"
+                    aria-describedby="graph-help"
+                  >
+                    <p id="graph-help" className="visually-hidden">
+                      A map of the repository. Tab moves between nodes and Enter opens a file. The file list
+                      is the quickest way around by keyboard.
+                    </p>
+                    <ExplorerGraph repoName={rev.full_name} theme={theme} />
                   </div>
-                )}
-              </div>
-            ) : e.tab === 'problems' ? (
-              <ProblemsView />
-            ) : e.tab === 'run' ? (
-              <RunView />
-            ) : (
-              <FilePanel theme={theme} />
-            )}
+                  {e.selectedPath && (
+                    <div className="graph-viewer">
+                      <FilePanel theme={theme} />
+                    </div>
+                  )}
+                </div>
+              ) : e.tab === 'problems' ? (
+                <ProblemsView />
+              ) : e.tab === 'run' ? (
+                <RunView />
+              ) : (
+                <FilePanel theme={theme} />
+              )}
+            </div>
           </>
         ) : (
           <div className="viewer-empty">

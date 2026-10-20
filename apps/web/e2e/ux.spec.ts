@@ -24,7 +24,7 @@ test('the Explorer is mentioned on the first screen and has examples when empty'
 test('new nodes have forms with explanations, and unconnected nodes are called out', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Add a Python node' }).click()
-  await page.getByRole('button', { name: 'Add node' }).click()
+  await page.getByRole('button', { name: '+ Node (add a node)' }).click()
   await page.getByRole('menuitem', { name: 'Filter list' }).click()
   await expect(page.getByLabel('Items path')).toBeVisible()
   await expect(page.getByLabel('Condition 1 operator')).toBeVisible()
@@ -57,7 +57,7 @@ test.describe('with GitHub', () => {
     // switch the filter, then leave and come back through the list of imports
     await page.getByRole('button', { name: 'Code only' }).click()
     await expect(page.getByText(/Showing source code only/)).toHaveCount(0)
-    await page.getByRole('button', { name: /All imports/ }).click()
+    await page.getByRole('button', { name: '← All repositories' }).click()
     await expect(page.getByText('See a codebase as nodes')).toBeVisible()
     await expect(page.getByRole('region', { name: 'Recent imports' })).toContainText('pallets/flask')
     await page
@@ -67,4 +67,19 @@ test.describe('with GitHub', () => {
       .click()
     await expect(page.locator('.xn-file').first()).toBeVisible({ timeout: 30_000 })
   })
+})
+
+test('the code editor keeps its height when the window is short', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 520 })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Add a Python node' }).click()
+  await page.getByRole('button', { name: '+ Node (add a node)' }).click()
+  await page.getByRole('menuitem', { name: 'Python code' }).click()
+  await page.locator('.code-node').first().click()
+  await expect(page.locator('.editor .monaco-editor')).toBeVisible({ timeout: 30_000 })
+  const h = await page.locator('.editor').evaluate((el) => el.getBoundingClientRect().height)
+  expect(h).toBeGreaterThanOrEqual(200)
+  // the settings panel scrolls instead
+  const scrolls = await page.locator('.inspector').evaluate((el) => el.scrollHeight > el.clientHeight)
+  expect(scrolls).toBe(true)
 })

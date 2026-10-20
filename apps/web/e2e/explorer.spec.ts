@@ -28,11 +28,11 @@ test.describe('with GitHub', () => {
     })
     // one node per file, with no extra click
     await expect(page.locator('.xn-file')).toHaveCount(3, { timeout: 60_000 })
-    await expect(page.locator('.xn-file .xn-name'))
+    await expect(page.locator('.xn-file .xn-open'))
       .toHaveText(['index.html', 'README.md', 'styles.css'], { timeout: 5_000 })
       .catch(() => {})
     for (const name of ['index.html', 'README.md', 'styles.css']) {
-      await expect(page.locator('.xn-file .xn-name', { hasText: name })).toBeVisible()
+      await expect(page.locator('.xn-file .xn-open', { hasText: name })).toBeVisible()
     }
     // index.html references styles.css: one real dependency edge
     await expect(page.locator('.react-flow__edge-dependency')).toHaveCount(1, { timeout: 30_000 })

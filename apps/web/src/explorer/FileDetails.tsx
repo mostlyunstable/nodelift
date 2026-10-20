@@ -30,10 +30,10 @@ function Rel({ e, to }: { e: RepoEdge; to: 'dst' | 'src' }) {
 function Section({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
   return (
     <section className="detail-section">
-      <h4>
+      <h2>
         {title}
         {count !== undefined && <span className="muted"> {count}</span>}
-      </h4>
+      </h2>
       {children}
     </section>
   )
@@ -59,7 +59,7 @@ export function FileDetails({ analysis, path }: { analysis: FileAnalysis | null;
   const symbols = analysis.symbols.filter((s) => !q || s.name.toLowerCase().includes(q))
 
   return (
-    <div className="details">
+    <div className="details" role="region" tabIndex={0} aria-label="File details">
       <Section title="File">
         <dl className="stats small">
           <dt>Language</dt>

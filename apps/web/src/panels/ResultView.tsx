@@ -32,27 +32,31 @@ export function ResultView({ status, duration_ms, input, output, logs, error, on
             <summary>
               {error.type}: {error.message}
             </summary>
-            {error.traceback && <pre>{error.traceback}</pre>}
+            {error.traceback && (
+              <pre role="region" tabIndex={0} aria-label="Traceback">
+                {error.traceback}
+              </pre>
+            )}
           </details>
         </div>
       )}
       {input !== undefined && (
         <>
-          <h4>Input</h4>
+          <h3>Input</h3>
           <Json value={input} />
         </>
       )}
       {status === 'succeeded' && (
         <>
-          <h4>Output</h4>
+          <h3>Output</h3>
           <Json value={output} />
         </>
       )}
-      <h4>Logs</h4>
+      <h3>Logs</h3>
       {logs.length === 0 ? (
         <div className="muted">No logs</div>
       ) : (
-        <pre className="logs">
+        <pre className="logs" role="region" tabIndex={0} aria-label="Logs">
           {logs.map((l, i) => (
             <div key={i} className={l.stream}>
               {l.text}

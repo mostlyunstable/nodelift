@@ -30,7 +30,7 @@ function ApprovalDialog({ pending, onClose }: { pending: Pending; onClose: () =>
         This will run on your computer, in a prepared copy of the repository, only because you approved it.
       </p>
       <div className="field">Command</div>
-      <pre className="approve-command" aria-label="Command to run">
+      <pre className="approve-command" role="region" tabIndex={0} aria-label="Command to run">
         {pending.command}
       </pre>
       <dl className="stats small">
@@ -105,7 +105,7 @@ function DiffDialog({ patch, onClose }: { patch: RepoPatch; onClose: () => void 
   }, [patch])
   return (
     <Dialog title={patch.title} onClose={onClose} wide>
-      <pre className="diff" aria-label={`Diff for ${patch.path}`}>
+      <pre className="diff" role="region" tabIndex={0} aria-label={`Diff for ${patch.path}`}>
         {(text ?? 'Loading…').split('\n').map((l, i) => (
           <span
             key={i}
@@ -138,7 +138,9 @@ function Output({ run }: { run: CommandRun }) {
         </span>
         {run.status === 'running' && <button onClick={() => void cancel(run.id)}>Cancel</button>}
       </div>
-      <pre>{run.output || (run.status === 'running' ? 'Running…' : '(no output)')}</pre>
+      <pre role="region" tabIndex={0} aria-label="Output">
+        {run.output || (run.status === 'running' ? 'Running…' : '(no output)')}
+      </pre>
       {run.output_truncated && <p className="muted small">Output was cut at 256 KB.</p>}
     </section>
   )
@@ -159,7 +161,7 @@ export function RunView() {
   const latest = r.runs[r.runs.length - 1]
 
   return (
-    <div className="run-view">
+    <div className="run-view" role="region" tabIndex={0} aria-label="Run and proposed changes">
       {r.error && (
         <div className="explorer-error" role="alert">
           {r.error}
@@ -167,7 +169,7 @@ export function RunView() {
       )}
 
       <section className="detail-section">
-        <h4>Workspace</h4>
+        <h2>Workspace</h2>
         {r.workspace?.state === 'ready' ? (
           <p className="small">
             Ready: a full copy of this commit ({r.workspace.file_count} files) on your computer.{' '}
@@ -196,7 +198,7 @@ export function RunView() {
       </section>
 
       <section className="detail-section">
-        <h4>Commands found in this repository</h4>
+        <h2>Commands found in this repository</h2>
         {r.discovery && r.discovery.suggestions.length === 0 && (
           <p className="muted small">
             No test setup was found in the repository’s own files. You can still enter a command below.
@@ -249,9 +251,9 @@ export function RunView() {
       {latest && <Output run={latest} />}
 
       <section className="detail-section">
-        <h4>
+        <h2>
           Proposed changes <span className="muted">{r.patches.length}</span>
-        </h4>
+        </h2>
         {r.patches.length === 0 && (
           <p className="muted small">
             Open a file, choose “Propose a change”, edit a copy and save it here. Your changes never touch the
@@ -294,7 +296,7 @@ export function RunView() {
 
       {r.runs.length > 1 && (
         <section className="detail-section">
-          <h4>Earlier runs</h4>
+          <h2>Earlier runs</h2>
           <ul className="detail-list">
             {r.runs
               .slice(0, -1)

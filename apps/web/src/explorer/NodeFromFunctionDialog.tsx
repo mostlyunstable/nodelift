@@ -95,7 +95,7 @@ export function NodeFromFunctionDialog({
             </ul>
           )}
           <div className="field">Generated source (review it)</div>
-          <pre className="approve-command" aria-label="Generated source">
+          <pre className="approve-command" role="region" tabIndex={0} aria-label="Generated source">
             {String(draft.config.source)}
           </pre>
           <p className="muted small">

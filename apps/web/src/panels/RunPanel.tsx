@@ -7,7 +7,7 @@ export function RunPanel() {
   const exec = run?.nodes.findLast((n) => n.node_id === selectedId)
   const nameOf = (id: string) => nodes.find((n) => n.id === id)?.data.name ?? id
   return (
-    <section className="runpanel">
+    <section className="runpanel" aria-label="Run results">
       <div className="run-col">
         <label className="field">
           Workflow input (JSON, passed to entry nodes)
@@ -24,7 +24,7 @@ export function RunPanel() {
         )}
       </div>
       <div className="run-col">
-        <h4>Run history</h4>
+        <h2>Run history</h2>
         {runs.length === 0 && <div className="muted">No saved runs yet.</div>}
         <ul className="steps">
           {runs.map((r) => (
@@ -41,7 +41,7 @@ export function RunPanel() {
         </ul>
         {events.length > 0 && (
           <>
-            <h4>Events</h4>
+            <h2>Events</h2>
             <ol className="events">
               {events.map((e) => (
                 <li key={e.seq}>
@@ -66,7 +66,7 @@ export function RunPanel() {
         )}
         {run && (
           <>
-            <h4>Steps</h4>
+            <h2>Steps</h2>
             <ul className="steps">
               {run.nodes.map((n) => (
                 <li
@@ -102,7 +102,7 @@ export function RunPanel() {
         )}
       </div>
       <div className="run-col wide">
-        <h4>Node execution{exec ? `: ${nameOf(exec.node_id)}` : ''}</h4>
+        <h2>Node execution{exec ? `: ${nameOf(exec.node_id)}` : ''}</h2>
         {exec ? (
           <ResultView
             onShowLine={(line) => exec && useStore.getState().requestFocusLine(exec.node_id, line)}

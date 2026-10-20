@@ -312,6 +312,7 @@ export const useExplorer = create<ExplorerState>((set, get) => {
         languages: new Set(),
         selectedEdge: null,
       })
+      void get().loadRevisions() // the list must be current: a polling import may have been stopped before it refreshed it
     },
 
     selectFile: async (path, opts) => {

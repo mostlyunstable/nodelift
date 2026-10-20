@@ -237,8 +237,18 @@ describe('the Explorer is easy to find and to leave', () => {
     expect(document.querySelector('.explorer-side')).toHaveAttribute('hidden')
     fireEvent.click(screen.getByRole('button', { name: 'Show the file list' }))
     expect(document.querySelector('.explorer-side')).not.toHaveAttribute('hidden')
-    fireEvent.click(screen.getByRole('button', { name: /All imports/ }))
+    fireEvent.click(screen.getByRole('button', { name: /All repositories/ }))
     expect(useExplorer.getState().revision).toBeNull()
+  })
+
+  it('going back lists your imports at once, even if you leave while the import is still working', async () => {
+    const list = [revision({ id: 'rev_9', full_name: 'a/b' })]
+    vi.spyOn(api, 'explorerRevisions').mockResolvedValue(list)
+    useExplorer.setState({ revision: revision(), files: [file('a.py', 'python')], revisions: [] })
+    render(<ExplorerView theme="dark" />)
+    fireEvent.click(screen.getByRole('button', { name: /All repositories/ }))
+    expect(await screen.findByRole('region', { name: 'Recent imports' })).toHaveTextContent('a/b')
+    expect(document.activeElement).toBe(document.getElementById('repo-url')) // ready for a different link
   })
 
   it('big repositories open code-only, and say so; the toggle shows everything', async () => {
@@ -262,6 +272,25 @@ describe('the Explorer is easy to find and to leave', () => {
 })
 
 describe('commands', () => {
+  it('in the Explorer the palette hides workflow-editing commands', () => {
+    const ctx = {
+      mode: 'explorer',
+      hasNodes: true,
+      busy: null,
+      runStatus: null,
+      canUndo: true,
+      canRedo: false,
+      workflowId: 'w',
+      workflows: [],
+      nodeDefs: [{ type: 'a', title: 'A' }],
+      examples: [],
+      hasVersions: false,
+      actions: new Proxy({}, { get: () => vi.fn() }),
+    } as unknown as CommandContext
+    const groups = new Set(buildCommands(ctx).map((c) => c.group))
+    expect([...groups].sort()).toEqual(['App', 'Explorer'])
+  })
+
   it('the palette can take you to the Explorer from anywhere', () => {
     const ctx = {
       hasNodes: false,

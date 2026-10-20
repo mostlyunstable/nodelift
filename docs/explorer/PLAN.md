@@ -191,3 +191,14 @@ Found by using the app as a first-time user (clean data folder; Flask and React 
   mean something and say what they do, node menu is grouped by category, unconnected nodes are labelled and explained, data errors say what to check.
 **Still true:** the first screen of a large repository shows the top of the tree, so the most interesting folder may be a scroll or a search away; the dependency
 lines of a big repository are dense by nature.
+
+## Accessibility and navigation pass (2026-10-20)
+Method: axe-core (WCAG 2.1 A/AA + best practices) on every screen in dark and light themes, a keyboard-only walk-through, and a visual review at 700/820/880/1280 px.
+Found and fixed: no obvious way back from a repository (now a breadcrumb bar: **← All repositories**, repository, commit, *Check for newer commit*, a file-list toggle; Back
+puts the cursor in the link box and the list of imports is reloaded); tabs without the ARIA pattern (one tab stop, arrow keys, linked panels); no page heading, landmarks or skip link;
+headings out of order; scrollable areas unreachable by keyboard; icon buttons whose names did not contain their visible text; graph nodes not operable by keyboard (a file node is now
+a real button; the file list is a proper tree with arrow keys); no way to connect nodes without dragging (Inspector → Connections); a code editor squashed to 2 px in short windows; a
+stray global heading style that shrank dialog titles; same-column dependency lines that doubled back across nodes; a palette that offered workflow commands inside the Explorer;
+import progress and results announced to screen readers.
+`pnpm e2e` now fails on any axe violation (both themes, every screen) and tests the keyboard flows. **Not covered by automation:** how a screen reader reads the graph canvas (the file
+list and Details are the intended accessible route), Monaco's own accessibility, and the sandboxed HTML preview.

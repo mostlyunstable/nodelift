@@ -20,6 +20,7 @@ import { DirNode, FileNode } from './ExplorerNodes'
 import {
   buildGraph,
   dirId,
+  FILE_W,
   fileId,
   languageCounts,
   layoutGraph,
@@ -62,7 +63,24 @@ function DependencyEdge({
   data,
   markerEnd,
 }: EdgeProps<ExplorerEdge>) {
-  const [path, lx, ly] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition })
+  // Nodes in the same column: loop out of the right side and back into the target's right side, instead of
+  // a curve that doubles back across both nodes.
+  const sameColumn = Math.abs(sourceX - FILE_W - targetX) < 24 && Math.abs(sourceY - targetY) > 8
+  const bend = 46 + Math.min(80, Math.abs(targetY - sourceY) / 4)
+  const [bezier, bx, by] = getBezierPath({
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+  })
+  const rightX = targetX + FILE_W
+  const path = sameColumn
+    ? `M ${sourceX},${sourceY} C ${sourceX + bend},${sourceY} ${rightX + bend},${targetY} ${rightX},${targetY}`
+    : bezier
+  const lx = sameColumn ? Math.max(sourceX, rightX) + bend * 0.75 : bx
+  const ly = sameColumn ? (sourceY + targetY) / 2 : by
   const conf = data?.confidence === 'heuristic' ? 'heuristic' : 'resolved'
   return (
     <>
@@ -181,26 +199,8 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
   const nameOf = (id: string) => (id.slice(2) === '' ? repoName : id.slice(2))
 
   return (
-    <ReactFlow
-      nodes={shownNodes}
-      edges={edges}
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
-      onNodesChange={onNodesChange}
-      onNodeClick={(_, n) => {
-        if (n.type === 'file') void selectFile(n.data.path)
-      }}
-      onEdgeClick={(_, e) => setSelectedEdge(e.id)}
-      onPaneClick={() => setSelectedEdge(null)}
-      nodesConnectable={false}
-      deleteKeyCode={null}
-      colorMode={theme}
-      minZoom={0.05}
-    >
-      <Background />
-      <Controls showInteractive={false} />
-      {built.nodes.length > 12 && <MiniMap pannable zoomable />}
-      <Panel position="top-left" className="graph-tools">
+    <div className="graph-wrap">
+      <div className="graph-toolbar" role="group" aria-label="Graph tools">
         <input
           type="search"
           aria-label="Find a file in the graph"
@@ -269,100 +269,127 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
             Collapse all
           </button>
         </div>
-      </Panel>
-      <Panel position="bottom-left" className="graph-legend" aria-label="Legend">
-        <label className="legend-toggle">
-          <input
-            type="checkbox"
-            checked={showDeps}
-            onChange={(e) => useExplorer.getState().setShowDeps(e.target.checked)}
-          />{' '}
-          Show dependencies
-        </label>
-        <details className="legend-details">
-          <summary>Legend</summary>
-          <div>
-            <svg width="28" height="8" aria-hidden="true">
-              <path d="M0 4 H28" className="xe-contains" />
-            </svg>{' '}
-            Folder contains item (structure)
-          </div>
-          {hasDeps && (
-            <>
+      </div>
+      <div className="graph-canvas">
+        <ReactFlow
+          nodes={shownNodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          onNodesChange={onNodesChange}
+          onNodeClick={(_, n) => {
+            if (n.type === 'file') void selectFile(n.data.path)
+          }}
+          onEdgeClick={(_, e) => setSelectedEdge(e.id)}
+          onPaneClick={() => setSelectedEdge(null)}
+          nodesConnectable={false}
+          nodesFocusable={false} // our own nodes are the focus targets (Enter opens a file)
+          edgesFocusable={false}
+          aria-label="Repository graph"
+          deleteKeyCode={null}
+          colorMode={theme}
+          minZoom={0.05}
+        >
+          <Background />
+          <Controls showInteractive={false} />
+          {built.nodes.length > 12 && <MiniMap pannable zoomable />}
+          <Panel position="bottom-left" className="graph-legend" aria-label="Legend">
+            <label className="legend-toggle">
+              <input
+                type="checkbox"
+                checked={showDeps}
+                onChange={(e) => useExplorer.getState().setShowDeps(e.target.checked)}
+              />{' '}
+              Show dependencies
+            </label>
+            <details className="legend-details">
+              <summary>Legend</summary>
               <div>
                 <svg width="28" height="8" aria-hidden="true">
-                  <path d="M0 4 H28" className="xe-dep xe-resolved" />
+                  <path d="M0 4 H28" className="xe-contains" />
                 </svg>{' '}
-                Imports / references (resolved to a file)
+                Folder contains item (structure)
               </div>
-              <div>
-                <svg width="28" height="8" aria-hidden="true">
-                  <path d="M0 4 H28" className="xe-dep xe-heuristic" />
-                </svg>{' '}
-                Heuristic (name match, not proven)
-              </div>
-              <div className="muted">A number is how many relations an edge stands for.</div>
-            </>
-          )}
-        </details>
-        {analysisStatus === 'analyzing' && <div role="status">Analyzing dependencies…</div>}
-        {analysisStatus === 'failed' && (
-          <div role="alert">Analysis failed; dependency edges are unavailable.</div>
-        )}
-        {analysisStatus === 'partial' && (
-          <div className="muted">Analysis hit its time budget; some files were not analyzed.</div>
-        )}
-        {(analysisStatus === 'done' || analysisStatus === 'partial') && !hasDeps && showDeps && (
-          <div className="muted">No dependencies between the visible nodes.</div>
-        )}
-        {graphTruncated && (
-          <div className="muted">Very large repository: only the first edges are loaded.</div>
-        )}
-        {selectedEdgeData?.kind === 'contains' && (
-          <div role="status">
-            <strong>Selected:</strong> {nameOf(selectedEdgeData.from)} contains {nameOf(selectedEdgeData.to)}.
-            This is folder structure, not a dependency.
-          </div>
-        )}
-        {selectedEdgeData?.kind === 'dependency' && (
-          <div role="status" className="edge-detail">
-            <strong>
-              {nameOf(selectedEdgeData.from)} → {nameOf(selectedEdgeData.to)}
-            </strong>
-            {selectedEdgeData.aggregated && (
-              <div className="muted">
-                Includes files inside collapsed folders. Expand them to see each edge.
+              {hasDeps && (
+                <>
+                  <div>
+                    <svg width="28" height="8" aria-hidden="true">
+                      <path d="M0 4 H28" className="xe-dep xe-resolved" />
+                    </svg>{' '}
+                    Imports / references (resolved to a file)
+                  </div>
+                  <div>
+                    <svg width="28" height="8" aria-hidden="true">
+                      <path d="M0 4 H28" className="xe-dep xe-heuristic" />
+                    </svg>{' '}
+                    Heuristic (name match, not proven)
+                  </div>
+                  <div className="muted">A number is how many relations an edge stands for.</div>
+                </>
+              )}
+            </details>
+            {analysisStatus === 'analyzing' && <div role="status">Analyzing dependencies…</div>}
+            {analysisStatus === 'failed' && (
+              <div role="alert">Analysis failed; dependency edges are unavailable.</div>
+            )}
+            {analysisStatus === 'partial' && (
+              <div className="muted">Analysis hit its time budget; some files were not analyzed.</div>
+            )}
+            {(analysisStatus === 'done' || analysisStatus === 'partial') && !hasDeps && showDeps && (
+              <div className="muted">No dependencies between the visible nodes.</div>
+            )}
+            {graphTruncated && (
+              <div className="muted">Very large repository: only the first edges are loaded.</div>
+            )}
+            {selectedEdgeData?.kind === 'contains' && (
+              <div role="status">
+                <strong>Selected:</strong> {nameOf(selectedEdgeData.from)} contains{' '}
+                {nameOf(selectedEdgeData.to)}. This is folder structure, not a dependency.
               </div>
             )}
-            <ul>
-              {selectedEdgeData.relations.slice(0, 8).map((r, i) => (
-                <li key={i}>
-                  <button
-                    className="link-button"
-                    onClick={() => void useExplorer.getState().goTo(r.src, r.line)}
-                    title="Open the importing file at this line"
-                  >
-                    {r.src}:{r.line}
-                  </button>{' '}
-                  {r.kind.replace('_', ' ')} <code>{r.raw}</code> → <code>{r.dst}</code>
+            {selectedEdgeData?.kind === 'dependency' && (
+              <div role="status" className="edge-detail">
+                <strong>
+                  {nameOf(selectedEdgeData.from)} → {nameOf(selectedEdgeData.to)}
+                </strong>
+                {selectedEdgeData.aggregated && (
                   <div className="muted">
-                    {r.confidence} · {r.provenance}
-                    {r.note ? ` · ${r.note}` : ''}
+                    Includes files inside collapsed folders. Expand them to see each edge.
                   </div>
-                </li>
-              ))}
-            </ul>
-            {selectedEdgeData.count > 8 && <div className="muted">and {selectedEdgeData.count - 8} more</div>}
-          </div>
-        )}
-      </Panel>
-      {built.truncated && (
-        <Panel position="top-right" className="graph-notice" role="status">
-          Showing {built.nodes.length} nodes; {built.hiddenNodes} more are hidden. Collapse folders or filter
-          by language to see them.
-        </Panel>
-      )}
-    </ReactFlow>
+                )}
+                <ul>
+                  {selectedEdgeData.relations.slice(0, 8).map((r, i) => (
+                    <li key={i}>
+                      <button
+                        className="link-button"
+                        onClick={() => void useExplorer.getState().goTo(r.src, r.line)}
+                        title="Open the importing file at this line"
+                      >
+                        {r.src}:{r.line}
+                      </button>{' '}
+                      {r.kind.replace('_', ' ')} <code>{r.raw}</code> → <code>{r.dst}</code>
+                      <div className="muted">
+                        {r.confidence} · {r.provenance}
+                        {r.note ? ` · ${r.note}` : ''}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                {selectedEdgeData.count > 8 && (
+                  <div className="muted">and {selectedEdgeData.count - 8} more</div>
+                )}
+              </div>
+            )}
+          </Panel>
+          {built.truncated && (
+            <Panel position="top-right" className="graph-notice" role="status">
+              Showing {built.nodes.length} nodes; {built.hiddenNodes} more are hidden. Collapse folders or
+              filter by language to see them.
+            </Panel>
+          )}
+        </ReactFlow>
+      </div>
+    </div>
   )
 }
 

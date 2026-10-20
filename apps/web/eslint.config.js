@@ -19,6 +19,8 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'error',
+      // A scrollable area must be reachable by keyboard (WCAG 2.1.1); a labelled region or tabpanel may take focus.
+      'jsx-a11y/no-noninteractive-tabindex': ['error', { roles: ['tabpanel', 'region'], tags: [] }],
     },
   },
   {

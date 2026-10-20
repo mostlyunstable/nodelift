@@ -1,4 +1,5 @@
 import { ConfigEditor } from './ConfigEditors'
+import { Connections } from './Connections'
 import { useStore } from '../state/store'
 import { ResultView } from './ResultView'
 
@@ -17,6 +18,7 @@ export function Inspector() {
         <input value={node.data.name} onChange={(e) => updateData(node.id, { name: e.target.value })} />
       </label>
       <ConfigEditor node={node} />
+      <Connections node={node} />
       {RETRYABLE.has(node.data.nodeType) && (
         <div className="retry-row">
           <label title="Retries re-run your code, so only enable this if running it twice is safe">
