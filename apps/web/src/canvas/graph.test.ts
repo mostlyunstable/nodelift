@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkConnection, wouldCreateCycle } from './graph'
+import { checkConnection, tidyLayout, wouldCreateCycle } from './graph'
 
 const chain = [
   { source: 'a', target: 'b' },
@@ -66,5 +66,46 @@ describe('checkConnection with ports', () => {
   })
   it('still refuses loops regardless of ports', () => {
     expect(checkConnection(branchEdges, 't', 'b', 'out', 'in')).toMatchObject({ ok: false })
+  })
+})
+
+describe('tidyLayout', () => {
+  const ids = (...a: string[]) => a.map((id) => ({ id }))
+  const link = (source: string, target: string) => ({ source, target }) as never
+  const overlaps = (p: Record<string, { x: number; y: number }>) => {
+    const k = Object.keys(p)
+    return k.some((a, i) =>
+      k.slice(i + 1).some((b) => Math.abs(p[a].x - p[b].x) < 240 && Math.abs(p[a].y - p[b].y) < 96),
+    )
+  }
+
+  it('puts each node in a column by depth, left to right', () => {
+    const p = tidyLayout(ids('a', 'b', 'c'), [link('a', 'b'), link('b', 'c')])
+    expect(p.a.x).toBeLessThan(p.b.x)
+    expect(p.b.x).toBeLessThan(p.c.x)
+  })
+
+  it('never overlaps nodes, including fan-out and fan-in', () => {
+    const p = tidyLayout(ids('a', 'b', 'c', 'd', 'e'), [
+      link('a', 'b'),
+      link('a', 'c'),
+      link('a', 'd'),
+      link('b', 'e'),
+      link('c', 'e'),
+    ])
+    expect(Object.keys(p)).toHaveLength(5)
+    expect(overlaps(p)).toBe(false)
+  })
+
+  it('sets unconnected nodes in a row below the graph', () => {
+    const p = tidyLayout(ids('a', 'b', 'x', 'y'), [link('a', 'b')])
+    expect(p.x.y).toBe(p.y.y)
+    expect(p.x.y).toBeGreaterThan(p.a.y)
+    expect(p.x.x).not.toBe(p.y.x)
+  })
+
+  it('survives a cycle and ignores unknown edges', () => {
+    const p = tidyLayout(ids('a', 'b'), [link('a', 'b'), link('b', 'a'), link('a', 'zzz')])
+    expect(Object.keys(p).sort()).toEqual(['a', 'b'])
   })
 })

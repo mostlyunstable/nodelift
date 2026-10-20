@@ -1,3 +1,4 @@
+import { githubCallsLeft } from './net'
 import { expect, test } from '@playwright/test'
 
 test('an invalid link is explained, nothing is imported', async ({ page }) => {
@@ -6,12 +7,18 @@ test('an invalid link is explained, nothing is imported', async ({ page }) => {
   await page.getByLabel('GitHub repository').fill('https://example.com/not/github')
   await page.getByRole('button', { name: 'Show Nodes' }).click()
   await expect(page.getByRole('alert')).toContainText('Only github.com repositories are supported')
-  await expect(page.locator('.xn')).toHaveCount(0)
+  await expect(page.locator('.xt, .xg')).toHaveCount(0)
 })
 
 // These talk to the real GitHub, so they only run when asked: E2E_NETWORK=1 pnpm e2e
 test.describe('with GitHub', () => {
   test.skip(!process.env.E2E_NETWORK, 'set E2E_NETWORK=1 to run against github.com')
+  test.beforeEach(async () => {
+    test.skip(
+      (await githubCallsLeft()) < 6,
+      'GitHub allows 60 anonymous API calls an hour and they are used up; try later',
+    )
+  })
 
   test('paste a link: files become nodes, source opens, dependencies are drawn, tests need approval', async ({
     page,
@@ -27,18 +34,20 @@ test.describe('with GitHub', () => {
       el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
     })
     // one node per file, with no extra click
-    await expect(page.locator('.xn-file')).toHaveCount(3, { timeout: 60_000 })
-    await expect(page.locator('.xn-file .xn-open'))
+    await expect(page.locator('.xt-file')).toHaveCount(3, { timeout: 60_000 })
+    await expect(page.locator('.xt-file .xn-open'))
       .toHaveText(['index.html', 'README.md', 'styles.css'], { timeout: 5_000 })
       .catch(() => {})
     for (const name of ['index.html', 'README.md', 'styles.css']) {
-      await expect(page.locator('.xn-file .xn-open', { hasText: name })).toBeVisible()
+      await expect(page.locator('.xt-file .xn-open', { hasText: name })).toBeVisible()
     }
-    // index.html references styles.css: one real dependency edge
+    // lines are drawn on demand: nothing yet, then selecting index.html shows the one line to styles.css
+    await expect(page.locator('.react-flow__edge-dependency')).toHaveCount(0)
+    await page.locator('.xt-file', { hasText: 'index.html' }).locator('.xn-open').click()
     await expect(page.locator('.react-flow__edge-dependency')).toHaveCount(1, { timeout: 30_000 })
 
     // clicking a node shows the real source, read-only
-    await page.locator('.xn-file', { hasText: 'styles.css' }).click()
+    await page.locator('.xt-file', { hasText: 'styles.css' }).locator('.xn-open').click()
     await expect(page.getByText(/read-only/)).toBeVisible()
     await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 })
 

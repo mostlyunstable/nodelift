@@ -1,4 +1,4 @@
-import { Background, Controls, MiniMap, ReactFlow } from '@xyflow/react'
+import { Background, Controls, MiniMap, ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react'
 import { useEffect, useRef, useState } from 'react'
 import { checkConnection } from '../canvas/graph'
 import { CodeNode } from '../nodes/CodeNode'
@@ -23,6 +23,16 @@ import { buildCommands, type CommandContext } from './commands'
 import { matchShortcut } from './shortcuts'
 
 const nodeTypes = { node: CodeNode }
+
+/** Brings every node into view when the layout is tidied. Lives inside the canvas so it can use its view controls. */
+function FitOnTidy() {
+  const nonce = useStore((st) => st.fitNonce)
+  const rf = useReactFlow()
+  useEffect(() => {
+    if (nonce > 0) void rf.fitView({ duration: 300, padding: 0.2, maxZoom: 1 })
+  }, [nonce, rf])
+  return null
+}
 
 const SAVE_LABEL = {
   saved: 'Saved',
@@ -146,6 +156,7 @@ export function App() {
       diagnostics: () => s.openDialog('diagnostics'),
       shortcuts: () => s.openDialog('shortcuts'),
       theme: s.setTheme,
+      tidy: s.tidy,
       explore: () => setMode('explorer'),
       build: () => setMode('build'),
       closeRepo: () => useExplorer.getState().closeRevision(),
@@ -186,6 +197,7 @@ export function App() {
     })),
   ]
   const moreItems: MenuItem[] = [
+    { label: 'Tidy up the layout', onSelect: s.tidy, disabled: s.nodes.length < 2 },
     { label: 'Check for problems', onSelect: () => void s.validate(), disabled: s.nodes.length === 0 },
     { label: 'Versions…', onSelect: () => s.openDialog('versions'), disabled: !s.workflowId },
     { label: 'Save a version', onSelect: () => void s.publish(), disabled: s.nodes.length === 0 },
@@ -307,34 +319,37 @@ export function App() {
               <TourBanner />
               <EmptyCanvas />
               <LonelyNodesNotice />
-              <ReactFlow
-                nodes={s.nodes}
-                edges={s.edges}
-                nodeTypes={nodeTypes}
-                onNodesChange={s.onNodesChange}
-                onEdgesChange={s.onEdgesChange}
-                onConnect={s.onConnect}
-                isValidConnection={(c) =>
-                  checkConnection(
-                    useStore.getState().edges,
-                    c.source,
-                    c.target,
-                    c.sourceHandle,
-                    c.targetHandle,
-                  ).ok
-                }
-                onNodeDragStart={s.beginDrag}
-                onNodeClick={(_, n) => s.select(n.id)}
-                onPaneClick={() => s.select(null)}
-                colorMode={theme}
-                fitView
-                minZoom={0.1} // the default 0.5 made graphs wider than the canvas impossible to see whole
-                deleteKeyCode={['Backspace', 'Delete']}
-              >
-                <Background />
-                <Controls />
-                {s.nodes.length > 12 && <MiniMap pannable zoomable />}
-              </ReactFlow>
+              <ReactFlowProvider>
+                <ReactFlow
+                  nodes={s.nodes}
+                  edges={s.edges}
+                  nodeTypes={nodeTypes}
+                  onNodesChange={s.onNodesChange}
+                  onEdgesChange={s.onEdgesChange}
+                  onConnect={s.onConnect}
+                  isValidConnection={(c) =>
+                    checkConnection(
+                      useStore.getState().edges,
+                      c.source,
+                      c.target,
+                      c.sourceHandle,
+                      c.targetHandle,
+                    ).ok
+                  }
+                  onNodeDragStart={s.beginDrag}
+                  onNodeClick={(_, n) => s.select(n.id)}
+                  onPaneClick={() => s.select(null)}
+                  colorMode={theme}
+                  fitView
+                  minZoom={0.1} // the default 0.5 made graphs wider than the canvas impossible to see whole
+                  deleteKeyCode={['Backspace', 'Delete']}
+                >
+                  <Background />
+                  <FitOnTidy />
+                  <Controls />
+                  {s.nodes.length > 12 && <MiniMap pannable zoomable />}
+                </ReactFlow>
+              </ReactFlowProvider>
             </div>
             <Inspector />
           </main>

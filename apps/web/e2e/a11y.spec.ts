@@ -1,4 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
+import { githubCallsLeft } from './net'
 import { expect, test, type Page } from '@playwright/test'
 
 /** Fails with a readable list when a screen has accessibility violations (WCAG 2.1 A/AA and best practices). */
@@ -50,14 +51,20 @@ for (const scheme of ['dark', 'light'] as const) {
 
     test.describe('with GitHub', () => {
       test.skip(!process.env.E2E_NETWORK, 'set E2E_NETWORK=1 to run against github.com')
+      test.beforeEach(async () => {
+        test.skip(
+          (await githubCallsLeft()) < 6,
+          'GitHub allows 60 anonymous API calls an hour and they are used up; try later',
+        )
+      })
       test('explorer screens have no violations', async ({ page }) => {
         test.setTimeout(180_000)
         await page.getByRole('tab', { name: 'Explorer' }).click()
         await page.getByRole('button', { name: 'octocat/Spoon-Knife (3 files)' }).click()
-        await page.locator('.xn-file').first().waitFor({ timeout: 60_000 })
+        await page.locator('.xt-file').first().waitFor({ timeout: 60_000 })
         await page.waitForTimeout(1500)
         await expectAccessible(page, 'explorer graph')
-        await page.locator('.xn-file', { hasText: 'index.html' }).click()
+        await page.locator('.xt-file', { hasText: 'index.html' }).locator('.xn-open').click()
         await page.waitForTimeout(1000)
         await expectAccessible(page, 'file source')
         await page.getByRole('tab', { name: /Details/ }).click()
@@ -111,6 +118,12 @@ test.describe('keyboard only', () => {
 
   test.describe('with GitHub', () => {
     test.skip(!process.env.E2E_NETWORK, 'set E2E_NETWORK=1 to run against github.com')
+    test.beforeEach(async () => {
+      test.skip(
+        (await githubCallsLeft()) < 6,
+        'GitHub allows 60 anonymous API calls an hour and they are used up; try later',
+      )
+    })
 
     test('the file list works with arrow keys, nodes open with Enter, and Back returns to the link box', async ({
       page,
@@ -119,7 +132,7 @@ test.describe('keyboard only', () => {
       await page.goto('/')
       await page.getByRole('tab', { name: 'Explorer' }).click()
       await page.getByRole('button', { name: 'octocat/Spoon-Knife (3 files)' }).click()
-      await page.locator('.xn-file').first().waitFor({ timeout: 60_000 })
+      await page.locator('.xt-file').first().waitFor({ timeout: 60_000 })
 
       // file list: arrows move between items, Enter opens
       const tree = page.getByRole('tree', { name: 'Repository files' })
@@ -132,9 +145,9 @@ test.describe('keyboard only', () => {
       await expect(page.getByText(/read-only/)).toBeVisible()
 
       // graph node: focus it and press Enter
-      await page.locator('.xn-file', { hasText: 'README.md' }).locator('.xn-open').focus()
+      await page.locator('.xt-file', { hasText: 'README.md' }).locator('.xn-open').focus()
       await page.keyboard.press('Enter')
-      await expect(page.locator('.xn-file.selected', { hasText: 'README.md' })).toBeVisible()
+      await expect(page.locator('.xt-file.selected', { hasText: 'README.md' })).toBeVisible()
 
       // back, with the link box ready for a different repository
       await page.getByRole('button', { name: '← All repositories' }).click()

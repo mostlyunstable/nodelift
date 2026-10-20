@@ -265,7 +265,7 @@ describe('the Explorer is easy to find and to leave', () => {
     })
     await waitFor(() => expect(useExplorer.getState().codeOnly).toBe(true))
     expect(await screen.findByText(/Showing source code only/)).toBeInTheDocument()
-    expect(document.querySelectorAll('.xn-file')).toHaveLength(6)
+    expect(document.querySelectorAll('.xt-file')).toHaveLength(6)
     fireEvent.click(screen.getByRole('button', { name: 'Code only' }))
     expect(screen.queryByText(/Showing source code only/)).not.toBeInTheDocument()
   })

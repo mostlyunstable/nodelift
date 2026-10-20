@@ -11,7 +11,7 @@ import { create } from 'zustand'
 import { api, ApiError } from '../api/client'
 import { followRun } from '../api/events'
 import { fileSlug, saveTextFile } from '../desktop/files'
-import { checkConnection } from '../canvas/graph'
+import { checkConnection, tidyLayout } from '../canvas/graph'
 import { DEFAULT_SOURCE, fromWorkflow, toWorkflow, type FlowNode, type NodeData } from '../canvas/mapper'
 import { errorLine, firstFailedNodeId } from '../panels/errors'
 import type {
@@ -154,6 +154,8 @@ interface State {
   canUndo: boolean
   canRedo: boolean
   undo: () => void
+  fitNonce: number // bumped to ask the canvas to bring every node into view
+  tidy: () => void
   redo: () => void
   beginDrag: () => void
   dirty: boolean
@@ -515,6 +517,18 @@ export const useStore = create<State>((set, get) => ({
   message: null,
   abort: null,
 
+  fitNonce: 0,
+  tidy: () => {
+    const { nodes, edges } = get()
+    if (nodes.length === 0) return
+    recordHistory()
+    const pos = tidyLayout(nodes, edges)
+    set({
+      nodes: nodes.map((n) => (pos[n.id] ? { ...n, position: pos[n.id]! } : n)),
+      fitNonce: get().fitNonce + 1,
+    })
+    markDirty()
+  },
   undo: () => {
     const previous = past.pop()
     if (!previous) return

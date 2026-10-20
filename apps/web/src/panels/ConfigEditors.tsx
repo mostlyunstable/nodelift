@@ -71,7 +71,7 @@ function CodeConfig({ node }: { node: FlowNode }) {
         <Editor
           height="240px"
           language="python"
-          theme={resolveTheme(themeChoice) === 'light' ? 'vs' : 'vs-dark'}
+          theme={resolveTheme(themeChoice) === 'light' ? 'nodecraft-light' : 'nodecraft-dark'}
           value={String(node.data.config.source ?? '')}
           onMount={(editor, monaco) => {
             handle.current = { editor, monaco }

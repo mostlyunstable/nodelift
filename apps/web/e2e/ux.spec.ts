@@ -1,3 +1,4 @@
+import { githubCallsLeft } from './net'
 import { expect, test } from '@playwright/test'
 
 test('the window never scrolls sideways, even when it is small', async ({ page }) => {
@@ -18,7 +19,7 @@ test('the Explorer is mentioned on the first screen and has examples when empty'
   await expect(page.getByRole('button', { name: 'Explore a GitHub repository' })).toBeVisible()
   await page.getByRole('button', { name: 'Explore a GitHub repository' }).click()
   await expect(page.getByText('See a codebase as nodes')).toBeVisible()
-  await expect(page.getByRole('button', { name: /octocat\/Spoon-Knife/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'octocat/Spoon-Knife (3 files)' })).toBeVisible()
 })
 
 test('new nodes have forms with explanations, and unconnected nodes are called out', async ({ page }) => {
@@ -35,6 +36,12 @@ test('new nodes have forms with explanations, and unconnected nodes are called o
 
 test.describe('with GitHub', () => {
   test.skip(!process.env.E2E_NETWORK, 'set E2E_NETWORK=1 to run against github.com')
+  test.beforeEach(async () => {
+    test.skip(
+      (await githubCallsLeft()) < 6,
+      'GitHub allows 60 anonymous API calls an hour and they are used up; try later',
+    )
+  })
 
   test('a real project opens readable: code first, root in view, no false alarms, easy to leave', async ({
     page,
@@ -43,15 +50,19 @@ test.describe('with GitHub', () => {
     await page.getByRole('tab', { name: 'Explorer' }).click()
     await page.getByRole('button', { name: /pallets\/flask/ }).click()
     await expect(page.getByText(/Showing source code only/)).toBeVisible({ timeout: 60_000 })
-    await expect(page.locator('.xn-file').first()).toBeVisible()
-    expect(await page.locator('.xn').count()).toBeLessThanOrEqual(130)
+    await expect(page.locator('.xt-file').first()).toBeVisible()
+    expect(await page.locator('.xt, .xg').count()).toBeLessThanOrEqual(130)
+    // folders are nested cards, so the map is compact: roughly landscape, not a long strip
+    const box = await page.locator('.xg').first().boundingBox()
+    expect(box!.width / box!.height).toBeGreaterThan(0.5)
+    expect(box!.width / box!.height).toBeLessThan(3.5)
     // the repository root is on screen at a readable zoom
-    const root = page.locator('.xn-dir', { hasText: 'pallets/flask' })
+    const root = page.locator('.xg', { hasText: 'pallets/flask' })
     await expect(root).toBeInViewport({ timeout: 10_000 })
     const zoom = await page.evaluate(
       () => new DOMMatrix(getComputedStyle(document.querySelector('.react-flow__viewport')!).transform).a,
     )
-    expect(zoom).toBeGreaterThanOrEqual(0.7)
+    expect(zoom).toBeGreaterThanOrEqual(0.55)
     await expect(page.getByRole('tab', { name: /Problems/ })).not.toContainText('⚠')
 
     // switch the filter, then leave and come back through the list of imports
@@ -65,7 +76,7 @@ test.describe('with GitHub', () => {
       .getByRole('button', { name: /pallets\/flask/ })
       .first()
       .click()
-    await expect(page.locator('.xn-file').first()).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('.xt-file').first()).toBeVisible({ timeout: 30_000 })
   })
 })
 

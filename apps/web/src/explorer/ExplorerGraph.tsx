@@ -1,9 +1,8 @@
 import {
-  applyNodeChanges,
-  Background,
   BaseEdge,
-  EdgeLabelRenderer,
+  Background,
   Controls,
+  EdgeLabelRenderer,
   getBezierPath,
   MarkerType,
   MiniMap,
@@ -12,45 +11,24 @@ import {
   ReactFlowProvider,
   useReactFlow,
   type EdgeProps,
-  type NodeChange,
+  type ReactFlowInstance,
 } from '@xyflow/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useExplorer } from '../state/explorer'
-import { DirNode, FileNode } from './ExplorerNodes'
+import { CardNode, FileNode, FolderTile } from './ExplorerNodes'
 import {
+  absoluteRect,
   buildGraph,
   dirId,
-  FILE_W,
   fileId,
   languageCounts,
-  layoutGraph,
+  viewportFor,
+  type DepMode,
   type ExplorerEdge,
   type ExplorerNode,
 } from './graph'
 import { searchFiles } from './tree'
 
-function ContainsEdge({
-  id,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
-  selected,
-}: EdgeProps) {
-  const [path] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition })
-  return (
-    <BaseEdge
-      id={id}
-      path={path}
-      className={`xe xe-contains${selected ? ' selected' : ''}`}
-      interactionWidth={16}
-    />
-  )
-}
-
-const nodeTypes = { file: FileNode, dir: DirNode }
 function DependencyEdge({
   id,
   sourceX,
@@ -63,32 +41,23 @@ function DependencyEdge({
   data,
   markerEnd,
 }: EdgeProps<ExplorerEdge>) {
-  // Nodes in the same column: loop out of the right side and back into the target's right side, instead of
-  // a curve that doubles back across both nodes.
-  const sameColumn = Math.abs(sourceX - FILE_W - targetX) < 24 && Math.abs(sourceY - targetY) > 8
-  const bend = 46 + Math.min(80, Math.abs(targetY - sourceY) / 4)
-  const [bezier, bx, by] = getBezierPath({
+  const [path, lx, ly] = getBezierPath({
     sourceX,
     sourceY,
     targetX,
     targetY,
     sourcePosition,
     targetPosition,
+    curvature: 0.4,
   })
-  const rightX = targetX + FILE_W
-  const path = sameColumn
-    ? `M ${sourceX},${sourceY} C ${sourceX + bend},${sourceY} ${rightX + bend},${targetY} ${rightX},${targetY}`
-    : bezier
-  const lx = sameColumn ? Math.max(sourceX, rightX) + bend * 0.75 : bx
-  const ly = sameColumn ? (sourceY + targetY) / 2 : by
-  const conf = data?.confidence === 'heuristic' ? 'heuristic' : 'resolved'
+  const kind = data?.confidence === 'heuristic' ? 'heuristic' : 'resolved'
   return (
     <>
       <BaseEdge
         id={id}
         path={path}
         markerEnd={markerEnd}
-        className={`xe xe-dep xe-${conf}${data?.aggregated ? ' aggregated' : ''}${selected ? ' selected' : ''}`}
+        className={`xe xe-dep xe-${kind} dir-${data?.direction || 'none'}${data?.aggregated ? ' aggregated' : ''}${selected ? ' selected' : ''}`}
         interactionWidth={18}
       />
       {(data?.count ?? 0) > 1 && (
@@ -105,7 +74,32 @@ function DependencyEdge({
   )
 }
 
-const edgeTypes = { contains: ContainsEdge, dependency: DependencyEdge }
+const nodeTypes = { file: FileNode, folder: FolderTile, card: CardNode }
+const edgeTypes = { dependency: DependencyEdge }
+
+const DEP_MODES: [DepMode, string, string][] = [
+  ['selected', 'Selected file', 'Show what the selected file imports and what imports it'],
+  ['folders', 'Folders', 'Show the strongest links between the top-level folders'],
+  ['all', 'All', 'Show every dependency line (can be crowded)'],
+  ['off', 'Off', 'Show no dependency lines'],
+]
+
+type ShowOpts = { minZoom?: number; maxZoom?: number; margin?: number; duration?: number }
+
+/** Pan and zoom so the node `id` (a card or tile) fills the window as well as readability allows. */
+function showNode(
+  rf: ReactFlowInstance,
+  el: HTMLElement | null,
+  nodes: ExplorerNode[],
+  id: string,
+  o: ShowOpts = {},
+) {
+  const rect = absoluteRect(nodes, id)
+  if (!el || !rect) return
+  void rf.setViewport(viewportFor(rect, el.clientWidth, el.clientHeight, o.minZoom, o.maxZoom, o.margin), {
+    duration: o.duration ?? 200,
+  })
+}
 
 function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light' }) {
   const files = useExplorer((s) => s.files)
@@ -114,83 +108,86 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
   const codeOnly = useExplorer((s) => s.codeOnly)
   const selectedPath = useExplorer((s) => s.selectedPath)
   const focus = useExplorer((s) => s.focus)
+  const opened = useExplorer((s) => s.opened)
   const selectedEdge = useExplorer((s) => s.selectedEdge)
   const dependencies = useExplorer((s) => s.edges)
   const diagnostics = useExplorer((s) => s.diagnostics)
-  const showDeps = useExplorer((s) => s.showDeps)
+  const depMode = useExplorer((s) => s.depMode)
   const graphTruncated = useExplorer((s) => s.graphTruncated)
   const analysisStatus = useExplorer((s) => s.revision?.analysis_status)
-  const { selectFile, setSelectedEdge, reveal, toggleLanguage, clearLanguages, collapseAll, expandAll } =
+  const { setSelectedEdge, reveal, toggleLanguage, clearLanguages, collapseAll, expandAll } =
     useExplorer.getState()
   const rf = useReactFlow()
+  const canvas = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')
 
-  const built = useMemo(() => {
-    const g = buildGraph(files, repoName, {
-      expanded,
-      languages,
-      codeOnly,
-      dependencies: showDeps ? dependencies : [],
-      diagnostics,
-    })
-    return { ...g, nodes: layoutGraph(g.nodes, g.edges) }
-  }, [files, repoName, expanded, languages, codeOnly, dependencies, diagnostics, showDeps])
+  const built = useMemo(
+    () =>
+      buildGraph(files, repoName, {
+        expanded,
+        languages,
+        codeOnly,
+        dependencies,
+        diagnostics,
+        depMode,
+        selectedPath,
+      }),
+    [files, repoName, expanded, languages, codeOnly, dependencies, diagnostics, depMode, selectedPath],
+  )
 
-  // Positions are local so nodes can be dragged; a new layout (expand/filter) replaces them.
-  const [nodes, setNodes] = useState<ExplorerNode[]>(built.nodes)
-  const [layoutSeen, setLayoutSeen] = useState(built.nodes)
-  if (layoutSeen !== built.nodes) {
-    setLayoutSeen(built.nodes) // adopt the new layout during render, not in an effect
-    setNodes(built.nodes)
-  }
-  const onNodesChange = (changes: NodeChange<ExplorerNode>[]) =>
-    setNodes((ns) =>
-      applyNodeChanges(
-        changes.filter((c) => c.type !== 'select'),
-        ns,
-      ),
-    )
-
-  const shownNodes = useMemo(
-    () => nodes.map((n) => (n.id === fileId(selectedPath ?? '\0') ? { ...n, selected: true } : n)),
-    [nodes, selectedPath],
+  const nodes: ExplorerNode[] = useMemo(
+    () => built.nodes.map((n) => (n.id === fileId(selectedPath ?? '\0') ? { ...n, selected: true } : n)),
+    [built.nodes, selectedPath],
   )
   const edges: ExplorerEdge[] = useMemo(
     () =>
-      built.edges.map((e) => {
-        const withMarker =
-          e.type === 'dependency'
-            ? { ...e, markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 } }
-            : e
-        return e.id === selectedEdge ? { ...withMarker, selected: true } : withMarker
-      }),
+      built.edges.map((e) => ({
+        ...e,
+        markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 },
+        selected: e.id === selectedEdge,
+      })),
     [built.edges, selectedEdge],
   )
 
-  // Frame the repository root and what is directly inside it, at a readable zoom, when a repository opens
-  // or the filter changes. Expanding a folder keeps your view where it is.
+  // Show the whole repository card (or the top of it, if it is too big to read at once) when a repository opens
+  // or the filter changes.
   const fitKey = `${repoName}|${[...languages].join(',')}|${codeOnly}`
   const lastFit = useRef('')
   useEffect(() => {
-    // wait until the repository's files have arrived (a lone root node means they have not)
     if (lastFit.current === fitKey || built.nodes.length < 2) return
     lastFit.current = fitKey
-    const root = built.nodes.find((n) => n.id === dirId(''))
-    if (!root) return
-    // Readable zoom, with the repository root at the left and its contents filling the view
+    showNode(rf, canvas.current, built.nodes, dirId(''), { minZoom: 0.55, duration: 0 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitKey, built.nodes.length])
+
+  // When the user opens a folder, bring the whole of it into view (not when a repository opens with folders open).
+  useEffect(() => {
+    if (!opened || lastFit.current === '') return
     const t = setTimeout(
-      () => void rf.setCenter(root.position.x + 330, root.position.y + 24, { zoom: 0.85, duration: 200 }),
+      () =>
+        showNode(rf, canvas.current, built.nodes, dirId(opened.path), {
+          minZoom: 0.55,
+          margin: 40,
+          duration: 250,
+        }),
       30,
     )
     return () => clearTimeout(t)
-  }, [fitKey, built.nodes, rf])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened])
 
-  // centre on a revealed file once its node exists
+  // Centre on a revealed file once its tile exists.
   useEffect(() => {
     if (!focus) return
-    const n = built.nodes.find((x) => x.id === fileId(focus.path))
-    if (n) void rf.setCenter(n.position.x + 105, n.position.y + 29, { zoom: 1, duration: 300 })
-  }, [focus, built.nodes, rf])
+    const r = absoluteRect(built.nodes, fileId(focus.path))
+    const el = canvas.current
+    if (!r || !el) return
+    void rf.setViewport(
+      { x: el.clientWidth / 2 - (r.x + r.width / 2), y: el.clientHeight / 2 - (r.y + r.height / 2), zoom: 1 },
+      { duration: 300 },
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus])
 
   const hits = useMemo(() => searchFiles(files, query, 50), [files, query])
   const langs = useMemo(() => languageCounts(files).slice(0, 8), [files])
@@ -241,11 +238,20 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
             Code only
           </button>
         </div>
-        {codeOnly && (
-          <div className="muted small" role="status">
-            Showing source code only. Docs, configuration and data are hidden here but still in the file list.
-          </div>
-        )}
+        <div className="chips" role="group" aria-label="Dependency lines">
+          <span className="chips-label">Lines</span>
+          {DEP_MODES.map(([mode, label, tip]) => (
+            <button
+              key={mode}
+              className={`chip${depMode === mode ? ' on' : ''}`}
+              aria-pressed={depMode === mode}
+              title={tip}
+              onClick={() => useExplorer.getState().setDepMode(mode)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="chips" role="group" aria-label="Filter by language">
           {langs.map(([l, n]) => (
             <button
@@ -269,92 +275,102 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
             Collapse all
           </button>
         </div>
+        {codeOnly && (
+          <div className="muted small toolbar-note" role="status">
+            Showing source code only. Docs, configuration and data are hidden here but still in the file list.
+          </div>
+        )}
+        {depMode === 'selected' && !selectedPath && (
+          <div className="muted small toolbar-note">
+            Select a file to see what it imports and what imports it.
+          </div>
+        )}
       </div>
-      <div className="graph-canvas">
+      <div className="graph-canvas" ref={canvas}>
         <ReactFlow
-          nodes={shownNodes}
+          nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-          onNodesChange={onNodesChange}
-          onNodeClick={(_, n) => {
-            if (n.type === 'file') void selectFile(n.data.path)
-          }}
           onEdgeClick={(_, e) => setSelectedEdge(e.id)}
           onPaneClick={() => setSelectedEdge(null)}
+          nodesDraggable={false}
           nodesConnectable={false}
-          nodesFocusable={false} // our own nodes are the focus targets (Enter opens a file)
+          nodesFocusable={false}
           edgesFocusable={false}
+          zoomOnDoubleClick={false}
           aria-label="Repository graph"
           deleteKeyCode={null}
           colorMode={theme}
-          minZoom={0.05}
+          minZoom={0.1}
         >
-          <Background />
+          <Background gap={22} size={1.2} />
           <Controls showInteractive={false} />
-          {built.nodes.length > 12 && <MiniMap pannable zoomable />}
+          {built.nodes.length > 40 && (
+            <MiniMap
+              pannable
+              zoomable
+              nodeStrokeWidth={0}
+              nodeColor={(n) => (n.type === 'card' ? 'var(--border-strong)' : 'var(--accent)')}
+            />
+          )}
           <Panel position="bottom-left" className="graph-legend" aria-label="Legend">
-            <label className="legend-toggle">
-              <input
-                type="checkbox"
-                checked={showDeps}
-                onChange={(e) => useExplorer.getState().setShowDeps(e.target.checked)}
-              />{' '}
-              Show dependencies
-            </label>
             <details className="legend-details">
               <summary>Legend</summary>
+              <div>Cards are folders; tiles are files. Click a ▸ folder tile to open it.</div>
               <div>
                 <svg width="28" height="8" aria-hidden="true">
-                  <path d="M0 4 H28" className="xe-contains" />
+                  <path d="M0 4 H28" className="xe-dep dir-out" />
                 </svg>{' '}
-                Folder contains item (structure)
+                What the selected file imports or calls
               </div>
-              {hasDeps && (
-                <>
-                  <div>
-                    <svg width="28" height="8" aria-hidden="true">
-                      <path d="M0 4 H28" className="xe-dep xe-resolved" />
-                    </svg>{' '}
-                    Imports / references (resolved to a file)
-                  </div>
-                  <div>
-                    <svg width="28" height="8" aria-hidden="true">
-                      <path d="M0 4 H28" className="xe-dep xe-heuristic" />
-                    </svg>{' '}
-                    Heuristic (name match, not proven)
-                  </div>
-                  <div className="muted">A number is how many relations an edge stands for.</div>
-                </>
-              )}
+              <div>
+                <svg width="28" height="8" aria-hidden="true">
+                  <path d="M0 4 H28" className="xe-dep dir-in" />
+                </svg>{' '}
+                What imports the selected file
+              </div>
+              <div>
+                <svg width="28" height="8" aria-hidden="true">
+                  <path d="M0 4 H28" className="xe-dep xe-heuristic" />
+                </svg>{' '}
+                Heuristic (name match, not proven)
+              </div>
+              <div className="muted">A number is how many relations a line stands for.</div>
             </details>
             {analysisStatus === 'analyzing' && <div role="status">Analyzing dependencies…</div>}
             {analysisStatus === 'failed' && (
-              <div role="alert">Analysis failed; dependency edges are unavailable.</div>
+              <div role="alert">Analysis failed; dependency lines are unavailable.</div>
             )}
             {analysisStatus === 'partial' && (
               <div className="muted">Analysis hit its time budget; some files were not analyzed.</div>
             )}
-            {(analysisStatus === 'done' || analysisStatus === 'partial') && !hasDeps && showDeps && (
-              <div className="muted">No dependencies between the visible nodes.</div>
-            )}
+            {(analysisStatus === 'done' || analysisStatus === 'partial') &&
+              !hasDeps &&
+              depMode !== 'off' &&
+              depMode !== 'selected' && (
+                <div className="muted">No dependencies between the visible items.</div>
+              )}
+            {depMode === 'selected' &&
+              selectedPath &&
+              !hasDeps &&
+              (analysisStatus === 'done' || analysisStatus === 'partial') && (
+                <div className="muted">This file has no resolved dependencies in the repository.</div>
+              )}
             {graphTruncated && (
-              <div className="muted">Very large repository: only the first edges are loaded.</div>
+              <div className="muted">Very large repository: only the first relations are loaded.</div>
             )}
-            {selectedEdgeData?.kind === 'contains' && (
-              <div role="status">
-                <strong>Selected:</strong> {nameOf(selectedEdgeData.from)} contains{' '}
-                {nameOf(selectedEdgeData.to)}. This is folder structure, not a dependency.
-              </div>
+            {built.hiddenDependencyEdges > 0 && (
+              <div className="muted">{built.hiddenDependencyEdges} more lines are not drawn.</div>
             )}
-            {selectedEdgeData?.kind === 'dependency' && (
+            {selectedEdgeData && (
               <div role="status" className="edge-detail">
                 <strong>
                   {nameOf(selectedEdgeData.from)} → {nameOf(selectedEdgeData.to)}
                 </strong>
                 {selectedEdgeData.aggregated && (
                   <div className="muted">
-                    Includes files inside collapsed folders. Expand them to see each edge.
+                    Includes files inside collapsed folders. Open them to see each line.
                   </div>
                 )}
                 <ul>
@@ -383,7 +399,7 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
           </Panel>
           {built.truncated && (
             <Panel position="top-right" className="graph-notice" role="status">
-              Showing {built.nodes.length} nodes; {built.hiddenNodes} more are hidden. Collapse folders or
+              Showing {built.nodes.length} items; {built.hiddenNodes} more are hidden. Collapse folders or
               filter by language to see them.
             </Panel>
           )}

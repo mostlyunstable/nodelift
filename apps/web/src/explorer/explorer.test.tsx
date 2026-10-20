@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api, ApiError, type RepoRevision } from '../api/client'
 import { useExplorer } from '../state/explorer'
+import { fileId } from './graph'
 import { ExplorerView } from './ExplorerView'
 
 vi.mock('@monaco-editor/react', () => ({
@@ -180,14 +181,14 @@ describe('Repository Explorer', () => {
         tab: 'graph',
       })
 
-    it('shows real files as nodes and folders collapsed, with a structure-only legend', () => {
+    it('shows files as tiles and folders as tiles you can open, with a legend', () => {
       ready()
       render(<ExplorerView theme="dark" />)
       expect(screen.getByText('main.py', { selector: '.xn-open' })).toBeInTheDocument()
       expect(screen.getByLabelText(/^Expand src/)).toBeInTheDocument()
       expect(screen.queryByText('app.py', { selector: '.xn-open' })).not.toBeInTheDocument()
-      expect(screen.getByText(/Folder contains item/)).toBeInTheDocument()
-      expect(screen.getByText(/No dependencies between the visible nodes/)).toBeInTheDocument()
+      expect(screen.getByText(/Cards are folders; tiles are files/)).toBeInTheDocument()
+      expect(screen.getByText(/Select a file to see what it imports/)).toBeInTheDocument()
     })
 
     it('expands a folder on demand', () => {
@@ -241,15 +242,23 @@ describe('Repository Explorer', () => {
       expect(screen.queryByLabelText(/^Expand docs/)).not.toBeInTheDocument()
     })
 
-    it('selecting an edge explains it is structure, not a dependency', () => {
+    it('selecting a line lists the exact relations behind it, each openable at its line', async () => {
+      const rel = {
+        src: 'main.py',
+        dst: 'src/app.py',
+        kind: 'import',
+        confidence: 'resolved',
+        line: 3,
+        raw: 'app',
+        provenance: 'python.ast',
+        note: null,
+      }
       ready()
+      useExplorer.setState({ edges: [rel], depMode: 'all', expanded: new Set(['', 'src']) })
       render(<ExplorerView theme="dark" />)
-      act(() => useExplorerEdge())
-      expect(screen.getByText(/not a dependency/)).toBeInTheDocument()
+      act(() => useExplorer.getState().setSelectedEdge(`x:${fileId('main.py')}>${fileId('src/app.py')}`))
+      expect(screen.getByText(/python\.ast/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'main.py:3' })).toBeInTheDocument()
     })
   })
 })
-
-function useExplorerEdge() {
-  useExplorer.getState().setSelectedEdge('e:d:>d:src')
-}

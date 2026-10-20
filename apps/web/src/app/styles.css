@@ -1,66 +1,72 @@
 /* ---------- design tokens ----------
-   Components use only these. Dark is the default; [data-theme='light'] overrides them. */
+   Components use only these. A warm, calm palette: paper-like in light, charcoal in dark.
+   Follows the system by default; [data-theme] forces one. */
 :root {
-  --bg: #0d1117;
-  --surface: #161b22;
-  --raised: #1c2330;
-  --hover: #21262d;
-  --border: #30363d;
-  --border-strong: #484f58;
-  --text: #e6edf3;
-  --text-muted: #9aa4af;
-  --accent: #58a6ff;
-  --accent-bg: #12304f;
-  --accent-fg: #79c0ff;
-  --focus: #79c0ff;
-  --success: #3fb950;
-  --success-bg: #1a4d2a;
-  --success-fg: #7ee787;
-  --danger: #f85149;
-  --danger-bg: #3b1219;
-  --danger-border: #6e2a30;
-  --danger-fg: #ffa198;
-  --warning: #d29922;
-  --warning-bg: #4a3a10;
-  --warning-fg: #e3b341;
-  --neutral-bg: #30363d;
-  --primary: #238636;
-  --primary-border: #2ea043;
-  --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-  --radius: 6px;
-  --radius-lg: 10px;
-  --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --bg: #262624;
+  --surface: #2e2d2a;
+  --raised: #353430;
+  --hover: #3d3c37;
+  --border: #46443e;
+  --border-strong: #6a675d;
+  --text: #f2f0e8;
+  --text-muted: #b5b2a6;
+  --accent: #e08a66;
+  --accent-bg: #4a322a;
+  --accent-fg: #f0a688;
+  --focus: #f0a688;
+  --success: #7fbf8b;
+  --success-bg: #25382a;
+  --success-fg: #a6d8ae;
+  --danger: #e8786b;
+  --danger-bg: #3f2522;
+  --danger-border: #7a3c35;
+  --danger-fg: #f2a59b;
+  --warning: #d9a441;
+  --warning-bg: #3f3318;
+  --warning-fg: #e9c06e;
+  --info: #8aa6c8;
+  --neutral-bg: #3d3c37;
+  --primary: #b8532f;
+  --primary-border: #d2704a;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --radius: 8px;
+  --radius-lg: 14px;
+  --font-ui: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Inter, sans-serif;
+  --font-serif: ui-serif, 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-family: var(--font-ui);
   color-scheme: dark;
 }
 :root[data-theme='light'] {
-  --bg: #ffffff;
-  --surface: #f6f8fa;
+  --bg: #faf9f5;
+  --surface: #f5f4ee;
   --raised: #ffffff;
-  --hover: #eaeef2;
-  --border: #d0d7de;
-  --border-strong: #8c959f;
-  --text: #1f2328;
-  --text-muted: #59636e;
-  --accent: #0969da;
-  --accent-bg: #ddf4ff;
-  --accent-fg: #0550ae;
-  --focus: #0969da;
-  --success: #1a7f37;
-  --success-bg: #dafbe1;
-  --success-fg: #116329;
-  --danger: #cf222e;
-  --danger-bg: #ffebe9;
-  --danger-border: #ff8182;
-  --danger-fg: #a40e26;
-  --warning: #9a6700;
-  --warning-bg: #fff8c5;
-  --warning-fg: #7d4e00;
-  --neutral-bg: #eaeef2;
-  --primary: #1f883d;
-  --primary-border: #1a7f37;
-  --shadow: 0 8px 24px rgba(31, 35, 40, 0.18);
+  --hover: #efede4;
+  --border: #e6e3d8;
+  --border-strong: #c3bfae;
+  --text: #1f1e1d;
+  --text-muted: #6b6a63;
+  --accent: #b8532f;
+  --accent-bg: #f6e7df;
+  --accent-fg: #9a4524;
+  --focus: #b8532f;
+  --success: #3f7d4b;
+  --success-bg: #e4f0e3;
+  --success-fg: #2b5e37;
+  --danger: #b3382c;
+  --danger-bg: #fbe9e6;
+  --danger-border: #e8b4ab;
+  --danger-fg: #92271d;
+  --warning: #8a5a00;
+  --warning-bg: #fbf0d8;
+  --warning-fg: #6e4800;
+  --info: #4f6b8c;
+  --neutral-bg: #edeae0;
+  --primary: #b8532f;
+  --primary-border: #a04827;
+  --shadow: 0 8px 28px rgba(31, 30, 29, 0.12);
+  --shadow-sm: 0 1px 2px rgba(31, 30, 29, 0.06);
   color-scheme: light;
 }
 
@@ -74,7 +80,9 @@ body,
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 :focus-visible {
   outline: 2px solid var(--focus);
@@ -1726,4 +1734,437 @@ textarea:focus-visible {
 }
 .editor {
   min-height: 240px;
+}
+
+/* ---------- explorer graph v2: folder cards and file tiles ---------- */
+.xg {
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  position: relative;
+}
+.xg-root {
+  border-color: var(--border-strong);
+}
+.xg-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+.xg-title {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 15px;
+}
+.xg-toggle {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text);
+  cursor: pointer;
+}
+.xt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--raised);
+  font-size: 12px;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+.xt:hover {
+  border-color: var(--border-strong);
+}
+.xt-file.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.xt-file.unreadable {
+  opacity: 0.75;
+}
+.xt-folder {
+  background: transparent;
+  border-style: dashed;
+}
+.xt-folder-icon {
+  width: 14px;
+  color: var(--text-muted);
+}
+.xt-text {
+  flex: 1;
+  min-width: 0;
+}
+.xt-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.xt .xn-open {
+  display: block;
+  width: 100%;
+  font-size: 13px;
+}
+.xt .react-flow__handle,
+.xg .react-flow__handle {
+  width: 6px;
+  height: 6px;
+  min-width: 0;
+  min-height: 0;
+  background: var(--border-strong);
+  border: 0;
+}
+.xe-dep,
+.xe-dep.react-flow__edge-path {
+  fill: none;
+  stroke-width: 1.6;
+}
+.xe-dep.dir-out,
+path.xe-dep.dir-out,
+.xe-dep.dir-none {
+  stroke: var(--accent);
+}
+.xe-dep.dir-in,
+path.xe-dep.dir-in {
+  stroke: var(--info, #5b7fa6);
+}
+.xe-dep.xe-heuristic,
+path.xe-dep.xe-heuristic {
+  stroke-dasharray: 2 4;
+}
+.xe-dep.aggregated {
+  stroke-width: 2.4;
+}
+.chips-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.toolbar-note {
+  flex-basis: 100%;
+}
+
+/* =====================================================================================
+   Look and feel: calm, warm, generous. Serif for titles, soft shapes, one accent.
+   ===================================================================================== */
+h1,
+h2.title,
+.empty-canvas h2,
+.explorer-welcome h2,
+.dialog h2,
+.dialog-head h2,
+.palette-title,
+.brand,
+.rev-card > strong {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.empty-canvas h2,
+.explorer-welcome h2 {
+  font-size: 26px;
+  line-height: 1.2;
+}
+.brand {
+  font-size: 17px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.brand::before {
+  content: '';
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 30% 30%, #fff 0 14%, transparent 15%),
+    radial-gradient(circle at 72% 68%, #fff 0 14%, transparent 15%),
+    linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 70%, #000));
+}
+
+/* controls */
+button {
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 13px;
+  box-shadow: var(--shadow-sm);
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+button:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--border-strong);
+}
+button.primary {
+  background: var(--primary);
+  border-color: var(--primary-border);
+  color: #fff;
+  font-weight: 600;
+}
+button.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 88%, #000);
+  border-color: var(--primary-border);
+}
+.icon-button,
+.link-button,
+.tabs button,
+.subtabs button,
+.mode-switch button,
+.xn-open,
+.xg-toggle,
+.tree-row,
+.row-button {
+  box-shadow: none;
+}
+.link-button {
+  color: var(--accent-fg);
+}
+input,
+textarea,
+select {
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 7px 10px;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline-offset: 0;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+/* top bar */
+.toolbar {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  gap: 10px;
+}
+.mode-switch {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+  margin: 0 6px;
+  gap: 2px;
+  overflow: visible;
+}
+.mode-switch button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 4px 14px;
+  color: var(--text-muted);
+}
+.mode-switch button[aria-selected='true'] {
+  background: var(--raised);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+}
+.tabs,
+.subtabs {
+  gap: 4px;
+}
+.tabs button,
+.subtabs button {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--text-muted);
+  padding: 8px 12px;
+}
+.tabs button[aria-selected='true'],
+.subtabs button[aria-selected='true'] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.tabs button:hover:not(:disabled),
+.subtabs button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+/* surfaces */
+.explorer-side,
+.inspector,
+.runpanel,
+.tabs,
+.crumbs,
+.panel-bar,
+.viewer-head,
+.graph-toolbar {
+  background: var(--surface);
+}
+.rev-card,
+.suggestion,
+.run-output,
+.edge-detail,
+.graph-legend,
+.graph-notice {
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.rev-card {
+  padding: 12px 14px;
+}
+.rev-card > strong {
+  font-size: 17px;
+}
+.chip {
+  border-radius: 999px;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  padding: 2px 11px;
+  box-shadow: none;
+}
+.chip.on {
+  background: var(--accent-bg);
+  color: var(--accent-fg);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.dialog {
+  border-radius: 18px;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.overlay {
+  background: color-mix(in srgb, var(--bg) 55%, rgba(0, 0, 0, 0.45));
+  backdrop-filter: blur(3px);
+}
+.menu-list,
+.palette-results,
+.graph-hits {
+  border-radius: 12px;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.tour {
+  border-radius: var(--radius-lg);
+}
+.toast {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+/* the workflow canvas */
+.react-flow {
+  --xy-background-color: var(--bg);
+  --xy-background-pattern-dots-color-default: var(--border-strong);
+  --xy-edge-stroke-default: var(--border-strong);
+  --xy-edge-stroke-selected-default: var(--accent);
+  --xy-controls-button-background-color-default: var(--raised);
+  --xy-controls-button-background-color-hover-default: var(--hover);
+  --xy-controls-button-color-default: var(--text);
+  --xy-controls-button-border-color-default: var(--border);
+  --xy-minimap-background-color-default: var(--raised);
+  --xy-minimap-mask-background-color-default: color-mix(in srgb, var(--bg) 70%, transparent);
+  --xy-attribution-background-color-default: transparent;
+  background: var(--bg);
+}
+.react-flow__controls {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.react-flow__minimap {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.react-flow__attribution {
+  opacity: 0.7;
+}
+.code-node {
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  padding: 10px 14px;
+}
+.code-node:hover {
+  border-color: var(--border-strong);
+}
+.code-node.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.code-node-badge,
+.xn-badge {
+  background: var(--accent-bg);
+  color: var(--accent-fg);
+  border-radius: 6px;
+}
+.code-node-title {
+  font-weight: 600;
+}
+
+/* explorer cards and tiles */
+.xg {
+  background: color-mix(in srgb, var(--raised) 55%, transparent);
+  border-radius: 18px;
+}
+.xt {
+  background: var(--raised);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+.xt-folder {
+  background: transparent;
+  box-shadow: none;
+}
+.xt-file.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.crumbs {
+  padding: 8px 14px;
+}
+.back-button {
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+
+/* quieter scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+/* React Flow turns pointer events off on nodes that are neither draggable nor selectable; their buttons must still click. */
+.react-flow__node button,
+.react-flow__node input {
+  pointer-events: auto;
 }

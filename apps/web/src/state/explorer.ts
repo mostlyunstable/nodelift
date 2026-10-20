@@ -5,6 +5,7 @@ import {
   defaultExpanded,
   INITIAL_CAP,
   isCode,
+  type DepMode,
   shouldDefaultToCodeOnly,
 } from '../explorer/graph'
 import {
@@ -34,13 +35,14 @@ interface ExplorerState {
   edges: RepoEdge[]
   diagnostics: RepoDiagnostic[]
   graphTruncated: boolean
-  showDeps: boolean
-  setShowDeps: (v: boolean) => void
+  depMode: DepMode
+  setDepMode: (m: DepMode) => void
   selectedPath: string | null
   tab: ExplorerTab
   setTab: (t: ExplorerTab) => void
   expanded: ReadonlySet<string>
   toggleDir: (path: string) => void
+  opened: { path: string; n: number } | null // the folder the user just opened (the graph brings it into view)
   collapseAll: () => void
   codeOnly: boolean
   setCodeOnly: (v: boolean) => void
@@ -142,17 +144,22 @@ export const useExplorer = create<ExplorerState>((set, get) => {
     edges: [],
     diagnostics: [],
     graphTruncated: false,
-    showDeps: true,
-    setShowDeps: (showDeps) => set({ showDeps }),
+    depMode: 'selected',
+    setDepMode: (depMode) => set({ depMode }),
     selectedPath: null,
     tab: 'graph',
     setTab: (tab) => set({ tab }),
     expanded: ROOT_OPEN(),
+    opened: null,
     toggleDir: (path) =>
       set((st) => {
         const next = new Set(st.expanded)
-        if (!next.delete(path)) next.add(path)
-        return { expanded: next }
+        const opening = !next.delete(path)
+        if (opening) next.add(path)
+        return {
+          expanded: next,
+          opened: opening ? { path, n: (st.opened?.n ?? 0) + 1 } : st.opened,
+        }
       }),
     collapseAll: () => set({ expanded: ROOT_OPEN() }),
     codeOnly: false,

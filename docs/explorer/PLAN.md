@@ -202,3 +202,9 @@ stray global heading style that shrank dialog titles; same-column dependency lin
 import progress and results announced to screen readers.
 `pnpm e2e` now fails on any axe violation (both themes, every screen) and tests the keyboard flows. **Not covered by automation:** how a screen reader reads the graph canvas (the file
 list and Details are the intended accessible route), Monaco's own accessibility, and the sandboxed HTML preview.
+
+## Graph v2 and the new look (2026-10-20)
+Why: the graph was a long strip joined by a tangle of lines, and the interface felt like a generic dark dashboard. See ADR 0012 for the graph.
+**Design system:** a warm, calm palette (paper `#faf9f5` and charcoal `#262624`), one coral accent (`#b8532f`, AA with white text), serif titles
+(system serif stack), soft 8–18 px shapes, pill tabs and chips, a quiet canvas, matching Monaco themes. It is original work in that spirit, with no
+borrowed assets or marks. Every screen is still checked by axe in both themes (`pnpm e2e`).
