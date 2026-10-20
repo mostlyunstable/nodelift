@@ -100,7 +100,7 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
   const showDeps = useExplorer((s) => s.showDeps)
   const graphTruncated = useExplorer((s) => s.graphTruncated)
   const analysisStatus = useExplorer((s) => s.revision?.analysis_status)
-  const { selectFile, setSelectedEdge, reveal, toggleLanguage, clearLanguages, collapseAll } =
+  const { selectFile, setSelectedEdge, reveal, toggleLanguage, clearLanguages, collapseAll, expandAll } =
     useExplorer.getState()
   const rf = useReactFlow()
   const [query, setQuery] = useState('')
@@ -237,6 +237,9 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
               Clear
             </button>
           )}
+          <button className="link-button" onClick={expandAll}>
+            Expand all
+          </button>
           <button className="link-button" onClick={collapseAll}>
             Collapse all
           </button>

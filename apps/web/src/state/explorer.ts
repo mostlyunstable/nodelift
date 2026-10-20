@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { ancestorDirs } from '../explorer/graph'
+import { allDirs, ancestorDirs, defaultExpanded } from '../explorer/graph'
 import {
   api,
   ApiError,
@@ -35,6 +35,7 @@ interface ExplorerState {
   expanded: ReadonlySet<string>
   toggleDir: (path: string) => void
   collapseAll: () => void
+  expandAll: () => void
   languages: ReadonlySet<string>
   toggleLanguage: (l: string) => void
   clearLanguages: () => void
@@ -90,7 +91,8 @@ export const useExplorer = create<ExplorerState>((set, get) => {
         if (get().files.length === 0) {
           const files = await api.explorerFiles(id)
           if (mine !== generation) return
-          set({ files })
+          // the file nodes should simply be there when the import finishes
+          set({ files, expanded: defaultExpanded(files) })
         }
         if (rev.analysis_status === 'not_analyzed') {
           // imported before analysis existed (or analysis was never started): static analysis only reads files
@@ -139,6 +141,7 @@ export const useExplorer = create<ExplorerState>((set, get) => {
         return { expanded: next }
       }),
     collapseAll: () => set({ expanded: ROOT_OPEN() }),
+    expandAll: () => set((st) => ({ expanded: allDirs(st.files) })),
     languages: new Set(),
     toggleLanguage: (l) =>
       set((st) => {

@@ -33,11 +33,23 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
             placeholder="https://github.com/owner/repo"
             value={e.url}
             onChange={(ev) => e.setUrl(ev.target.value)}
+            onPaste={(ev) => {
+              // pasting a repository link starts the import straight away
+              const text = ev.clipboardData.getData('text').trim()
+              if (/^(https:\/\/)?(www\.)?github\.com\/[^/\s]+\/[^/\s]+/i.test(text)) {
+                ev.preventDefault()
+                e.setUrl(text)
+                void useExplorer.getState().showNodes()
+              }
+            }}
           />
           <button className="primary" type="submit" disabled={e.starting || !e.url.trim()}>
             {e.starting ? 'Checking…' : 'Show Nodes'}
           </button>
-          <p className="muted small">Public repositories only. Nothing from the repository is ever run.</p>
+          <p className="muted small">
+            Paste a link and the nodes are made. Public repositories only; nothing from the repository is ever
+            run.
+          </p>
         </form>
 
         {e.error && (

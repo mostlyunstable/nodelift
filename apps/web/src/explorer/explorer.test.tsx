@@ -102,6 +102,28 @@ describe('Repository Explorer', () => {
     expect(api.explorerImport).toHaveBeenCalledWith('https://github.com/octo/hello')
   })
 
+  it('pasting a GitHub link starts the import without pressing the button', async () => {
+    vi.spyOn(api, 'explorerImport').mockResolvedValue(rev())
+    vi.spyOn(api, 'explorerRevision').mockResolvedValue(rev())
+    vi.spyOn(api, 'explorerFiles').mockResolvedValue([file('main.py')])
+    render(<ExplorerView theme="dark" />)
+    fireEvent.paste(screen.getByLabelText('GitHub repository'), {
+      clipboardData: { getData: () => 'https://github.com/octo/hello' },
+    })
+    await waitFor(() => expect(api.explorerImport).toHaveBeenCalledWith('https://github.com/octo/hello'))
+    // ...and the file is already a node, with no folder to open first
+    expect(await screen.findByText('main.py', { selector: '.xn-name' })).toBeInTheDocument()
+  })
+
+  it('does not import when pasting something that is not a GitHub link', () => {
+    vi.spyOn(api, 'explorerImport').mockResolvedValue(rev())
+    render(<ExplorerView theme="dark" />)
+    fireEvent.paste(screen.getByLabelText('GitHub repository'), {
+      clipboardData: { getData: () => 'hello world' },
+    })
+    expect(api.explorerImport).not.toHaveBeenCalled()
+  })
+
   it('shows the API error for an invalid or unavailable repository', async () => {
     vi.spyOn(api, 'explorerImport').mockRejectedValue(
       new ApiError('Only github.com repositories are supported', 422, 'invalid_repo_url'),

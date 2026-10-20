@@ -286,3 +286,33 @@ export function languageCounts(files: RepoFile[]): [string, number][] {
   for (const f of files) m.set(f.language, (m.get(f.language) ?? 0) + 1)
   return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
 }
+
+/**
+ * Folders to open when a repository first appears, so its files are already nodes: open level by
+ * level, smallest folders first, until the node cap would be exceeded.
+ */
+export function defaultExpanded(files: RepoFile[], cap = DEFAULT_CAP): Set<string> {
+  const root = buildTree(files)
+  const open = new Set([''])
+  let total = 1 + root.children.length
+  let frontier = root.children.filter((c): c is TreeDir => c.kind === 'dir')
+  while (frontier.length > 0) {
+    frontier.sort((a, b) => a.children.length - b.children.length)
+    const next: TreeDir[] = []
+    for (const d of frontier) {
+      if (total + d.children.length > cap) continue
+      open.add(d.path)
+      total += d.children.length
+      next.push(...d.children.filter((c): c is TreeDir => c.kind === 'dir'))
+    }
+    frontier = next
+  }
+  return open
+}
+
+/** Every folder path, for "Expand all". The node cap still applies when drawing. */
+export function allDirs(files: RepoFile[]): Set<string> {
+  const out = new Set([''])
+  for (const f of files) for (const d of ancestorDirs(f.path)) out.add(d)
+  return out
+}

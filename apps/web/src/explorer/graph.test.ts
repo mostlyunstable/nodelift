@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { RepoEdge, RepoFile } from '../api/client'
 import {
+  allDirs,
   ancestorDirs,
   buildGraph,
+  defaultExpanded,
   dirId,
   fileId,
   languageCounts,
@@ -244,5 +246,29 @@ describe('dependency edges', () => {
     const withDeps = buildGraph(files, 'r', opts({ expanded: open, dependencies: deps }))
     const laid = layoutGraph(withDeps.nodes, withDeps.edges)
     expect(laid.map((n) => [n.id, n.position])).toEqual(plain.map((n) => [n.id, n.position]))
+  })
+})
+
+describe('defaultExpanded', () => {
+  it('opens every folder of a small repository so all files are nodes', () => {
+    const open = defaultExpanded(files)
+    expect(open).toEqual(new Set(['', 'src', 'src/deep', 'docs']))
+    const g = buildGraph(files, 'r', { expanded: open, languages: new Set() })
+    expect(g.nodes.filter((n) => n.type === 'file').length).toBe(files.length)
+    expect(g.truncated).toBe(false)
+  })
+
+  it('stops opening folders before the node cap, keeping the result drawable', () => {
+    const big = Array.from({ length: 400 }, (_, i) => f(`a/f${i}.py`, 'python'))
+    const small = [f('b/x.py'), f('b/y.py')]
+    const open = defaultExpanded([...big, ...small], 50)
+    expect(open.has('a')).toBe(false) // 400 files would blow the cap
+    expect(open.has('b')).toBe(true) // the small folder still opens
+    const g = buildGraph([...big, ...small], 'r', { expanded: open, languages: new Set(), cap: 50 })
+    expect(g.truncated).toBe(false)
+  })
+
+  it('allDirs lists every folder', () => {
+    expect(allDirs(files)).toEqual(new Set(['', 'src', 'src/deep', 'docs']))
   })
 })
