@@ -181,13 +181,13 @@ describe('Repository Explorer', () => {
         tab: 'graph',
       })
 
-    it('shows files as tiles and folders as tiles you can open, with a legend', () => {
+    it('shows files as round nodes and folders as hubs you can open, with a legend', () => {
       ready()
       render(<ExplorerView theme="dark" />)
       expect(screen.getByText('main.py', { selector: '.xn-open' })).toBeInTheDocument()
       expect(screen.getByLabelText(/^Expand src/)).toBeInTheDocument()
       expect(screen.queryByText('app.py', { selector: '.xn-open' })).not.toBeInTheDocument()
-      expect(screen.getByText(/Cards are folders; tiles are files/)).toBeInTheDocument()
+      expect(screen.getByText(/Big circles are folders, small ones are files/)).toBeInTheDocument()
     })
 
     it('expands a folder on demand', () => {

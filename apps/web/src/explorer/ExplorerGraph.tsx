@@ -3,29 +3,30 @@ import {
   Background,
   Controls,
   EdgeLabelRenderer,
-  getBezierPath,
   MarkerType,
   MiniMap,
   Panel,
   ReactFlow,
   ReactFlowProvider,
+  useInternalNode,
   useReactFlow,
   type EdgeProps,
   type ReactFlowInstance,
 } from '@xyflow/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useExplorer } from '../state/explorer'
-import { CardNode, FileNode, FolderTile } from './ExplorerNodes'
+import { FileNode, FolderNode } from './ExplorerNodes'
 import {
   absoluteRect,
+  boundsOf,
   buildGraph,
-  dirId,
   fileId,
   languageCounts,
   viewportFor,
   type DepMode,
   type ExplorerEdge,
   type ExplorerNode,
+  type Rect,
 } from './graph'
 import { searchFiles } from './tree'
 
@@ -35,21 +36,22 @@ function DependencyEdge({
   sourceY,
   targetX,
   targetY,
-  sourcePosition,
-  targetPosition,
+  target,
   selected,
   data,
   markerEnd,
 }: EdgeProps<ExplorerEdge>) {
-  const [path, lx, ly] = getBezierPath({
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    sourcePosition,
-    targetPosition,
-    curvature: 0.4,
-  })
+  // Lines run between the centres of two circles, so stop at the edge of the target one, where the arrowhead can be seen.
+  const radius = (useInternalNode(target)?.measured.width ?? 28) / 2 + 3
+  const dx = targetX - sourceX
+  const dy = targetY - sourceY
+  const len = Math.max(1, Math.hypot(dx, dy))
+  const tx = targetX - (dx / len) * radius
+  const ty = targetY - (dy / len) * radius
+  const bend = Math.min(60, len * 0.15)
+  const lx = (sourceX + tx) / 2 - (dy / len) * bend
+  const ly = (sourceY + ty) / 2 + (dx / len) * bend
+  const path = `M ${sourceX} ${sourceY} Q ${lx} ${ly} ${tx} ${ty}`
   const kind = data?.confidence === 'heuristic' ? 'heuristic' : 'resolved'
   return (
     <>
@@ -74,8 +76,13 @@ function DependencyEdge({
   )
 }
 
-const nodeTypes = { file: FileNode, folder: FolderTile, card: CardNode }
-const edgeTypes = { dependency: DependencyEdge }
+/** The thin line from a folder to what it holds. */
+function TreeEdge({ id, sourceX, sourceY, targetX, targetY }: EdgeProps<ExplorerEdge>) {
+  return <BaseEdge id={id} path={`M ${sourceX} ${sourceY} L ${targetX} ${targetY}`} className="xe-tree" />
+}
+
+const nodeTypes = { file: FileNode, folder: FolderNode }
+const edgeTypes = { dependency: DependencyEdge, tree: TreeEdge }
 
 const DEP_MODES: [DepMode, string, string][] = [
   ['selected', 'Selected file', 'Show what the selected file imports and what imports it'],
@@ -86,19 +93,18 @@ const DEP_MODES: [DepMode, string, string][] = [
 
 type ShowOpts = { minZoom?: number; maxZoom?: number; margin?: number; duration?: number }
 
-/** Pan and zoom so the node `id` (a card or tile) fills the window as well as readability allows. */
-function showNode(
-  rf: ReactFlowInstance,
-  el: HTMLElement | null,
-  nodes: ExplorerNode[],
-  id: string,
-  o: ShowOpts = {},
-) {
-  const rect = absoluteRect(nodes, id)
+/** Pan and zoom so `rect` fills the window as well as readability allows. */
+function showRect(rf: ReactFlowInstance, el: HTMLElement | null, rect: Rect | null, o: ShowOpts = {}) {
   if (!el || !rect) return
   void rf.setViewport(viewportFor(rect, el.clientWidth, el.clientHeight, o.minZoom, o.maxZoom, o.margin), {
     duration: o.duration ?? 200,
   })
+}
+
+/** A folder's hub together with everything opened around it. */
+function boundsUnder(nodes: ExplorerNode[], path: string): Rect | null {
+  const prefix = path === '' ? '' : `${path}/`
+  return boundsOf(nodes.filter((n) => n.data.path === path || n.data.path.startsWith(prefix)))
 }
 
 function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light' }) {
@@ -144,7 +150,9 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
     () =>
       built.edges.map((e) => ({
         ...e,
-        markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 },
+        ...(e.data?.kind === 'dependency'
+          ? { markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 } }
+          : {}),
         selected: e.id === selectedEdge,
       })),
     [built.edges, selectedEdge],
@@ -157,7 +165,7 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
   useEffect(() => {
     if (lastFit.current === fitKey || built.nodes.length < 2) return
     lastFit.current = fitKey
-    showNode(rf, canvas.current, built.nodes, dirId(''), { minZoom: 0.55, duration: 0 })
+    showRect(rf, canvas.current, boundsOf(built.nodes), { minZoom: 0.2, duration: 0 })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitKey, built.nodes.length])
 
@@ -166,8 +174,8 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
     if (!opened || lastFit.current === '') return
     const t = setTimeout(
       () =>
-        showNode(rf, canvas.current, built.nodes, dirId(opened.path), {
-          minZoom: 0.55,
+        showRect(rf, canvas.current, boundsUnder(built.nodes, opened.path), {
+          minZoom: 0.45,
           margin: 40,
           duration: 250,
         }),
@@ -312,13 +320,15 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
               pannable
               zoomable
               nodeStrokeWidth={0}
-              nodeColor={(n) => (n.type === 'card' ? 'var(--border-strong)' : 'var(--accent)')}
+              nodeColor={(n) => (n.type === 'folder' ? 'var(--border-strong)' : 'var(--accent)')}
             />
           )}
           <Panel position="bottom-left" className="graph-legend" aria-label="Legend">
             <details className="legend-details">
               <summary>Legend</summary>
-              <div>Cards are folders; tiles are files. Click a ▸ folder tile to open it.</div>
+              <div>
+                Big circles are folders, small ones are files (bigger = longer). Click a ▸ folder to open it.
+              </div>
               <div>
                 <svg width="28" height="8" aria-hidden="true">
                   <path d="M0 4 H28" className="xe-dep dir-out" />

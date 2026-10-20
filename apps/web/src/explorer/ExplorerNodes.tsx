@@ -10,32 +10,38 @@ const BADGES: Record<string, string> = {
   rust: 'rs', ruby: 'rb',
 } // prettier-ignore
 
+/** A steady colour per language, so the same kind of file looks the same everywhere. */
+const hueOf = (language: string): number => {
+  let h = 0
+  for (const c of language) h = (h * 31 + c.charCodeAt(0)) % 360
+  return h
+}
+
+/** Invisible connection points at the centre of the node, so lines run from circle to circle. */
 const Ports = () => (
   <>
-    <Handle type="target" position={Position.Left} isConnectable={false} />
-    <Handle type="source" position={Position.Right} isConnectable={false} />
+    <Handle type="target" position={Position.Left} isConnectable={false} className="xn-port" />
+    <Handle type="source" position={Position.Right} isConnectable={false} className="xn-port" />
   </>
 )
 
-/** A file: one tile in its folder's grid. The name is a real button, so Tab and Enter work. */
+/** A file: a round node sized by its length. The name under it is a real button, so Tab and Enter work. */
 export function FileNode({ data, selected }: NodeProps<ExplorerNode>) {
   const metaId = useId()
+  const open = () => void useExplorer.getState().selectFile(data.path)
   return (
     <div
       className={`xt xt-file${selected ? ' selected' : ''}${data.note ? ' unreadable' : ''}`}
       title={data.path}
+      style={{ ['--hue' as string]: hueOf(data.language) }}
     >
       <Ports />
-      <span className="xn-badge" aria-hidden="true">
+      <button className="xn-dot" tabIndex={-1} aria-hidden="true" onClick={open}>
         {BADGES[data.language] ?? data.language.slice(0, 3)}
-      </span>
-      <div className="xt-text">
-        <button
-          className="xn-open"
-          aria-pressed={selected}
-          aria-describedby={metaId}
-          onClick={() => void useExplorer.getState().selectFile(data.path)}
-        >
+        {data.problems > 0 && <span className="xn-warn">!</span>}
+      </button>
+      <div className="xn-label">
+        <button className="xn-open" aria-pressed={selected} aria-describedby={metaId} onClick={open}>
           {data.name}
         </button>
         <div id={metaId} className="xt-meta">
@@ -53,58 +59,41 @@ export function FileNode({ data, selected }: NodeProps<ExplorerNode>) {
   )
 }
 
-/** A collapsed folder: a tile that opens into a card of its own. */
-export function FolderTile({ data }: NodeProps<ExplorerNode>) {
-  const toggle = useExplorer((s) => s.toggleDir)
-  return (
-    <div className="xt xt-folder">
-      <Ports />
-      <span className="xt-folder-icon" aria-hidden="true">
-        ▸
-      </span>
-      <div className="xt-text">
-        <button
-          className="xn-open nodrag nopan"
-          aria-expanded={false}
-          aria-label={`Expand ${data.name}, ${data.count} files`}
-          onClick={() => toggle(data.path)}
-        >
-          {data.name}
-        </button>
-        <div className="xt-meta">
-          {data.count} file{data.count === 1 ? '' : 's'}
-          {data.problems > 0 && <span className="xn-problems"> ⚠ {data.problems}</span>}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/** An open folder: a titled card holding its tiles and its sub-folder cards. */
-export function CardNode({ data }: NodeProps<ExplorerNode>) {
+/** A folder: a hub that opens into its files and sub-folders, or (the repository itself) the centre of the network. */
+export function FolderNode({ data }: NodeProps<ExplorerNode>) {
   const toggle = useExplorer((s) => s.toggleDir)
   const isRoot = data.path === ''
+  const count = `${data.count} file${data.count === 1 ? '' : 's'}`
   return (
-    <div className={`xg${isRoot ? ' xg-root' : ''}`}>
+    <div className={`xt xt-folder${data.expanded ? ' open' : ''}${isRoot ? ' root' : ''}`}>
       <Ports />
-      <div className="xg-head">
+      <button
+        className="xn-dot"
+        tabIndex={-1}
+        aria-hidden="true"
+        disabled={isRoot}
+        onClick={() => toggle(data.path)}
+      >
+        {data.count}
+      </button>
+      <div className="xn-label">
         {isRoot ? (
-          <span className="xg-title">{data.name}</span>
+          <span className="xn-open xn-root-name">{data.name}</span>
         ) : (
           <button
-            className="xg-toggle nodrag nopan"
-            aria-expanded={true}
-            aria-label={`Collapse ${data.name}, ${data.count} files`}
+            className="xn-open"
+            aria-expanded={data.expanded}
+            aria-label={`${data.expanded ? 'Collapse' : 'Expand'} ${data.name}, ${count}`}
             onClick={() => toggle(data.path)}
           >
-            <span aria-hidden="true">▾ </span>
-            <span className="xg-title">{data.name}</span>
+            {data.expanded ? '▾ ' : '▸ '}
+            {data.name}
           </button>
         )}
-        <span className="xn-count">
-          {data.count} file{data.count === 1 ? '' : 's'}
-        </span>
-        {data.problems > 0 && <span className="xn-problems">⚠ {data.problems}</span>}
+        <div className="xt-meta">
+          {count}
+          {data.problems > 0 && <span className="xn-problems"> ⚠ {data.problems}</span>}
+        </div>
       </div>
     </div>
   )

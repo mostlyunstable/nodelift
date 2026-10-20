@@ -39,43 +39,36 @@ const opts = (over: Partial<GraphOptions> = {}): GraphOptions => ({
   ...over,
 })
 
-/** Absolute rectangle of every node, walking up through parent cards. */
-function rects(nodes: ExplorerNode[]) {
-  const byId = new Map(nodes.map((n) => [n.id, n]))
-  const out = new Map<string, { x1: number; y1: number; x2: number; y2: number }>()
-  const abs = (n: ExplorerNode): { x: number; y: number } => {
-    const p = n.parentId ? abs(byId.get(n.parentId)!) : { x: 0, y: 0 }
-    return { x: p.x + n.position.x, y: p.y + n.position.y }
-  }
-  for (const n of nodes) {
-    const a = abs(n)
-    out.set(n.id, { x1: a.x, y1: a.y, x2: a.x + n.data.width, y2: a.y + n.data.height })
-  }
-  return out
-}
-const overlap = (a: { x1: number; y1: number; x2: number; y2: number }, b: typeof a) =>
-  a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2
+const isDep = (e: { type?: string }) => e.type === 'dependency'
+const centre = (n: ExplorerNode) => ({
+  x: n.position.x + n.data.width / 2,
+  y: n.position.y + n.data.height / 2,
+})
+const dist = (a: ExplorerNode, b: ExplorerNode) =>
+  Math.hypot(centre(a).x - centre(b).x, centre(a).y - centre(b).y)
 
-describe('folders are cards, files are tiles', () => {
-  it('the root is a card; its folders start as tiles you can open, its files are tiles', () => {
+describe('folders are hubs, files are nodes, lines join them', () => {
+  it('the root is the centre; its folders start as hubs you can open, its files are nodes', () => {
     const g = buildGraph(files, 'octo/hello', opts())
     const byId = new Map(g.nodes.map((n) => [n.id, n]))
-    expect(byId.get(dirId(''))!.type).toBe('card')
-    expect(byId.get(dirId('src'))!.type).toBe('folder')
-    expect(byId.get(dirId('docs'))!.type).toBe('folder')
+    expect(byId.get(dirId(''))!.type).toBe('folder')
+    expect(byId.get(dirId(''))!.data.expanded).toBe(true)
+    expect(centre(byId.get(dirId(''))!)).toEqual({ x: 0, y: 0 })
+    expect(byId.get(dirId('src'))!.data.expanded).toBe(false)
     expect(byId.get(fileId('main.py'))!.type).toBe('file')
-    expect(g.nodes.every((n) => n.id === dirId('') || n.parentId === dirId(''))).toBe(true)
-    expect(g.edges).toEqual([]) // containment is nesting, not lines
+    // a thin line joins every node to its folder, and nothing else is drawn
+    expect(g.edges.every((e) => e.type === 'tree' && e.source === dirId(''))).toBe(true)
+    expect(g.edges).toHaveLength(g.nodes.length - 1)
   })
 
-  it('an open folder becomes a card nested inside its parent card', () => {
+  it('an open folder becomes a hub whose files hang off it', () => {
     const g = buildGraph(files, 'r', opts({ expanded: new Set(['', 'src', 'src/deep']) }))
     const byId = new Map(g.nodes.map((n) => [n.id, n]))
-    expect(byId.get(dirId('src'))!.type).toBe('card')
-    expect(byId.get(dirId('src'))!.parentId).toBe(dirId(''))
-    expect(byId.get(dirId('src/deep'))!.parentId).toBe(dirId('src'))
-    expect(byId.get(fileId('src/deep/x.js'))!.parentId).toBe(dirId('src/deep'))
+    expect(byId.get(dirId('src'))!.data.expanded).toBe(true)
     expect(byId.get(dirId('src'))!.data.count).toBe(2)
+    const lines = g.edges.map((e) => `${e.source}>${e.target}`)
+    expect(lines).toContain(`${dirId('src')}>${dirId('src/deep')}`)
+    expect(lines).toContain(`${dirId('src/deep')}>${fileId('src/deep/x.js')}`)
   })
 
   it('keeps every file, including ones nothing depends on, and says why one cannot be read', () => {
@@ -136,11 +129,13 @@ describe('folders are cards, files are tiles', () => {
   })
 })
 
-describe('the layout is a tidy map, not a long line', () => {
+describe('the layout is a network in rings, not a long line', () => {
   const synthetic = {
     'one flat folder of 120 files': Array.from({ length: 120 }, (_, i) => f(`a${i}.py`, 'python')),
     'eight folders of 15': Array.from({ length: 120 }, (_, i) => f(`pkg${i % 8}/m${i}.py`, 'python')),
-    'a deep chain': Array.from({ length: 40 }, (_, i) => f(`${'d/'.repeat((i % 8) + 1)}f${i}.py`, 'python')),
+    'a three-level tree': Array.from({ length: 90 }, (_, i) =>
+      f(`a${i % 3}/b${i % 5}/c${i % 2}/f${i}.py`, 'python'),
+    ),
     'mixed tree': [
       ...Array.from({ length: 30 }, (_, i) => f(`src/core/c${i}.py`, 'python')),
       ...Array.from({ length: 12 }, (_, i) => f(`src/util/u${i}.py`, 'python')),
@@ -150,44 +145,36 @@ describe('the layout is a tidy map, not a long line', () => {
     ],
   }
   for (const [name, repo] of Object.entries(synthetic)) {
-    it(`${name}: nothing overlaps, everything sits inside its card, and the shape is compact`, () => {
+    it(`${name}: no two nodes touch, and the shape is round rather than a strip`, () => {
       const g = buildGraph(repo, 'r', opts({ expanded: allDirs(repo), cap: 500 }))
-      const r = rects(g.nodes)
-      const ids = [...r.keys()]
-      // siblings never overlap (children of the same card)
-      const byParent = new Map<string | undefined, ExplorerNode[]>()
-      for (const n of g.nodes) byParent.set(n.parentId, [...(byParent.get(n.parentId) ?? []), n])
-      for (const sibs of byParent.values())
-        for (let i = 0; i < sibs.length; i++)
-          for (let j = i + 1; j < sibs.length; j++)
-            expect(overlap(r.get(sibs[i]!.id)!, r.get(sibs[j]!.id)!), `${sibs[i]!.id} / ${sibs[j]!.id}`).toBe(
-              false,
-            )
-      // every child is inside its parent card
-      for (const n of g.nodes) {
-        if (!n.parentId) continue
-        const c = r.get(n.id)!
-        const p = r.get(n.parentId)!
-        expect(
-          c.x1 >= p.x1 && c.y1 >= p.y1 && c.x2 <= p.x2 && c.y2 <= p.y2,
-          `${n.id} inside ${n.parentId}`,
-        ).toBe(true)
-      }
-      // not a long line: the whole map is roughly landscape, never a thin strip either way
+      for (let i = 0; i < g.nodes.length; i++)
+        for (let j = i + 1; j < g.nodes.length; j++) {
+          const a = g.nodes[i]!
+          const b = g.nodes[j]!
+          expect(dist(a, b), `${a.id} / ${b.id}`).toBeGreaterThan((a.data.width + b.data.width) / 2 + 8)
+        }
       const { width, height } = g.size
-      expect(width / height, `${width}x${height}`).toBeGreaterThan(0.55)
-      expect(width / height).toBeLessThan(3.2)
-      expect(ids.length).toBeGreaterThan(0)
+      expect(width / height, `${width}x${height}`).toBeGreaterThan(0.5)
+      expect(width / height).toBeLessThan(2)
     })
   }
 
-  it('a folder of 60 files is a block of columns, not 60 stacked rows', () => {
-    const repo = Array.from({ length: 60 }, (_, i) => f(`pkg/m${i}.py`, 'python'))
-    const g = buildGraph(repo, 'r', opts({ expanded: new Set(['', 'pkg']), cap: 500 }))
-    const pkg = g.nodes.find((n) => n.id === dirId('pkg'))!
-    expect(pkg.data.height).toBeLessThan(60 * 56 * 0.3)
-    const xs = new Set(g.nodes.filter((n) => n.type === 'file').map((n) => n.position.x))
-    expect(xs.size).toBeGreaterThanOrEqual(4)
+  it('files sit around their folder, clear of its circle', () => {
+    const repo = Array.from({ length: 20 }, (_, i) => f(`pkg/m${i}.py`, 'python'))
+    const g = buildGraph(repo, 'r', opts({ expanded: new Set(['', 'pkg']) }))
+    const hub = g.nodes.find((n) => n.id === dirId('pkg'))!
+    for (const n of g.nodes.filter((x) => x.type === 'file'))
+      expect(dist(n, hub)).toBeGreaterThan(hub.data.width / 2 + 20)
+  })
+
+  it('bigger files are bigger circles', () => {
+    const g = buildGraph(
+      [f('small.py', 'python', { lines: 3 }), f('big.py', 'python', { lines: 2000 })],
+      'r',
+      opts(),
+    )
+    const w = (p: string) => g.nodes.find((n) => n.id === fileId(p))!.data.width
+    expect(w('big.py')).toBeGreaterThan(w('small.py'))
   })
 })
 
@@ -223,7 +210,10 @@ describe('dependency lines are drawn on demand', () => {
       'r',
       opts({ expanded: open, dependencies: deps, depMode: 'selected', selectedPath: 'src/app.py' }),
     )
-    const lines = g.edges.map((e) => `${e.source}>${e.target}:${e.data!.direction}`).sort()
+    const lines = g.edges
+      .filter(isDep)
+      .map((e) => `${e.source}>${e.target}:${e.data!.direction}`)
+      .sort()
     expect(lines).toEqual(
       [
         `${fileId('main.py')}>${fileId('src/app.py')}:in`,
@@ -235,26 +225,29 @@ describe('dependency lines are drawn on demand', () => {
 
   it('"selected" with nothing selected, and "off", draw nothing', () => {
     expect(
-      buildGraph(files, 'r', opts({ expanded: open, dependencies: deps, depMode: 'selected' })).edges,
+      buildGraph(files, 'r', opts({ expanded: open, dependencies: deps, depMode: 'selected' })).edges.filter(
+        isDep,
+      ),
     ).toEqual([])
     expect(
       buildGraph(
         files,
         'r',
         opts({ expanded: open, dependencies: deps, depMode: 'off', selectedPath: 'main.py' }),
-      ).edges,
+      ).edges.filter(isDep),
     ).toEqual([])
   })
 
   it('"all" draws every file-to-file relation once, keeps confidence, and never an external one', () => {
     const g = buildGraph(files, 'r', opts({ expanded: open, dependencies: deps, depMode: 'all' }))
-    expect(g.edges).toHaveLength(4)
+    expect(g.edges.filter(isDep)).toHaveLength(4)
     expect(
-      g.edges.find((e) => e.id === `x:${fileId('utils.py')}>${fileId('src/app.py')}`)!.data!.confidence,
+      g.edges.filter(isDep).find((e) => e.id === `x:${fileId('utils.py')}>${fileId('src/app.py')}`)!.data!
+        .confidence,
     ).toBe('heuristic')
     expect(
-      g.edges.find((e) => e.id === `x:${fileId('main.py')}>${fileId('utils.py')}`)!.data!.relations[0]!
-        .provenance,
+      g.edges.filter(isDep).find((e) => e.id === `x:${fileId('main.py')}>${fileId('utils.py')}`)!.data!
+        .relations[0]!.provenance,
     ).toBe('python.ast')
   })
 
@@ -270,11 +263,13 @@ describe('dependency lines are drawn on demand', () => {
       'r',
       opts({ expanded: new Set(['']), dependencies: many, depMode: 'folders' }),
     )
-    const toSrc = g.edges.find((e) => e.target === dirId('src'))!
+    const toSrc = g.edges.filter(isDep).find((e) => e.target === dirId('src'))!
     expect(toSrc.source).toBe(fileId('main.py'))
     expect(toSrc.data!.count).toBe(2)
     expect(toSrc.data!.aggregated).toBe(true)
-    expect(g.edges[0]!.data!.count).toBeGreaterThanOrEqual(g.edges[g.edges.length - 1]!.data!.count)
+    expect(g.edges.filter(isDep)[0]!.data!.count).toBeGreaterThanOrEqual(
+      g.edges.filter(isDep)[g.edges.filter(isDep).length - 1]!.data!.count,
+    )
   })
 
   it('attaches a line to the folder tile hiding a file and marks it aggregated', () => {
@@ -283,8 +278,8 @@ describe('dependency lines are drawn on demand', () => {
       'r',
       opts({ expanded: new Set(['']), dependencies: [rel('main.py', 'src/app.py')], depMode: 'all' }),
     )
-    expect(g.edges[0]!.target).toBe(dirId('src'))
-    expect(g.edges[0]!.data!.aggregated).toBe(true)
+    expect(g.edges.filter(isDep)[0]!.target).toBe(dirId('src'))
+    expect(g.edges.filter(isDep)[0]!.data!.aggregated).toBe(true)
   })
 
   it('draws nothing for files that are filtered out or do not exist', () => {

@@ -1729,96 +1729,6 @@ textarea:focus-visible {
 }
 
 /* ---------- explorer graph v2: folder cards and file tiles ---------- */
-.xg {
-  width: 100%;
-  height: 100%;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
-  position: relative;
-}
-.xg-root {
-  border-color: var(--border-strong);
-}
-.xg-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 14px;
-  font-size: 13px;
-}
-.xg-title {
-  font-weight: 600;
-  font-size: 15px;
-}
-.xg-toggle {
-  border: 0;
-  background: transparent;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  color: var(--text);
-  cursor: pointer;
-}
-.xt {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  height: 100%;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--raised);
-  font-size: 12px;
-  transition:
-    border-color 0.12s,
-    box-shadow 0.12s;
-}
-.xt:hover {
-  border-color: var(--border-strong);
-}
-.xt-file.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
-}
-.xt-file.unreadable {
-  opacity: 0.75;
-}
-.xt-folder {
-  background: transparent;
-  border-style: dashed;
-}
-.xt-folder-icon {
-  width: 14px;
-  color: var(--text-muted);
-}
-.xt-text {
-  flex: 1;
-  min-width: 0;
-}
-.xt-meta {
-  color: var(--text-muted);
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.xt .xn-open {
-  display: block;
-  width: 100%;
-  font-size: 13px;
-}
-.xt .react-flow__handle,
-.xg .react-flow__handle {
-  width: 6px;
-  height: 6px;
-  min-width: 0;
-  min-height: 0;
-  background: var(--border-strong);
-  border: 0;
-}
 .xe-dep,
 .xe-dep.react-flow__edge-path {
   fill: none;
@@ -1873,8 +1783,7 @@ path.xe-dep.xe-heuristic {
 .react-flow__edge.selected .react-flow__edge-path {
   stroke: var(--accent);
 }
-.code-node,
-.xt {
+.code-node {
   border-radius: 12px;
   background: var(--raised);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
@@ -1917,29 +1826,6 @@ path.xe-dep.xe-heuristic {
 .code-node-meta {
   margin-left: 44px;
 }
-.xt .xn-badge {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  font-size: 11px;
-  font-weight: 700;
-}
-.xt {
-  border: 1.5px solid var(--border-strong);
-  padding: 0 12px 0 8px;
-}
-.xg {
-  border-radius: 12px;
-  border: 1.5px dashed var(--border-strong);
-  background: color-mix(in srgb, var(--accent) 5%, transparent);
-}
-.xg-root {
-  border-style: solid;
-}
 
 /* React Flow turns pointer events off on nodes that are neither draggable nor selectable; their buttons must still click. */
 .react-flow__node button,
@@ -1960,4 +1846,113 @@ path.xe-dep.dir-out,
 path.xe-dep.dir-in {
   stroke: var(--accent);
   stroke-width: 2.4;
+}
+
+/* ---------- explorer network: round nodes joined by lines ---------- */
+.xt {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  --hue: 210;
+}
+.xt .xn-dot {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  background: hsl(var(--hue) 55% 45% / 0.28);
+  border: 2px solid hsl(var(--hue) 60% 58%);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transition:
+    box-shadow 0.12s,
+    border-color 0.12s;
+}
+.xt .xn-dot:hover {
+  box-shadow: 0 0 0 4px hsl(var(--hue) 60% 58% / 0.28);
+}
+.xt-folder .xn-dot {
+  background: var(--raised);
+  border: 2px solid var(--border-strong);
+  font-size: 13px;
+}
+.xt-folder.open .xn-dot {
+  border-color: var(--accent);
+}
+.xt-folder.root .xn-dot {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  cursor: default;
+}
+.xt-file.selected .xn-dot {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 45%, transparent);
+  border-color: var(--accent);
+}
+.xt-file.unreadable {
+  opacity: 0.7;
+}
+.xn-warn {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--warning);
+  color: #000;
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+}
+.xt .xn-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 4px;
+  width: 112px;
+  text-align: center;
+  pointer-events: none;
+}
+.xt .xn-open {
+  pointer-events: auto;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+.xt .xt-meta {
+  color: var(--text-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.xn-port.react-flow__handle {
+  top: 50%;
+  left: 50%;
+  right: auto;
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  min-height: 0;
+  opacity: 0;
+  border: 0;
+  transform: none;
+}
+.xe-tree {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 1.4;
+  opacity: 0.7;
 }

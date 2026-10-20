@@ -51,18 +51,14 @@ test.describe('with GitHub', () => {
     await page.getByRole('button', { name: /pallets\/flask/ }).click()
     await expect(page.getByText(/Showing source code only/)).toBeVisible({ timeout: 60_000 })
     await expect(page.locator('.xt-file').first()).toBeVisible()
-    expect(await page.locator('.xt, .xg').count()).toBeLessThanOrEqual(130)
-    // folders are nested cards, so the map is compact: roughly landscape, not a long strip
-    const box = await page.locator('.xg').first().boundingBox()
-    expect(box!.width / box!.height).toBeGreaterThan(0.5)
-    expect(box!.width / box!.height).toBeLessThan(3.5)
-    // the repository root is on screen at a readable zoom
-    const root = page.locator('.xg', { hasText: 'pallets/flask' })
+    expect(await page.locator('.xt').count()).toBeLessThanOrEqual(130)
+    // the repository is the hub in the middle, in view, and the whole network is framed rather than cut off
+    const root = page.locator('.xt-folder.root')
     await expect(root).toBeInViewport({ timeout: 10_000 })
     const zoom = await page.evaluate(
       () => new DOMMatrix(getComputedStyle(document.querySelector('.react-flow__viewport')!).transform).a,
     )
-    expect(zoom).toBeGreaterThanOrEqual(0.55)
+    expect(zoom).toBeGreaterThanOrEqual(0.2)
     await expect(page.getByRole('tab', { name: /Problems/ })).not.toContainText('⚠')
 
     // switch the filter, then leave and come back through the list of imports
