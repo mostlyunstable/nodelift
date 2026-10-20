@@ -504,6 +504,8 @@ export const useStore = create<State>((set, get) => ({
   },
 
   reset: () => {
+    stopFollowing?.()
+    stopFollowing = null
     clearTimeout(autosaveTimer)
     generation++
     forget()

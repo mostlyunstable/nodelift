@@ -7,6 +7,7 @@ const token = process.env.NODECRAFT_API_TOKEN
 
 export default defineConfig({
   plugins: [react()],
+  build: { chunkSizeWarningLimit: 5000 }, // Monaco is bundled for offline use; this is a local app
   server: {
     port: 5173,
     proxy: {

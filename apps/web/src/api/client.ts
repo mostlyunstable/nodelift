@@ -1,3 +1,4 @@
+import { apiUrl, authHeaders } from './config'
 import type {
   CodeRunResult,
   NodeDefinition,
@@ -23,9 +24,9 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(`/api/v1${path}`, {
+  const res = await fetch(apiUrl(path), {
     method,
-    headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+    headers: authHeaders(body === undefined ? {} : { 'content-type': 'application/json' }),
     body: body === undefined ? undefined : JSON.stringify(body),
     signal,
   })

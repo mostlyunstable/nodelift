@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { applyEvent, useStore } from '../state/store'
 import type { RunEvent } from '../types/workflow'
 import { RunPanel } from '../panels/RunPanel'
+import { jsonResponse, sseStream } from '../test-utils/sse'
 import { ResultView } from '../panels/ResultView'
 
 vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
@@ -74,80 +75,61 @@ describe('persistence', () => {
   })
 })
 
-class FakeEventSource {
-  static instances: FakeEventSource[] = []
-  static CLOSED = 2
-  readyState = 1
-  onerror: (() => void) | null = null
-  listeners: Record<string, (m: MessageEvent<string>) => void> = {}
-  constructor(public url: string) {
-    FakeEventSource.instances.push(this)
-  }
-  addEventListener(type: string, fn: (m: MessageEvent<string>) => void) {
-    this.listeners[type] = fn
-  }
-  emit(type: string, data: object) {
-    this.listeners[type]?.({ data: JSON.stringify(data) } as MessageEvent<string>)
-  }
-  close() {
-    this.readyState = FakeEventSource.CLOSED
-  }
-}
-
 describe('live run', () => {
   beforeEach(() => {
-    FakeEventSource.instances = []
-    vi.stubGlobal('EventSource', FakeEventSource)
     vi.restoreAllMocks()
     useStore.getState().reset()
   })
 
   it('shows node status as events arrive, ignores duplicates, and loads the final run', async () => {
-    const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }))
+    const stream = sseStream()
+    const streamCalls: string[] = []
     vi.spyOn(globalThis, 'fetch').mockImplementation((url, init) => {
       const u = String(url)
-      if (u.endsWith('/workflows') && init?.method === 'POST') return json({ id: 'wf_1', revision: 1 }, 201)
+      if (u.includes('/events/stream')) {
+        streamCalls.push(u)
+        return Promise.resolve(stream.response())
+      }
+      if (u.endsWith('/workflows') && init?.method === 'POST') return jsonResponse({ id: 'wf_1', revision: 1 }, 201)
       if (u.endsWith('/workflows/wf_1/runs') && init?.method === 'POST')
-        return json({ id: 'run_1', status: 'running', nodes: [], duration_ms: 0, version_no: 1 }, 202)
+        return jsonResponse({ id: 'run_1', status: 'running', nodes: [], duration_ms: 0, version_no: 1 }, 202)
       if (u.endsWith('/runs/run_1'))
-        return json({ id: 'run_1', status: 'succeeded', nodes: [], duration_ms: 5, version_no: 1 })
-      return json([])
+        return jsonResponse({ id: 'run_1', status: 'succeeded', nodes: [], duration_ms: 5, version_no: 1 })
+      return jsonResponse([])
     })
     useStore.getState().addNode()
     const nodeId = useStore.getState().nodes[0].id
     await useStore.getState().runWorkflow()
-    const es = FakeEventSource.instances[0]
-    expect(es.url).toContain('/runs/run_1/events/stream?after=0')
+    await vi.waitFor(() => expect(streamCalls).toHaveLength(1))
+    expect(streamCalls[0]).toContain('/runs/run_1/events/stream?after=0')
     expect(useStore.getState().busy).toBe('run')
 
-    es.emit('node.started', { seq: 2, type: 'node.started', node_id: nodeId })
-    expect(useStore.getState().liveStatus[nodeId]).toBe('running')
-    es.emit('node.started', { seq: 2, type: 'node.started', node_id: nodeId }) // replay after reconnect
-    expect(useStore.getState().events).toHaveLength(1)
+    stream.send('node.started', { seq: 2, type: 'node.started', node_id: nodeId }, 2)
+    await vi.waitFor(() => expect(useStore.getState().liveStatus[nodeId]).toBe('running'))
+    stream.send('node.started', { seq: 2, type: 'node.started', node_id: nodeId }, 2) // replay after a reconnect
+    stream.send('node.finished', { seq: 3, type: 'node.finished', node_id: nodeId, status: 'succeeded' }, 3)
+    await vi.waitFor(() => expect(useStore.getState().liveStatus[nodeId]).toBe('succeeded'))
+    expect(useStore.getState().events.map((e) => e.seq)).toEqual([2, 3]) // the duplicate was ignored
 
-    es.emit('node.finished', { seq: 3, type: 'node.finished', node_id: nodeId, status: 'succeeded' })
-    expect(useStore.getState().liveStatus[nodeId]).toBe('succeeded')
-    es.emit('run.finished', { seq: 4, type: 'run.finished', status: 'succeeded' })
+    stream.send('run.finished', { seq: 4, type: 'run.finished', status: 'succeeded' }, 4)
     await vi.waitFor(() => expect(useStore.getState().run?.status).toBe('succeeded'))
     expect(useStore.getState().busy).toBeNull()
-    expect(es.readyState).toBe(FakeEventSource.CLOSED)
+    expect(streamCalls).toHaveLength(1) // finished runs are not re-followed
+    stream.close()
   })
 })
 
 describe('cancel and resume', () => {
   beforeEach(() => {
-    FakeEventSource.instances = []
-    vi.stubGlobal('EventSource', FakeEventSource)
     vi.restoreAllMocks()
     useStore.getState().reset()
   })
-  const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }))
 
   it('cancels on the server and keeps following until run.finished', async () => {
     const calls: string[] = []
     vi.spyOn(globalThis, 'fetch').mockImplementation((url, init) => {
       calls.push(`${init?.method ?? 'GET'} ${String(url)}`)
-      return json({ id: 'run_1', status: 'running', nodes: [], duration_ms: 0, version_no: 1 }, 202)
+      return jsonResponse({ id: 'run_1', status: 'running', nodes: [], duration_ms: 0, version_no: 1 }, 202)
     })
     useStore.setState({ run: { id: 'run_1', status: 'running', nodes: [], duration_ms: 0 }, busy: 'run' })
     await useStore.getState().cancel()
@@ -162,13 +144,20 @@ describe('cancel and resume', () => {
   })
 
   it('resumes a failed run as a new run and follows it', async () => {
-    vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
-      json({ id: 'run_2', status: 'running', nodes: [], duration_ms: 0, version_no: 1 }, 202),
-    )
+    const stream = sseStream()
+    const streamCalls: string[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      if (String(url).includes('/events/stream')) {
+        streamCalls.push(String(url))
+        return Promise.resolve(stream.response())
+      }
+      return jsonResponse({ id: 'run_2', status: 'running', nodes: [], duration_ms: 0, version_no: 1 }, 202)
+    })
     useStore.setState({ run: { id: 'run_1', status: 'failed', nodes: [], duration_ms: 3 } })
     await useStore.getState().resume()
     expect(useStore.getState().run?.id).toBe('run_2')
-    expect(FakeEventSource.instances[0].url).toContain('/runs/run_2/events/stream')
+    await vi.waitFor(() => expect(streamCalls[0]).toContain('/runs/run_2/events/stream'))
+    stream.close()
   })
 
   it('refuses to resume a succeeded run', async () => {
