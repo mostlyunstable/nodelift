@@ -8,6 +8,7 @@ from app.domain.records import (
     RepoDiagnosticRecord,
     RepoEdgeRecord,
     RepoFileRecord,
+    RepoPatchRecord,
     RepoRevisionRecord,
     RepoSymbolRecord,
     RunRecord,
@@ -82,6 +83,19 @@ class RepoRepository(Protocol):
     ) -> tuple[list[RepoEdgeRecord], bool]: ...
     def list_diagnostics(self, revision_id: str, limit: int) -> list[RepoDiagnosticRecord]: ...
     def file_analysis(self, revision_id: str, path: str) -> FileAnalysisRecord | None: ...
+    def create_patch(
+        self,
+        revision_id: str,
+        path: str,
+        title: str,
+        new_content: str,
+        additions: int,
+        deletions: int,
+    ) -> RepoPatchRecord: ...
+    def list_patches(self, revision_id: str) -> list[RepoPatchRecord]: ...
+    def get_patch(self, patch_id: str) -> tuple[RepoPatchRecord, str] | None: ...
+    def set_patch_applied(self, patch_id: str, applied: bool) -> None: ...
+    def delete_patch(self, patch_id: str) -> bool: ...
 
 
 class CredentialRepository(Protocol):

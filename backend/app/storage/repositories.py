@@ -11,6 +11,7 @@ from app.domain.records import (
     RepoDiagnosticRecord,
     RepoEdgeRecord,
     RepoFileRecord,
+    RepoPatchRecord,
     RepoRevisionRecord,
     RepoSymbolRecord,
     RunRecord,
@@ -29,6 +30,7 @@ from app.storage.models import (
     RepoDiagnosticRow,
     RepoEdgeRow,
     RepoFileRow,
+    RepoPatchRow,
     RepoRevisionRow,
     RepoSymbolRow,
     RunEventRow,
@@ -473,7 +475,13 @@ class SqlRepoRepository:
 
     def delete_revision(self, revision_id: str) -> bool:
         with self.sf.begin() as s:
-            for table in (RepoEdgeRow, RepoSymbolRow, RepoDiagnosticRow, RepoFileRow):
+            for table in (
+                RepoEdgeRow,
+                RepoSymbolRow,
+                RepoDiagnosticRow,
+                RepoFileRow,
+                RepoPatchRow,
+            ):
                 s.execute(delete(table).where(table.revision_id == revision_id))
             row = s.get(RepoRevisionRow, revision_id)
             if row is None:
@@ -611,3 +619,59 @@ class SqlRepoRepository:
                 dependents=[self._edge(r) for r in inc],
                 diagnostics=[self._diag(r) for r in diags],
             )  # fmt: skip
+
+    # -- patches ----------------------------------------------------------------------------
+    @staticmethod
+    def _patch(r: RepoPatchRow) -> RepoPatchRecord:
+        return RepoPatchRecord(
+            id=r.id, revision_id=r.revision_id, path=r.path, title=r.title, additions=r.additions,
+            deletions=r.deletions, applied=r.applied, created_at=r.created_at,
+            applied_at=r.applied_at,
+        )  # fmt: skip
+
+    def create_patch(
+        self,
+        revision_id: str,
+        path: str,
+        title: str,
+        new_content: str,
+        additions: int,
+        deletions: int,
+    ) -> RepoPatchRecord:
+        with self.sf.begin() as s:
+            row = RepoPatchRow(
+                id=f"patch_{uuid.uuid4().hex[:12]}", revision_id=revision_id, path=path,
+                title=title, new_content=new_content, additions=additions, deletions=deletions,
+            )  # fmt: skip
+            s.add(row)
+            s.flush()
+            return self._patch(row)
+
+    def list_patches(self, revision_id: str) -> list[RepoPatchRecord]:
+        with self.sf() as s:
+            rows = s.scalars(
+                select(RepoPatchRow)
+                .where(RepoPatchRow.revision_id == revision_id)
+                .order_by(RepoPatchRow.created_at)
+            )
+            return [self._patch(r) for r in rows]
+
+    def get_patch(self, patch_id: str) -> tuple[RepoPatchRecord, str] | None:
+        with self.sf() as s:
+            row = s.get(RepoPatchRow, patch_id)
+            return (self._patch(row), row.new_content) if row else None
+
+    def set_patch_applied(self, patch_id: str, applied: bool) -> None:
+        with self.sf.begin() as s:
+            row = s.get(RepoPatchRow, patch_id)
+            if row is not None:
+                row.applied = applied
+                row.applied_at = utcnow() if applied else None
+
+    def delete_patch(self, patch_id: str) -> bool:
+        with self.sf.begin() as s:
+            row = s.get(RepoPatchRow, patch_id)
+            if row is None:
+                return False
+            s.delete(row)
+            return True

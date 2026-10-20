@@ -8,6 +8,7 @@ from typing import Any
 
 from app.domain.nodes import NodeRegistry
 from app.domain.repositories import CredentialRepository
+from app.services.command_service import CommandRuns
 from app.services.explorer_service import ExplorerService
 from app.services.workflow_service import WorkflowService
 from app.storage.db import current_revision, head_revision
@@ -40,6 +41,11 @@ def explorer_service(state: Any) -> ExplorerService:
         state.import_jobs,
         getattr(state, "github_transport", None),
     )
+
+
+def command_runs(state: Any) -> CommandRuns:
+    runs: CommandRuns = state.command_runs
+    return runs
 
 
 def credential_repository(state: Any) -> CredentialRepository:

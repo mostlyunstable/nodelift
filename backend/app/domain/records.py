@@ -151,3 +151,57 @@ class RepoGraphRecord(BaseModel):
     edges: list[RepoEdgeRecord]  # only edges between two files of the repository
     truncated: bool
     diagnostics: list[RepoDiagnosticRecord]
+
+
+class RepoPatchRecord(BaseModel):
+    """A change someone proposed to one file. The repository's own files are never modified."""
+
+    id: str
+    revision_id: str
+    path: str
+    title: str
+    additions: int
+    deletions: int
+    applied: bool
+    created_at: datetime
+    applied_at: datetime | None
+
+
+class WorkspaceRecord(BaseModel):
+    state: str  # none | preparing | ready | failed
+    path: str | None
+    file_count: int
+    error: str | None
+
+
+class SuggestionRecord(BaseModel):
+    id: str
+    label: str
+    argv: list[str]
+    framework: str
+    kind: str
+    cwd: str
+    evidence: str
+    notes: list[str]
+
+
+class DiscoveryRecord(BaseModel):
+    suggestions: list[SuggestionRecord]
+    test_files: list[str]
+    frameworks: list[str]
+
+
+class CommandRunRecord(BaseModel):
+    id: str
+    revision_id: str
+    command: str
+    argv: list[str]
+    cwd: str
+    status: str  # running | succeeded | failed | cancelled | timeout | blocked
+    exit_code: int | None
+    started_at: datetime
+    ended_at: datetime | None
+    output: str
+    output_truncated: bool
+    confinement: dict[str, object]
+    notes: list[str]

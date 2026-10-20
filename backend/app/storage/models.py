@@ -214,3 +214,19 @@ class RepoDiagnosticRow(Base):
     code: Mapped[str] = mapped_column(String)
     message: Mapped[str] = mapped_column(String)
     source: Mapped[str] = mapped_column(String)
+
+
+class RepoPatchRow(Base):
+    __tablename__ = "repo_patches"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    revision_id: Mapped[str] = mapped_column(
+        ForeignKey("repo_revisions.id", ondelete="CASCADE"), index=True
+    )
+    path: Mapped[str] = mapped_column(String)
+    title: Mapped[str] = mapped_column(String)
+    new_content: Mapped[str] = mapped_column(String)
+    additions: Mapped[int] = mapped_column(Integer, default=0)
+    deletions: Mapped[int] = mapped_column(Integer, default=0)
+    applied: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+    applied_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)

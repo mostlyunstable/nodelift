@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Import GitHub repositories at a pinned commit and serve their indexed files.
 
 Imports run as background tasks and report progress through the revision row. Repository code is
@@ -11,6 +12,7 @@ import shutil
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import httpx
 from pydantic import BaseModel
@@ -18,15 +20,28 @@ from pydantic import BaseModel
 from app.config import Settings
 from app.domain.errors import AppError
 from app.domain.records import (
+    CommandRunRecord,
+    DiscoveryRecord,
     FileAnalysisRecord,
     RepoFileRecord,
     RepoGraphRecord,
+    RepoPatchRecord,
     RepoRevisionRecord,
+    SuggestionRecord,
+    WorkspaceRecord,
 )
 from app.domain.repositories import RepoRepository
 from app.explorer.analysis.runner import analyze_files
-from app.explorer.archive import Cancelled, ExtractedFile, Limits, extract_tarball
+from app.explorer.archive import (
+    Cancelled,
+    ExtractedFile,
+    Limits,
+    extract_tarball,
+    extract_workspace,
+)
+from app.explorer.discovery import CONFIG_NAMES, discover
 from app.explorer.github import GitHubClient
+from app.explorer.patches import stats, unified_diff
 from app.explorer.urls import InvalidRepoUrl, parse_github_url
 
 log = logging.getLogger("nodecraft.explorer")
@@ -39,6 +54,7 @@ class ImportJobs:
     tasks: dict[str, asyncio.Task[None]] = field(default_factory=dict)
     cancels: dict[str, threading.Event] = field(default_factory=dict)
     sem: asyncio.Semaphore = field(default_factory=lambda: asyncio.Semaphore(2))
+    workspace_errors: dict[str, str] = field(default_factory=dict)
 
     async def shutdown(self) -> None:
         for ev in self.cancels.values():
@@ -293,3 +309,207 @@ class ExplorerService:
             raise AppError(409, "import_running", "Cancel the import before deleting it")
         self.repo.delete_revision(revision_id)
         self._remove_dir(revision_id)
+
+    # -- workspace: a full, writable copy of the revision, for running tests -----------------
+    def workspace_dir(self, revision_id: str) -> Path:
+        return self._dir(revision_id) / "workspace"
+
+    def workspace(self, revision_id: str) -> WorkspaceRecord:
+        self.get(revision_id)
+        d = self.workspace_dir(revision_id)
+        key = f"ws:{revision_id}"
+        if key in self.jobs.tasks:
+            return WorkspaceRecord(state="preparing", path=None, file_count=0, error=None)
+        marker = d / ".nodecraft-ready"
+        if marker.is_file():
+            try:
+                n = int(marker.read_text().strip() or 0)
+            except ValueError:
+                n = 0
+            return WorkspaceRecord(state="ready", path=str(d), file_count=n, error=None)
+        err = self.jobs.workspace_errors.get(revision_id)
+        return WorkspaceRecord(
+            state="failed" if err else "none", path=None, file_count=0, error=err
+        )
+
+    def prepare_workspace(self, revision_id: str) -> WorkspaceRecord:
+        rev = self._ready(revision_id)
+        ws = self.workspace(revision_id)
+        if ws.state in ("ready", "preparing"):
+            return ws
+        self.jobs.workspace_errors.pop(revision_id, None)
+        cancel = threading.Event()
+        key = f"ws:{revision_id}"
+        self.jobs.cancels[key] = cancel
+        task = asyncio.create_task(self._prepare(rev, cancel))
+        self.jobs.tasks[key] = task
+        task.add_done_callback(lambda _t, k=key: self._forget(k))  # type: ignore[misc]
+        return WorkspaceRecord(state="preparing", path=None, file_count=0, error=None)
+
+    async def _prepare(self, rev: RepoRevisionRecord, cancel: threading.Event) -> None:
+        rid = rev.id
+        base = self._dir(rid)
+        archive = base / "workspace.tgz"
+        dest = self.workspace_dir(rid)
+        try:
+            async with self.jobs.sem:
+                base.mkdir(parents=True, exist_ok=True)
+                shutil.rmtree(dest, ignore_errors=True)
+                async with GitHubClient(self.transport) as gh:
+                    await gh.download_tarball(
+                        rev.owner, rev.repo, rev.commit_sha, archive, self.max_download, cancel
+                    )
+                n = await asyncio.to_thread(extract_workspace, archive, dest, self.limits, cancel)
+            (dest / ".nodecraft-ready").write_text(str(n))
+        except Cancelled:
+            shutil.rmtree(dest, ignore_errors=True)
+        except AppError as e:
+            self.jobs.workspace_errors[rid] = e.message
+            shutil.rmtree(dest, ignore_errors=True)
+        except Exception:
+            log.exception("workspace preparation failed")
+            self.jobs.workspace_errors[rid] = "Preparing the workspace failed unexpectedly."
+            shutil.rmtree(dest, ignore_errors=True)
+        finally:
+            with contextlib.suppress(OSError):
+                archive.unlink()
+
+    def reset_workspace(self, revision_id: str) -> WorkspaceRecord:
+        self.get(revision_id)
+        if f"ws:{revision_id}" in self.jobs.tasks:
+            raise AppError(409, "workspace_busy", "The workspace is still being prepared")
+        shutil.rmtree(self.workspace_dir(revision_id), ignore_errors=True)
+        for p in self.repo.list_patches(revision_id):
+            self.repo.set_patch_applied(p.id, False)
+        return self.workspace(revision_id)
+
+    def ready_workspace_path(self, revision_id: str) -> Path:
+        ws = self.workspace(revision_id)
+        if ws.state != "ready" or ws.path is None:
+            raise AppError(409, "workspace_not_ready", "Prepare the workspace first")
+        return Path(ws.path)
+
+    # -- test and command discovery (reads files; runs nothing) -------------------------------
+    def discovery(self, revision_id: str) -> DiscoveryRecord:
+        self._ready(revision_id)
+        files = self.repo.list_files(revision_id)
+        texts: dict[str, str] = {}
+        root = (self._dir(revision_id) / "files").resolve()
+        for f in files:
+            name = f.path.rsplit("/", 1)[-1]
+            if f.stored and name in CONFIG_NAMES and f.size < 200_000:
+                with contextlib.suppress(OSError):
+                    texts[f.path] = (root / f.path).read_text(encoding="utf-8")
+        d = discover(files, texts)
+        return DiscoveryRecord(
+            suggestions=[
+                SuggestionRecord(
+                    id=x.id, label=x.label, argv=x.argv, framework=x.framework, kind=x.kind,
+                    cwd=x.cwd, evidence=x.evidence, notes=x.notes,
+                )
+                for x in d.suggestions
+            ],
+            test_files=d.test_files,
+            frameworks=d.frameworks,
+        )  # fmt: skip
+
+    # -- patches: proposed changes, kept apart from the repository's own files ----------------
+    def _original(self, revision_id: str, path: str) -> str:
+        self._ready(revision_id)
+        meta = self.repo.get_file(revision_id, path)
+        if meta is None:
+            raise AppError(404, "file_not_found", "That file is not in this revision")
+        if not meta.stored:
+            raise AppError(
+                422, "not_editable", "Only readable text files can have a proposed change"
+            )
+        root = (self._dir(revision_id) / "files").resolve()
+        target = (root / path).resolve()
+        if root not in target.parents:
+            raise AppError(404, "file_not_found", "That file is not in this revision")
+        try:
+            return target.read_text(encoding="utf-8")
+        except OSError as e:
+            raise AppError(409, "cache_missing", "The cached copy of this file is missing") from e
+
+    def create_patch(
+        self, revision_id: str, path: str, title: str, new_content: str
+    ) -> RepoPatchRecord:
+        old = self._original(revision_id, path)
+        if len(new_content.encode("utf-8")) > self.limits.max_file_bytes:
+            raise AppError(413, "patch_too_large", "The changed file is larger than the file limit")
+        if new_content == old:
+            raise AppError(
+                422, "no_changes", "The file is unchanged, so there is nothing to propose"
+            )
+        add, rem = stats(old, new_content)
+        return self.repo.create_patch(
+            revision_id, path, title.strip() or f"Change to {path}", new_content, add, rem
+        )
+
+    def list_patches(self, revision_id: str) -> list[RepoPatchRecord]:
+        self.get(revision_id)
+        return self.repo.list_patches(revision_id)
+
+    def _patch(self, revision_id: str, patch_id: str) -> tuple[RepoPatchRecord, str]:
+        got = self.repo.get_patch(patch_id)
+        if got is None or got[0].revision_id != revision_id:
+            raise AppError(404, "not_found", "Patch not found")
+        return got
+
+    def patch_diff(self, revision_id: str, patch_id: str) -> str:
+        rec, new = self._patch(revision_id, patch_id)
+        return unified_diff(rec.path, self._original(revision_id, rec.path), new)
+
+    def delete_patch(self, revision_id: str, patch_id: str) -> None:
+        rec, _ = self._patch(revision_id, patch_id)
+        if rec.applied:
+            raise AppError(
+                409, "patch_applied", "Revert the patch in the workspace before deleting it"
+            )
+        self.repo.delete_patch(patch_id)
+
+    def _workspace_file(self, revision_id: str, path: str) -> Path:
+        ws = self.ready_workspace_path(revision_id).resolve()
+        target = (ws / path).resolve()
+        if ws not in target.parents:
+            raise AppError(422, "invalid_path", "That path is outside the workspace")
+        return target
+
+    def apply_patch(self, revision_id: str, patch_id: str) -> RepoPatchRecord:
+        """Write the proposed content into the workspace copy. Refuses if that file changed meanwhile."""
+        rec, new = self._patch(revision_id, patch_id)
+        target = self._workspace_file(revision_id, rec.path)
+        old = self._original(revision_id, rec.path)
+        current = target.read_text(encoding="utf-8") if target.is_file() else None
+        if current == new:
+            self.repo.set_patch_applied(patch_id, True)
+        elif current != old:
+            raise AppError(
+                409, "patch_conflict",
+                "The file in the workspace was changed since the import (another patch or a command). Reset the workspace first.",
+            )  # fmt: skip
+        else:
+            target.write_text(new, encoding="utf-8")
+            self.repo.set_patch_applied(patch_id, True)
+        return self._patch(revision_id, patch_id)[0]
+
+    def revert_patch(self, revision_id: str, patch_id: str) -> RepoPatchRecord:
+        rec, new = self._patch(revision_id, patch_id)
+        target = self._workspace_file(revision_id, rec.path)
+        old = self._original(revision_id, rec.path)
+        current = target.read_text(encoding="utf-8") if target.is_file() else None
+        if current == new:
+            target.write_text(old, encoding="utf-8")
+        elif current != old:
+            raise AppError(
+                409,
+                "patch_conflict",
+                "The file in the workspace has other changes; reset the workspace instead",
+            )
+        self.repo.set_patch_applied(patch_id, False)
+        return self._patch(revision_id, patch_id)[0]
+
+
+def command_record(runs: Any, run: Any) -> CommandRunRecord:
+    return runs.record(run)  # type: ignore[no-any-return]

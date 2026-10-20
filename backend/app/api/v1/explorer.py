@@ -3,15 +3,22 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
+from app.api.errors import AppError
 from app.domain.records import (
+    CommandRunRecord,
+    DiscoveryRecord,
     FileAnalysisRecord,
     RepoFileRecord,
     RepoGraphRecord,
+    RepoPatchRecord,
     RepoRevisionRecord,
+    WorkspaceRecord,
 )
-from app.services.container import explorer_service
+from app.services.command_service import CommandRuns
+from app.services.container import command_runs, explorer_service
 from app.services.explorer_service import ExplorerService, FileContent
 
 router = APIRouter(prefix="/explorer", tags=["explorer"])
@@ -84,3 +91,124 @@ def read_file(
     revision_id: str, svc: Svc, path: Annotated[str, Query(max_length=400)]
 ) -> FileContent:
     return svc.read_file(revision_id, path)
+
+
+# ---- workspace, tests and approved commands ----------------------------------------------------
+def get_runs(request: Request) -> CommandRuns:
+    return command_runs(request.app.state)
+
+
+Runs = Annotated[CommandRuns, Depends(get_runs)]
+
+
+@router.get("/revisions/{revision_id}/discovery", response_model=DiscoveryRecord)
+def discovery(revision_id: str, svc: Svc) -> DiscoveryRecord:
+    """How the repository says it is tested. Reads files only; runs nothing."""
+    return svc.discovery(revision_id)
+
+
+@router.get("/revisions/{revision_id}/workspace", response_model=WorkspaceRecord)
+def workspace(revision_id: str, svc: Svc) -> WorkspaceRecord:
+    return svc.workspace(revision_id)
+
+
+@router.post("/revisions/{revision_id}/workspace", response_model=WorkspaceRecord, status_code=202)
+async def prepare_workspace(revision_id: str, svc: Svc) -> WorkspaceRecord:
+    return svc.prepare_workspace(revision_id)
+
+
+@router.delete("/revisions/{revision_id}/workspace", response_model=WorkspaceRecord)
+def reset_workspace(revision_id: str, svc: Svc) -> WorkspaceRecord:
+    return svc.reset_workspace(revision_id)
+
+
+class CommandRequest(BaseModel):
+    command: str = Field(max_length=2000)
+    approved_command: str = Field(
+        max_length=2000
+    )  # must repeat `command` exactly: the user's approval
+    cwd: str = Field(default="", max_length=300)
+    timeout_s: float = Field(default=300, ge=1, le=900)
+    allow_network: bool = False
+    allow_home_read: bool = False
+    acknowledge_unconfined: bool = False
+
+
+@router.post("/revisions/{revision_id}/commands", response_model=CommandRunRecord, status_code=202)
+async def run_command(
+    revision_id: str, body: CommandRequest, svc: Svc, runs: Runs
+) -> CommandRunRecord:
+    """Runs only a command the caller restated verbatim as approved, in the prepared workspace."""
+    if body.approved_command != body.command:
+        raise AppError(
+            422, "not_approved", "The approved command must be exactly the command that will run"
+        )
+    ws = svc.ready_workspace_path(revision_id)
+    run = await runs.start(
+        revision_id, ws, body.command, body.cwd, body.timeout_s,
+        body.allow_network, body.allow_home_read, body.acknowledge_unconfined,
+    )  # fmt: skip
+    return runs.record(run)
+
+
+@router.get("/revisions/{revision_id}/commands", response_model=list[CommandRunRecord])
+def list_commands(revision_id: str, svc: Svc, runs: Runs) -> list[CommandRunRecord]:
+    svc.get(revision_id)
+    return [runs.record(r) for r in runs.list_for(revision_id)]
+
+
+@router.get("/revisions/{revision_id}/commands/{run_id}", response_model=CommandRunRecord)
+def get_command(revision_id: str, run_id: str, runs: Runs) -> CommandRunRecord:
+    return runs.record(runs.get(run_id, revision_id))
+
+
+@router.post("/revisions/{revision_id}/commands/{run_id}/cancel", response_model=CommandRunRecord)
+def cancel_command(revision_id: str, run_id: str, runs: Runs) -> CommandRunRecord:
+    return runs.record(runs.cancel(run_id, revision_id))
+
+
+# ---- proposed changes ---------------------------------------------------------------------------
+class PatchRequest(BaseModel):
+    path: str = Field(max_length=400)
+    title: str = Field(default="", max_length=200)
+    new_content: str = Field(max_length=2_000_000)
+
+
+@router.get("/revisions/{revision_id}/patches", response_model=list[RepoPatchRecord])
+def list_patches(revision_id: str, svc: Svc) -> list[RepoPatchRecord]:
+    return svc.list_patches(revision_id)
+
+
+@router.post("/revisions/{revision_id}/patches", response_model=RepoPatchRecord, status_code=201)
+def create_patch(revision_id: str, body: PatchRequest, svc: Svc) -> RepoPatchRecord:
+    return svc.create_patch(revision_id, body.path, body.title, body.new_content)
+
+
+@router.get("/revisions/{revision_id}/patches/{patch_id}/diff", response_class=PlainTextResponse)
+def patch_diff(revision_id: str, patch_id: str, svc: Svc) -> PlainTextResponse:
+    return PlainTextResponse(svc.patch_diff(revision_id, patch_id), media_type="text/x-diff")
+
+
+@router.get("/revisions/{revision_id}/patches/{patch_id}/export", response_class=PlainTextResponse)
+def export_patch(revision_id: str, patch_id: str, svc: Svc) -> PlainTextResponse:
+    """The same diff as a downloadable file you can `git apply` yourself."""
+    return PlainTextResponse(
+        svc.patch_diff(revision_id, patch_id),
+        media_type="text/x-diff",
+        headers={"Content-Disposition": f'attachment; filename="{patch_id}.patch"'},
+    )
+
+
+@router.post("/revisions/{revision_id}/patches/{patch_id}/apply", response_model=RepoPatchRecord)
+def apply_patch(revision_id: str, patch_id: str, svc: Svc) -> RepoPatchRecord:
+    return svc.apply_patch(revision_id, patch_id)
+
+
+@router.post("/revisions/{revision_id}/patches/{patch_id}/revert", response_model=RepoPatchRecord)
+def revert_patch(revision_id: str, patch_id: str, svc: Svc) -> RepoPatchRecord:
+    return svc.revert_patch(revision_id, patch_id)
+
+
+@router.delete("/revisions/{revision_id}/patches/{patch_id}", status_code=204)
+def delete_patch(revision_id: str, patch_id: str, svc: Svc) -> None:
+    svc.delete_patch(revision_id, patch_id)

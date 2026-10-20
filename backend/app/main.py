@@ -10,6 +10,7 @@ from app.api.v1 import credentials, explorer, health, nodes, portability, stored
 from app.config import Settings, get_settings
 from app.nodes import default_registry, load_plugins
 from app.runtime.subprocess_runner import SubprocessRunner
+from app.services.command_service import CommandRuns
 from app.services.explorer_service import ImportJobs
 from app.services.gate import ExecutionGate
 from app.services.run_hub import RunHub
@@ -47,9 +48,11 @@ def create_app(database_url: str | None = None, settings: Settings | None = None
                 run_id, "run.finished", {"status": "failed", "reason": "server_restarted"}
             )
         app.state.import_jobs = ImportJobs()
+        app.state.command_runs = CommandRuns(settings.sandbox)
         SqlRepoRepository(app.state.session_factory).fail_stale_imports()
         yield
         await app.state.import_jobs.shutdown()
+        await app.state.command_runs.shutdown()
         for task in list(app.state.run_hub.tasks):
             task.cancel()
         engine.dispose()

@@ -127,3 +127,60 @@ def extract_tarball(
     finally:
         tf.close()
     return files
+
+
+def extract_workspace(
+    archive: Path,
+    dest: Path,
+    limits: Limits,
+    cancel: threading.Event | None = None,
+) -> int:
+    """Unpack the whole worktree (binary and large files included) so tests can run against it.
+
+    Same path rules as `extract_tarball`; symlinks, devices and hard links are never created.
+    Returns the number of files written.
+    """
+    dest.mkdir(parents=True, exist_ok=True)
+    root = dest.resolve()
+    written = 0
+    total = 0
+    seen: set[str] = set()
+    try:
+        tf = tarfile.open(archive, mode="r|gz")  # noqa: SIM115 - streaming; closed below
+    except (tarfile.TarError, OSError) as e:
+        raise AppError(
+            502, "bad_archive", "GitHub returned an archive that could not be read"
+        ) from e
+    try:
+        for member in tf:
+            if cancel is not None and cancel.is_set():
+                raise Cancelled
+            if not member.isfile():
+                continue
+            rel = safe_relative_path(member.name)
+            if rel is None or rel in seen:
+                continue
+            seen.add(rel)
+            written += 1
+            total += member.size
+            if written > limits.max_files or total > limits.max_total_bytes:
+                raise AppError(
+                    413, "repo_too_large", "The repository is too large to prepare a workspace"
+                )
+            target = (root / rel).resolve()
+            if root not in target.parents:
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            src = tf.extractfile(member)
+            with target.open("wb") as out:
+                if src is not None:
+                    while chunk := src.read(1 << 20):
+                        out.write(chunk)
+            target.chmod(0o755 if member.mode & 0o111 else 0o644)
+    except tarfile.TarError as e:
+        raise AppError(
+            502, "bad_archive", "GitHub returned an archive that could not be read"
+        ) from e
+    finally:
+        tf.close()
+    return written

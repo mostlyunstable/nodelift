@@ -76,7 +76,7 @@ def _group_rss_mb(pgid: int) -> float:
     return total_kb / 1024
 
 
-async def _watch_memory(
+async def watch_memory(
     proc: asyncio.subprocess.Process, limit_mb: int, tripped: asyncio.Event
 ) -> None:
     """macOS ignores RLIMIT_AS, so poll the group's memory and kill it past the limit."""
@@ -200,7 +200,7 @@ class SubprocessRunner:
             cancel_wait = asyncio.ensure_future(cancel.wait()) if cancel else None
             mem_tripped = asyncio.Event()
             watchdog = (
-                asyncio.ensure_future(_watch_memory(proc, self.memory_mb, mem_tripped))
+                asyncio.ensure_future(watch_memory(proc, self.memory_mb, mem_tripped))
                 if self.memory_mb and sys.platform == "darwin"
                 else None
             )
