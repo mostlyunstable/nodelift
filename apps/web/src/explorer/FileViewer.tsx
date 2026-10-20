@@ -154,7 +154,7 @@ export function FileViewer({
           path={file.path}
           language={file.language}
           value={draft ?? file.content}
-          theme={theme === 'dark' ? 'nodecraft-dark' : 'nodecraft-light'}
+          theme={theme === 'dark' ? 'vs-dark' : 'vs'}
           onMount={(editor, monaco) => setHandle({ editor, monaco })}
           onChange={(v) => onDraftChange?.(v ?? '')}
           options={{

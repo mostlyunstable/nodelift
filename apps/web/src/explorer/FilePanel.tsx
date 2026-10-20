@@ -104,7 +104,7 @@ export function FilePanel({ theme }: { theme: 'dark' | 'light' }) {
                 language={e.file.language}
                 original={e.file.content}
                 modified={draft.text}
-                theme={theme === 'dark' ? 'nodecraft-dark' : 'nodecraft-light'}
+                theme={theme === 'dark' ? 'vs-dark' : 'vs'}
                 options={{ readOnly: true, renderSideBySide: false, minimap: { enabled: false } }}
               />
             </div>
