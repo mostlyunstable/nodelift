@@ -3,7 +3,7 @@ import { useStore } from '../state/store'
 import { ResultView } from './ResultView'
 
 export function Inspector() {
-  const { nodes, selectedId, updateData, testNode, nodeTests, busy } = useStore()
+  const { nodes, selectedId, updateData, testNode, nodeTests, busy, requestFocusLine } = useStore()
   const node = nodes.find((n) => n.id === selectedId)
   if (!node) return <aside className="inspector muted pad">Select or add a node to edit it.</aside>
   const test = nodeTests[node.id]
@@ -50,6 +50,7 @@ export function Inspector() {
       </button>
       {test && (
         <ResultView
+          onShowLine={(line) => requestFocusLine(node.id, line)}
           status={test.status}
           duration_ms={test.duration_ms}
           output={test.output}

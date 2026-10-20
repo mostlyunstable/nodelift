@@ -3,7 +3,9 @@ import { useEffect } from 'react'
 import { CodeNode } from '../nodes/CodeNode'
 import { Inspector } from '../panels/Inspector'
 import { RunPanel } from '../panels/RunPanel'
+import { checkConnection } from '../canvas/graph'
 import { useStore } from '../state/store'
+import { matchShortcut } from './shortcuts'
 
 const nodeTypes = { node: CodeNode }
 
@@ -31,11 +33,26 @@ export function App() {
     const onHide = () => {
       if (document.hidden) void useStore.getState().flush() // tab switch or close: save right now
     }
+    const onKey = (e: KeyboardEvent) => {
+      const action = matchShortcut(e)
+      if (!action) return
+      const store = useStore.getState()
+      if (action === 'palette') return // wired up with the command palette
+      e.preventDefault()
+      if (action === 'undo') store.undo()
+      else if (action === 'redo') store.redo()
+      else if (action === 'save') void store.save()
+      else if (action === 'run') {
+        if (store.busy === null && store.nodes.length > 0) void store.runWorkflow()
+      } else if (action === 'cancel') void store.cancel()
+    }
     window.addEventListener('beforeunload', onBeforeUnload)
     document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('keydown', onKey)
     return () => {
       window.removeEventListener('beforeunload', onBeforeUnload)
       document.removeEventListener('visibilitychange', onHide)
+      window.removeEventListener('keydown', onKey)
     }
   }, [])
 
@@ -118,6 +135,8 @@ export function App() {
             onNodesChange={s.onNodesChange}
             onEdgesChange={s.onEdgesChange}
             onConnect={s.onConnect}
+            isValidConnection={(c) => checkConnection(useStore.getState().edges, c.source, c.target).ok}
+            onNodeDragStart={s.beginDrag}
             onNodeClick={(_, n) => s.select(n.id)}
             onPaneClick={() => s.select(null)}
             colorMode="dark"

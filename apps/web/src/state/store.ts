@@ -10,7 +10,9 @@ import {
 import { create } from 'zustand'
 import { api, ApiError } from '../api/client'
 import { followRun } from '../api/events'
+import { checkConnection } from '../canvas/graph'
 import { DEFAULT_SOURCE, fromWorkflow, toWorkflow, type FlowNode, type NodeData } from '../canvas/mapper'
+import { errorLine, firstFailedNodeId } from '../panels/errors'
 import type {
   CodeRunResult,
   RunSummary,
@@ -61,12 +63,57 @@ const forget = () => {
 
 export type SaveState = 'saved' | 'saving' | 'unsaved' | 'error'
 
+// ---- undo / redo: snapshots of the editable graph (immutable updates make them cheap)
+interface Snapshot {
+  nodes: FlowNode[]
+  edges: Edge[]
+  name: string
+}
+const MAX_HISTORY = 100
+const COALESCE_MS = 800
+let past: Snapshot[] = []
+let future: Snapshot[] = []
+let lastEdit: { key: string; at: number } | null = null
+
+function takeSnapshot(): Snapshot {
+  const s = useStore.getState()
+  return { nodes: s.nodes, edges: s.edges, name: s.workflowName }
+}
+
+/** Call BEFORE changing the graph. Rapid edits with the same key (typing) share one undo step. */
+function recordHistory(coalesceKey?: string) {
+  const now = Date.now()
+  if (coalesceKey && lastEdit?.key === coalesceKey && now - lastEdit.at < COALESCE_MS) {
+    lastEdit.at = now
+    return
+  }
+  lastEdit = coalesceKey ? { key: coalesceKey, at: now } : null
+  past.push(takeSnapshot())
+  if (past.length > MAX_HISTORY) past.shift()
+  future = []
+  useStore.setState({ canUndo: true, canRedo: false })
+}
+
+function clearHistory() {
+  past = []
+  future = []
+  lastEdit = null
+  useStore.setState({ canUndo: false, canRedo: false })
+}
+
 let autosaveTimer: ReturnType<typeof setTimeout> | undefined
 let editSeq = 0 // bumped on every edit; a save only clears "dirty" if nothing changed meanwhile
 let generation = 0 // bumped when a different workflow is opened/reset; stale saves must not apply
 let inFlight: Promise<string | null> | null = null
 
 interface State {
+  focusLine: { nodeId: string; line: number; nonce: number } | null
+  requestFocusLine: (nodeId: string, line: number) => void
+  canUndo: boolean
+  canRedo: boolean
+  undo: () => void
+  redo: () => void
+  beginDrag: () => void
   dirty: boolean
   saveState: SaveState
   conflict: boolean // saved elsewhere; autosave stops until the workflow is reopened
@@ -141,7 +188,9 @@ function follow(runId: string) {
     stopFollowing?.()
     stopFollowing = null
     try {
-      useStore.setState({ run: await api.getRun(runId) })
+      const finalRun = await api.getRun(runId)
+      useStore.setState({ run: finalRun })
+      focusFailure(finalRun)
     } finally {
       useStore.setState({ busy: null, message: null })
       await useStore.getState().refresh()
@@ -186,6 +235,28 @@ function follow(runId: string) {
   }
 }
 
+/** After a failed run: jump to the node that failed and ask the editor to show the failing line. */
+function focusFailure(run: ExecutionRun) {
+  const id = firstFailedNodeId(run)
+  if (!id) return
+  const exec = run.nodes.findLast((n) => n.node_id === id)
+  const line = errorLine(exec?.error)
+  useStore.setState({ selectedId: id, focusLine: line ? { nodeId: id, line, nonce: Date.now() } : null })
+}
+
+function applySnapshot(snap: Snapshot) {
+  const selected = useStore.getState().selectedId
+  useStore.setState({
+    nodes: snap.nodes,
+    edges: snap.edges,
+    workflowName: snap.name,
+    selectedId: snap.nodes.some((n) => n.id === selected) ? selected : null,
+    canUndo: past.length > 0,
+    canRedo: future.length > 0,
+  })
+  markDirty()
+}
+
 function scheduleAutosave() {
   clearTimeout(autosaveTimer)
   if (useStore.getState().conflict) return // someone else changed it; saving would just fail again
@@ -205,6 +276,10 @@ function markDirty() {
 export const useStore = create<State>((set, get) => ({
   nodes: [],
   edges: [],
+  focusLine: null,
+  requestFocusLine: (nodeId, line) => useStore.setState({ focusLine: { nodeId, line, nonce: Date.now() } }),
+  canUndo: false,
+  canRedo: false,
   dirty: false,
   saveState: 'saved',
   conflict: false,
@@ -226,16 +301,36 @@ export const useStore = create<State>((set, get) => ({
   message: null,
   abort: null,
 
+  undo: () => {
+    const previous = past.pop()
+    if (!previous) return
+    future.push(takeSnapshot())
+    lastEdit = null
+    applySnapshot(previous)
+  },
+  redo: () => {
+    const next = future.pop()
+    if (!next) return
+    past.push(takeSnapshot())
+    lastEdit = null
+    applySnapshot(next)
+  },
+  beginDrag: () => recordHistory(), // one undo step for a whole drag, not one per mouse move
+
   onNodesChange: (c) => {
+    if (c.some((ch) => ch.type === 'remove')) recordHistory()
     set({ nodes: applyNodeChanges(c, get().nodes) })
     // selection and measurement are not edits; moves, adds and removals are
     if (c.some((ch) => ch.type !== 'select' && ch.type !== 'dimensions')) markDirty()
   },
   onEdgesChange: (c) => {
+    if (c.some((ch) => ch.type === 'remove')) recordHistory()
     set({ edges: applyEdgeChanges(c, get().edges) })
     if (c.some((ch) => ch.type !== 'select')) markDirty()
   },
   onConnect: (c) => {
+    if (!checkConnection(get().edges, c.source, c.target).ok) return // the canvas already refuses these
+    recordHistory()
     set({ edges: addEdge({ ...c, id: `e_${c.source}_${c.target}` }, get().edges) })
     markDirty()
   },
@@ -265,10 +360,12 @@ export const useStore = create<State>((set, get) => ({
         maxAttempts: 1,
       },
     }
+    recordHistory()
     set({ nodes: [...get().nodes, node], selectedId: id })
     markDirty()
   },
   updateConfig: (id, patch) => {
+    recordHistory(`config:${id}:${Object.keys(patch).join(',')}`)
     set({
       nodes: get().nodes.map((n) =>
         n.id === id ? { ...n, data: { ...n.data, config: { ...n.data.config, ...patch } } } : n,
@@ -278,6 +375,7 @@ export const useStore = create<State>((set, get) => ({
   },
   select: (id) => set({ selectedId: id }),
   updateData: (id, patch) => {
+    recordHistory(`data:${id}:${Object.keys(patch).join(',')}`)
     set({ nodes: get().nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)) })
     markDirty()
   },
@@ -358,6 +456,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   setName: (n) => {
+    recordHistory('name')
     set({ workflowName: n })
     markDirty()
   },
@@ -445,6 +544,7 @@ export const useStore = create<State>((set, get) => ({
       stopFollowing?.()
       clearTimeout(autosaveTimer)
       generation++
+      clearHistory()
       set({
         events: [], liveStatus: {}, busy: null,
         nodes, edges, workflowId: rec.id, workflowName: rec.name, revision: rec.revision,
@@ -468,6 +568,7 @@ export const useStore = create<State>((set, get) => ({
         if (e.node_id && e.type === 'node.finished') liveStatus[e.node_id] = e.status as NodeLiveStatus
       }
       set({ run, events, liveStatus })
+      focusFailure(run)
       if (run.status === 'running') {
         set({ busy: 'run' })
         follow(run.id)
@@ -508,6 +609,7 @@ export const useStore = create<State>((set, get) => ({
     stopFollowing = null
     clearTimeout(autosaveTimer)
     generation++
+    clearHistory()
     forget()
     set({
       events: [], liveStatus: {}, nodes: [], edges: [], selectedId: null, run: null, nodeTests: {}, issues: [],

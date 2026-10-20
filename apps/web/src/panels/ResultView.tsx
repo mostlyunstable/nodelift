@@ -1,5 +1,6 @@
 import { Json } from '../editor/Json'
 import type { LogLine, NodeError } from '../types/workflow'
+import { errorLine, explainError } from './errors'
 
 interface Props {
   status: string
@@ -8,9 +9,11 @@ interface Props {
   output: unknown
   logs: LogLine[]
   error: NodeError | null
+  onShowLine?: (line: number) => void
 }
 
-export function ResultView({ status, duration_ms, input, output, logs, error }: Props) {
+export function ResultView({ status, duration_ms, input, output, logs, error, onShowLine }: Props) {
+  const line = errorLine(error)
   return (
     <div className="result">
       <div className="result-head">
@@ -19,9 +22,18 @@ export function ResultView({ status, duration_ms, input, output, logs, error }: 
       </div>
       {error && (
         <div className="error-box" role="alert">
-          <strong>{error.type}</strong>: {error.message}
-          {error.line != null && <span> (line {error.line})</span>}
-          {error.traceback && <pre>{error.traceback}</pre>}
+          <p className="explain">{explainError(error)}</p>
+          {line != null && onShowLine && (
+            <button className="link-button" onClick={() => onShowLine(line)}>
+              Show line {line} in the code
+            </button>
+          )}
+          <details>
+            <summary>
+              {error.type}: {error.message}
+            </summary>
+            {error.traceback && <pre>{error.traceback}</pre>}
+          </details>
         </div>
       )}
       {input !== undefined && (

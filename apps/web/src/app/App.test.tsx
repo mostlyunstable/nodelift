@@ -119,6 +119,63 @@ describe('live run', () => {
   })
 })
 
+describe('failed runs', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    useStore.getState().reset()
+  })
+
+  it('selects the failing node and asks the editor to show the failing line', async () => {
+    const stream = sseStream()
+    const failedRun = {
+      id: 'run_1', status: 'failed', duration_ms: 9, version_no: 1,
+      nodes: [
+        { node_id: 'good', status: 'succeeded', attempt: 1, input: null, output: 1, logs: [], error: null, duration_ms: 1 },
+        { node_id: 'bad', status: 'failed', attempt: 1, input: 1, output: null, logs: [], duration_ms: 2,
+          error: { type: 'runtime_error', message: 'ZeroDivisionError: x',
+            traceback: 'Traceback (most recent call last):\n  File "<node>", line 4, in main\nZeroDivisionError: x' } },
+        { node_id: 'later', status: 'skipped', attempt: 1, input: null, output: null, logs: [], error: null, duration_ms: 0 },
+      ],
+    }
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url, init) => {
+      const u = String(url)
+      if (u.includes('/events/stream')) return Promise.resolve(stream.response())
+      if (u.endsWith('/workflows') && init?.method === 'POST') return jsonResponse({ id: 'wf_1', revision: 1 }, 201)
+      if (u.endsWith('/workflows/wf_1/runs') && init?.method === 'POST')
+        return jsonResponse({ id: 'run_1', status: 'running', nodes: [], duration_ms: 0, version_no: 1 }, 202)
+      if (u.endsWith('/runs/run_1')) return jsonResponse(failedRun)
+      return jsonResponse([])
+    })
+    useStore.getState().addNode()
+    await useStore.getState().runWorkflow()
+    stream.send('run.finished', { seq: 9, type: 'run.finished', status: 'failed' }, 9)
+    await vi.waitFor(() => expect(useStore.getState().selectedId).toBe('bad'))
+    expect(useStore.getState().focusLine).toMatchObject({ nodeId: 'bad', line: 4 })
+    stream.close()
+  })
+
+  it('does not steal the selection when a run succeeds', async () => {
+    useStore.setState({ selectedId: 'mine' })
+    const stream = sseStream()
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url, init) => {
+      const u = String(url)
+      if (u.includes('/events/stream')) return Promise.resolve(stream.response())
+      if (u.endsWith('/workflows') && init?.method === 'POST') return jsonResponse({ id: 'wf_1', revision: 1 }, 201)
+      if (u.endsWith('/workflows/wf_1/runs') && init?.method === 'POST')
+        return jsonResponse({ id: 'run_2', status: 'running', nodes: [], duration_ms: 0, version_no: 1 }, 202)
+      if (u.endsWith('/runs/run_2')) return jsonResponse({ id: 'run_2', status: 'succeeded', nodes: [], duration_ms: 1, version_no: 1 })
+      return jsonResponse([])
+    })
+    useStore.getState().addNode()
+    useStore.setState({ selectedId: 'mine' })
+    await useStore.getState().runWorkflow()
+    stream.send('run.finished', { seq: 3, type: 'run.finished', status: 'succeeded' }, 3)
+    await vi.waitFor(() => expect(useStore.getState().run?.status).toBe('succeeded'))
+    expect(useStore.getState().selectedId).toBe('mine')
+    stream.close()
+  })
+})
+
 describe('cancel and resume', () => {
   beforeEach(() => {
     vi.restoreAllMocks()

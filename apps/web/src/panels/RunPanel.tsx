@@ -44,7 +44,11 @@ export function RunPanel() {
             <h4>Events</h4>
             <ol className="events">
               {events.map((e) => (
-                <li key={e.seq}>
+                <li
+                  key={e.seq}
+                  className={e.node_id ? 'clickable' : undefined}
+                  onClick={() => e.node_id && useStore.getState().select(e.node_id)}
+                >
                   <span className="muted">#{e.seq}</span> {e.type}
                   {e.node_id && <span> · {nameOf(e.node_id)}</span>}
                   {e.status && <span className={`pill pill-${e.status}`}> {e.status}</span>}
@@ -86,6 +90,7 @@ export function RunPanel() {
         <h4>Node execution{exec ? `: ${nameOf(exec.node_id)}` : ''}</h4>
         {exec ? (
           <ResultView
+            onShowLine={(line) => exec && useStore.getState().requestFocusLine(exec.node_id, line)}
             status={exec.status}
             duration_ms={exec.duration_ms}
             input={exec.input}

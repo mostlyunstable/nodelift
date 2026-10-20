@@ -1,12 +1,59 @@
 import Editor from '@monaco-editor/react'
+import type * as Monaco from 'monaco-editor'
+import { useEffect, useRef, useState } from 'react'
 import type { FlowNode } from '../canvas/mapper'
 import { JsonField } from '../editor/JsonField'
 import { useStore } from '../state/store'
+import { errorLine, explainError } from './errors'
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']
 
 function CodeConfig({ node }: { node: FlowNode }) {
   const { updateConfig } = useStore()
+  const exec = useStore((s) => s.run?.nodes.findLast((n) => n.node_id === node.id))
+  const test = useStore((s) => s.nodeTests[node.id])
+  const focus = useStore((s) => s.focusLine)
+  const failure =
+    (test?.status === 'failed' ? test.error : null) ?? (exec?.status === 'failed' ? exec.error : null)
+  const line = errorLine(failure)
+  const handle = useRef<{ editor: Monaco.editor.IStandaloneCodeEditor; monaco: typeof Monaco } | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  const setMarker = (l: number | null, message: string) => {
+    const h = handle.current
+    const model = h?.editor.getModel()
+    if (!h || !model) return
+    h.monaco.editor.setModelMarkers(
+      model,
+      'nodecraft',
+      l && l <= model.getLineCount()
+        ? [
+            {
+              severity: h.monaco.MarkerSeverity.Error,
+              message,
+              startLineNumber: l,
+              endLineNumber: l,
+              startColumn: 1,
+              endColumn: model.getLineMaxColumn(l),
+            },
+          ]
+        : [],
+    )
+  }
+
+  // underline the failing line whenever this node has a failure to show
+  useEffect(() => {
+    if (mounted) setMarker(line, failure ? explainError(failure) : '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, line, failure?.message])
+
+  // "Show line N" and automatic focus after a failed run
+  useEffect(() => {
+    if (!mounted || !focus || focus.nodeId !== node.id) return
+    handle.current?.editor.revealLineInCenter(focus.line)
+    handle.current?.editor.setPosition({ lineNumber: focus.line, column: 1 })
+  }, [mounted, focus, node.id])
+
   return (
     <>
       <div className="field">
@@ -18,7 +65,14 @@ function CodeConfig({ node }: { node: FlowNode }) {
           language="python"
           theme="vs-dark"
           value={String(node.data.config.source ?? '')}
-          onChange={(v) => updateConfig(node.id, { source: v ?? '' })}
+          onMount={(editor, monaco) => {
+            handle.current = { editor, monaco }
+            setMounted(true)
+          }}
+          onChange={(v) => {
+            setMarker(null, '') // the old error no longer describes this code
+            updateConfig(node.id, { source: v ?? '' })
+          }}
           options={{ minimap: { enabled: false }, fontSize: 13, scrollBeyondLastLine: false }}
         />
       </div>
