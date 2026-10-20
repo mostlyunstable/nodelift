@@ -242,6 +242,11 @@ def _walk(
         )
 
 
+def _is_flow(text: str) -> bool:
+    """Files that declare `@flow` use Flow type syntax, which this parser does not read."""
+    return "@flow" in text[:2048]
+
+
 class JavaScriptAnalyzer:
     id = SOURCE
     languages = frozenset({"javascript", "typescript"})
@@ -251,16 +256,16 @@ class JavaScriptAnalyzer:
         parser = Parser(_language(path))
         tree = parser.parse(text.encode("utf-8"))
         root: Any = tree.root_node
-        if root.has_error:
+        if root.has_error and not _is_flow(text):
             bad = _first_error(root)
             ln = (bad.start_point[0] + 1) if bad is not None else 1
             col = (bad.start_point[1] + 1) if bad is not None else 0
             out.diagnostics.append(
                 RepoDiagnosticRecord(
-                    path=path, line=ln, column=col, severity="warning", code="syntax_error",
+                    path=path, line=ln, column=col, severity="info", code="parser_note",
                     message=(
-                        "The parser reported a syntax error here "
-                        "(it may be newer syntax the parser does not know)"
+                        "The parser could not fully read this file. It may use syntax the parser "
+                        "does not know (for example Flow types), so this is a note, not a verdict."
                     ),
                     source=SOURCE,
                 )

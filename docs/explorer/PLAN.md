@@ -176,3 +176,18 @@ review, cancel (nothing runs), approve, output `42`. CI runs the offline specs. 
 and checks: signature still verifies after a launch, UI reached the bundled backend, bundled runtime process, database at the newest schema, no process
 left after quitting. It found a real bug: the app wrote `.pyc` files into its own bundle, breaking the code signature on first launch (fixed: bytecode
 precompiled with `unchecked-hash` and `PYTHONDONTWRITEBYTECODE=1`).
+
+## User-testing fixes (2026-10-20)
+Found by using the app as a first-time user (clean data folder; Flask and React imported), then fixed and re-tested the same way:
+- **Unreadable graph:** big repositories now open "code only" (docs/config/data hidden, one click to show all; the file list always shows everything),
+  folders open code-first within a 120-node budget, a folder's files are packed in a grid instead of one tall column (no overlaps, tested), and the view opens at a
+  readable zoom (0.85) with the repository root at the left instead of fit-all (6% before).
+- **False Problems:** Flow-typed files are not flagged, other parser limits are *notes* (not counted), imports of build output/`node_modules` are not diagnosed,
+  JSON-with-comments files (tsconfig, .eslintrc, ...) are read. React: 1,187 "problems" before, 0 now; notes are available folded under the Problems tab.
+- **Getting around:** "All imports", "Check for newer commit", a hide-the-file-list toggle, the imports list stays reachable, ⌘K and a menu in Explorer mode.
+- **Small windows:** no sideways scrolling at 700, 880 or 1280 px (tested in e2e); the Explorer sidebar stacks on narrow windows.
+- **Discoverability:** the Build welcome screen offers the Explorer; the Explorer welcome explains itself and offers two examples; palette commands for Explorer.
+- **Nodes:** settings are generated forms with explanations (filter conditions have their own builder; "Edit as JSON" remains), retry settings only appear where they
+  mean something and say what they do, node menu is grouped by category, unconnected nodes are labelled and explained, data errors say what to check.
+**Still true:** the first screen of a large repository shows the top of the tree, so the most interesting folder may be a scroll or a search away; the dependency
+lines of a big repository are dense by nature.

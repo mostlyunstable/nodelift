@@ -5,6 +5,7 @@ import {
   ancestorDirs,
   buildGraph,
   defaultExpanded,
+  shouldDefaultToCodeOnly,
   dirId,
   fileId,
   languageCounts,
@@ -97,14 +98,51 @@ describe('buildGraph', () => {
 })
 
 describe('layoutGraph', () => {
-  it('places children to the right of their parent without overlapping siblings', () => {
+  const rect = (n: { position: { x: number; y: number }; type?: string }) => ({
+    x1: n.position.x,
+    y1: n.position.y,
+    x2: n.position.x + (n.type === 'file' ? 210 : 210),
+    y2: n.position.y + (n.type === 'file' ? 58 : 46),
+  })
+
+  it('places children to the right of their parent', () => {
     const g = buildGraph(files, 'r', opts())
     const laid = layoutGraph(g.nodes, g.edges)
     const byId = new Map(laid.map((n) => [n.id, n]))
     const root = byId.get(dirId(''))!
     for (const e of g.edges) expect(byId.get(e.target)!.position.x).toBeGreaterThan(root.position.x)
-    const ys = laid.filter((n) => n.id !== dirId('')).map((n) => n.position.y)
-    expect(new Set(ys).size).toBe(ys.length)
+  })
+
+  it('never overlaps two nodes, even for a big mixed tree', () => {
+    const many = [
+      ...Array.from({ length: 40 }, (_, i) => f(`pkg/m${i}.py`, 'python')),
+      ...Array.from({ length: 9 }, (_, i) => f(`pkg/sub/s${i}.py`, 'python')),
+      ...Array.from({ length: 3 }, (_, i) => f(`pkg/sub/deep/d${i}.py`, 'python')),
+      ...Array.from({ length: 6 }, (_, i) => f(`docs/d${i}.md`, 'markdown')),
+    ]
+    const g = buildGraph(
+      many,
+      'r',
+      opts({ expanded: new Set(['', 'pkg', 'pkg/sub', 'pkg/sub/deep', 'docs']), cap: 500 }),
+    )
+    const laid = layoutGraph(g.nodes, g.edges).map(rect)
+    for (let i = 0; i < laid.length; i++)
+      for (let j = i + 1; j < laid.length; j++) {
+        const a = laid[i]!
+        const b = laid[j]!
+        const overlap = a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2
+        expect(overlap, `nodes ${i} and ${j} overlap`).toBe(false)
+      }
+  })
+
+  it('packs a big folder into a compact grid instead of one tall column', () => {
+    const many = Array.from({ length: 60 }, (_, i) => f(`pkg/m${i}.py`, 'python'))
+    const g = buildGraph(many, 'r', opts({ expanded: new Set(['', 'pkg']), cap: 500 }))
+    const laid = layoutGraph(g.nodes, g.edges)
+    const ys = laid.map((n) => n.position.y)
+    const height = Math.max(...ys) - Math.min(...ys)
+    expect(height).toBeLessThan((60 * 70) / 2) // far shorter than 60 stacked rows
+    expect(new Set(laid.filter((n) => n.type === 'file').map((n) => n.position.x)).size).toBe(3)
   })
 })
 
@@ -256,6 +294,32 @@ describe('defaultExpanded', () => {
     const g = buildGraph(files, 'r', { expanded: open, languages: new Set() })
     expect(g.nodes.filter((n) => n.type === 'file').length).toBe(files.length)
     expect(g.truncated).toBe(false)
+  })
+
+  it('opens folders that hold code before documentation folders when the budget is tight', () => {
+    const repo = [
+      ...Array.from({ length: 30 }, (_, i) => f(`docs/d${i}.md`, 'markdown')),
+      ...Array.from({ length: 30 }, (_, i) => f(`src/s${i}.py`, 'python')),
+    ]
+    const open = defaultExpanded(repo, 40)
+    expect(open.has('src')).toBe(true)
+    expect(open.has('docs')).toBe(false)
+  })
+
+  it('code-only hides docs and config, and big repositories default to it', () => {
+    const repo = [
+      ...Array.from({ length: 70 }, (_, i) => f(`docs/d${i}.md`, 'markdown')),
+      ...Array.from({ length: 6 }, (_, i) => f(`src/s${i}.py`, 'python')),
+    ]
+    expect(shouldDefaultToCodeOnly(repo)).toBe(true)
+    expect(shouldDefaultToCodeOnly(files)).toBe(false) // small repos show every file
+    const g = buildGraph(repo, 'r', {
+      expanded: new Set(['', 'src', 'docs']),
+      languages: new Set(),
+      codeOnly: true,
+    })
+    expect(g.nodes.some((n) => n.id === dirId('docs'))).toBe(false)
+    expect(g.nodes.filter((n) => n.type === 'file')).toHaveLength(6)
   })
 
   it('stops opening folders before the node cap, keeping the result drawable', () => {

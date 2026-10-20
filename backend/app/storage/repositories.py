@@ -543,7 +543,9 @@ class SqlRepoRepository:
                 rev.analysis_error = None
                 rev.analyzed_count = sum(1 for v in statuses.values() if v == "analyzed")
                 rev.edge_count = len(edges)
-                rev.diagnostic_count = len(diagnostics)
+                rev.diagnostic_count = sum(
+                    1 for d in diagnostics if d.severity != "info"
+                )  # notes are not problems
                 rev.updated_at = utcnow()
 
     @staticmethod

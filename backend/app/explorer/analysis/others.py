@@ -498,6 +498,85 @@ _JSON_PATH_KEYS = {
 }
 
 
+_JSONC_NAMES = (
+    "tsconfig",
+    "jsconfig",
+    ".eslintrc",
+    ".babelrc",
+    ".prettierrc",
+    "devcontainer.json",
+    "settings.json",
+    "launch.json",
+    "tasks.json",
+)
+
+
+def _is_jsonc(path: str) -> bool:
+    low = path.lower()
+    base = low.rsplit("/", 1)[-1]
+    return (
+        low.endswith(".jsonc")
+        or base.startswith(_JSONC_NAMES)
+        or "/.vscode/" in f"/{low}"
+        or "/.devcontainer/" in f"/{low}"
+    )
+
+
+def _strip_jsonc(text: str) -> str:
+    """Remove // and /* */ comments and trailing commas, leaving string contents alone."""
+    out: list[str] = []
+    i, n, in_str, esc = 0, len(text), False, False
+    while i < n:
+        c = text[i]
+        if in_str:
+            out.append(c)
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+        elif c == '"':
+            in_str = True
+            out.append(c)
+        elif text.startswith("//", i):
+            while i < n and text[i] != "\n":
+                i += 1
+            continue
+        elif text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            i = n if end == -1 else end + 2
+            continue
+        else:
+            out.append(c)
+        i += 1
+    cleaned = "".join(out)
+    # trailing commas before } or ]
+    res, in_str, esc, k = [], False, False, 0
+    while k < len(cleaned):
+        c = cleaned[k]
+        if in_str:
+            res.append(c)
+            esc = (not esc) if c == "\\" else False
+            if c == '"' and not esc:
+                in_str = False
+        elif c == '"':
+            in_str = True
+            res.append(c)
+        elif c == ",":
+            j = k + 1
+            while j < len(cleaned) and cleaned[j] in " \t\r\n":
+                j += 1
+            if j < len(cleaned) and cleaned[j] in "}]":
+                k += 1
+                continue
+            res.append(c)
+        else:
+            res.append(c)
+        k += 1
+    return "".join(res)
+
+
 class JsonAnalyzer:
     id = "json"
     languages = frozenset({"json"})
@@ -505,14 +584,14 @@ class JsonAnalyzer:
     def analyze(self, path: str, text: str) -> FileAnalysis:
         out = FileAnalysis()
         try:
-            data = json.loads(text)
+            data = json.loads(_strip_jsonc(text) if _is_jsonc(path) else text)
         except json.JSONDecodeError as e:
             out.diagnostics.append(
                 RepoDiagnosticRecord(
                     path=path,
                     line=e.lineno,
                     column=e.colno,
-                    severity="error",
+                    severity="warning" if _is_jsonc(path) else "error",
                     code="syntax_error",
                     message=f"Invalid JSON: {e.msg}",
                     source=self.id,

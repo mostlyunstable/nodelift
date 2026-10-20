@@ -1,3 +1,4 @@
+import { useExplorer } from '../state/explorer'
 import { useEffect } from 'react'
 import { useStore } from '../state/store'
 
@@ -65,6 +66,9 @@ export function EmptyCanvas() {
         </button>
         <button onClick={() => void createExample('route-orders')}>See branching</button>
         <button onClick={() => addNode('code.python')}>Add a Python node</button>
+        <button onClick={() => useExplorer.getState().setMode('explorer')}>
+          Explore a GitHub repository
+        </button>
       </div>
       <p className="muted">
         Press <kbd>⌘K</kbd> for every command, or{' '}
@@ -93,6 +97,21 @@ export function TourBanner() {
       <button className="icon-button" aria-label="Dismiss tip" onClick={dismissTour}>
         ✕
       </button>
+    </div>
+  )
+}
+
+/** Several nodes but some stand alone: say so, and say how to connect them. */
+export function LonelyNodesNotice() {
+  const { nodes, edges } = useStore()
+  const lonely =
+    nodes.length > 1 ? nodes.filter((n) => !edges.some((e) => e.source === n.id || e.target === n.id)) : []
+  if (lonely.length === 0) return null
+  return (
+    <div className="lonely-notice" role="note">
+      {lonely.length === 1 ? `“${lonely[0]!.data.name}” isn’t` : `${lonely.length} nodes aren’t`} connected to
+      anything, so {lonely.length === 1 ? 'it' : 'each one'} runs on its own with the workflow input. Drag
+      from the dot on the right of a node to the dot on the left of another to pass data along.
     </div>
   )
 }

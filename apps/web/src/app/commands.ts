@@ -43,6 +43,9 @@ export interface CommandContext {
     credentials: () => void
     shortcuts: () => void
     theme: (t: 'dark' | 'light' | 'system') => void
+    explore?: () => void // switch to the repository Explorer
+    build?: () => void // switch to the workflow editor
+    closeRepo?: () => void // go back to the list of imported repositories
   }
 }
 
@@ -58,6 +61,14 @@ export function buildCommands(c: CommandContext): Command[] {
   if (c.runStatus === 'failed' || c.runStatus === 'cancelled')
     add('resume', 'Resume from failure', 'Run', a.resume)
   if (c.hasNodes) add('validate', 'Check workflow for problems', 'Run', a.validate)
+
+  if (a.explore) add('explore', 'Explore a GitHub repository…', 'Explorer', a.explore)
+  if (a.build) add('build', 'Go to the workflow editor (Build)', 'Explorer', a.build)
+  if (a.closeRepo)
+    add('repos', 'Show imported repositories', 'Explorer', () => {
+      a.explore?.()
+      a.closeRepo?.()
+    })
 
   if (c.canUndo) add('undo', 'Undo', 'Edit', a.undo, '⌘Z')
   if (c.canRedo) add('redo', 'Redo', 'Edit', a.redo, '⇧⌘Z')

@@ -15,6 +15,7 @@ const BADGES: Record<string, string> = {
   sql: 'sql',
   shell: 'sh',
   markdown: 'md',
+  plaintext: 'txt',
   go: 'go',
   java: 'java',
   rust: 'rs',

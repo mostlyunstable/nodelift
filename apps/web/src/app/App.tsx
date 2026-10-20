@@ -17,7 +17,7 @@ import {
   VersionsDialog,
 } from '../ui/Dialogs'
 import { Menu, type MenuItem } from '../ui/Menu'
-import { EmptyCanvas, RunAnnouncer, Toast, TourBanner } from '../ui/Overlays'
+import { EmptyCanvas, LonelyNodesNotice, RunAnnouncer, Toast, TourBanner } from '../ui/Overlays'
 import { buildCommands, type CommandContext } from './commands'
 import { matchShortcut } from './shortcuts'
 
@@ -144,17 +144,32 @@ export function App() {
       diagnostics: () => s.openDialog('diagnostics'),
       shortcuts: () => s.openDialog('shortcuts'),
       theme: s.setTheme,
+      explore: () => setMode('explorer'),
+      build: () => setMode('build'),
+      closeRepo: () => useExplorer.getState().closeRevision(),
     },
   }
   // only needed while the palette is open; building the list is cheap
   const commands = s.dialog === 'palette' ? buildCommands(context) : []
 
+  const ORDER = ['Code', 'Data', 'Logic', 'Integrations', 'AI', 'Files']
   const addItems: MenuItem[] = (
     s.nodeDefs.length > 0 ? s.nodeDefs : [{ type: 'code.python', title: 'Python code' }]
-  ).map((d) => ({
-    label: d.title,
-    onSelect: () => s.addNode(d.type),
-  }))
+  )
+    .slice()
+    .sort(
+      (x, y) =>
+        (ORDER.indexOf((x as { category?: string }).category ?? '') + 1 || 99) -
+        (ORDER.indexOf((y as { category?: string }).category ?? '') + 1 || 99),
+    )
+    .map((d, i, all) => ({
+      label: d.title,
+      onSelect: () => s.addNode(d.type),
+      heading:
+        'category' in d && (i === 0 || (all[i - 1] as { category?: string }).category !== d.category)
+          ? (d as { category?: string }).category
+          : undefined,
+    }))
   const workflowItems: MenuItem[] = [
     { label: 'New workflow', onSelect: () => void guarded(s.reset) },
     ...s.examples.map((ex) => ({
@@ -197,7 +212,27 @@ export function App() {
             Explorer
           </button>
         </div>
-        {mode === 'explorer' && <span className="spacer" />}
+        {mode === 'explorer' && (
+          <>
+            <span className="spacer" />
+            <button
+              onClick={() => s.openDialog('palette')}
+              title="Command palette (⌘K)"
+              aria-label="Command palette"
+            >
+              ⌘K
+            </button>
+            <Menu
+              label="⋯"
+              ariaLabel="More actions"
+              align="right"
+              items={[
+                { label: 'Diagnostics…', onSelect: () => s.openDialog('diagnostics') },
+                { label: 'Keyboard shortcuts…', onSelect: () => s.openDialog('shortcuts') },
+              ]}
+            />
+          </>
+        )}
         {mode === 'build' && (
           <>
             <input
@@ -253,6 +288,7 @@ export function App() {
             <div className="canvas">
               <TourBanner />
               <EmptyCanvas />
+              <LonelyNodesNotice />
               <ReactFlow
                 nodes={s.nodes}
                 edges={s.edges}

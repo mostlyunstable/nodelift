@@ -14,11 +14,12 @@ import {
   type EdgeProps,
   type NodeChange,
 } from '@xyflow/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useExplorer } from '../state/explorer'
 import { DirNode, FileNode } from './ExplorerNodes'
 import {
   buildGraph,
+  dirId,
   fileId,
   languageCounts,
   layoutGraph,
@@ -92,6 +93,7 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
   const files = useExplorer((s) => s.files)
   const expanded = useExplorer((s) => s.expanded)
   const languages = useExplorer((s) => s.languages)
+  const codeOnly = useExplorer((s) => s.codeOnly)
   const selectedPath = useExplorer((s) => s.selectedPath)
   const focus = useExplorer((s) => s.focus)
   const selectedEdge = useExplorer((s) => s.selectedEdge)
@@ -109,11 +111,12 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
     const g = buildGraph(files, repoName, {
       expanded,
       languages,
+      codeOnly,
       dependencies: showDeps ? dependencies : [],
       diagnostics,
     })
     return { ...g, nodes: layoutGraph(g.nodes, g.edges) }
-  }, [files, repoName, expanded, languages, dependencies, diagnostics, showDeps])
+  }, [files, repoName, expanded, languages, codeOnly, dependencies, diagnostics, showDeps])
 
   // Positions are local so nodes can be dragged; a new layout (expand/filter) replaces them.
   const [nodes, setNodes] = useState<ExplorerNode[]>(built.nodes)
@@ -146,15 +149,23 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
     [built.edges, selectedEdge],
   )
 
-  // fit the view whenever the set of visible nodes changes shape
-  const shapeKey = built.nodes.map((n) => n.id).join('|')
+  // Frame the repository root and what is directly inside it, at a readable zoom, when a repository opens
+  // or the filter changes. Expanding a folder keeps your view where it is.
+  const fitKey = `${repoName}|${[...languages].join(',')}|${codeOnly}`
+  const lastFit = useRef('')
   useEffect(() => {
+    // wait until the repository's files have arrived (a lone root node means they have not)
+    if (lastFit.current === fitKey || built.nodes.length < 2) return
+    lastFit.current = fitKey
+    const root = built.nodes.find((n) => n.id === dirId(''))
+    if (!root) return
+    // Readable zoom, with the repository root at the left and its contents filling the view
     const t = setTimeout(
-      () => void rf.fitView({ padding: 0.15, duration: 200, minZoom: 0.6, maxZoom: 1 }),
+      () => void rf.setCenter(root.position.x + 330, root.position.y + 24, { zoom: 0.85, duration: 200 }),
       30,
     )
     return () => clearTimeout(t)
-  }, [shapeKey, rf])
+  }, [fitKey, built.nodes, rf])
 
   // centre on a revealed file once its node exists
   useEffect(() => {
@@ -185,7 +196,6 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
       deleteKeyCode={null}
       colorMode={theme}
       minZoom={0.05}
-      fitView
     >
       <Background />
       <Controls showInteractive={false} />
@@ -221,6 +231,21 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
             ))}
           </ul>
         )}
+        <div className="chips" role="group" aria-label="Show">
+          <button
+            className={`chip${codeOnly ? ' on' : ''}`}
+            aria-pressed={codeOnly}
+            onClick={() => useExplorer.getState().setCodeOnly(!codeOnly)}
+            title="Hide documentation, configuration and data files"
+          >
+            Code only
+          </button>
+        </div>
+        {codeOnly && (
+          <div className="muted small" role="status">
+            Showing source code only. Docs, configuration and data are hidden here but still in the file list.
+          </div>
+        )}
         <div className="chips" role="group" aria-label="Filter by language">
           {langs.map(([l, n]) => (
             <button
@@ -229,7 +254,7 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
               aria-pressed={languages.has(l)}
               onClick={() => toggleLanguage(l)}
             >
-              {l} <span className="muted">{n}</span>
+              {l === 'plaintext' ? 'text' : l} <span className="muted">{n}</span>
             </button>
           ))}
           {languages.size > 0 && (
@@ -254,29 +279,32 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
           />{' '}
           Show dependencies
         </label>
-        <div>
-          <svg width="28" height="8" aria-hidden="true">
-            <path d="M0 4 H28" className="xe-contains" />
-          </svg>{' '}
-          Folder contains item (structure)
-        </div>
-        {hasDeps && (
-          <>
-            <div>
-              <svg width="28" height="8" aria-hidden="true">
-                <path d="M0 4 H28" className="xe-dep xe-resolved" />
-              </svg>{' '}
-              Imports / references (resolved to a file)
-            </div>
-            <div>
-              <svg width="28" height="8" aria-hidden="true">
-                <path d="M0 4 H28" className="xe-dep xe-heuristic" />
-              </svg>{' '}
-              Heuristic (name match, not proven)
-            </div>
-            <div className="muted">A number is how many relations an edge stands for.</div>
-          </>
-        )}
+        <details className="legend-details">
+          <summary>Legend</summary>
+          <div>
+            <svg width="28" height="8" aria-hidden="true">
+              <path d="M0 4 H28" className="xe-contains" />
+            </svg>{' '}
+            Folder contains item (structure)
+          </div>
+          {hasDeps && (
+            <>
+              <div>
+                <svg width="28" height="8" aria-hidden="true">
+                  <path d="M0 4 H28" className="xe-dep xe-resolved" />
+                </svg>{' '}
+                Imports / references (resolved to a file)
+              </div>
+              <div>
+                <svg width="28" height="8" aria-hidden="true">
+                  <path d="M0 4 H28" className="xe-dep xe-heuristic" />
+                </svg>{' '}
+                Heuristic (name match, not proven)
+              </div>
+              <div className="muted">A number is how many relations an edge stands for.</div>
+            </>
+          )}
+        </details>
         {analysisStatus === 'analyzing' && <div role="status">Analyzing dependencies…</div>}
         {analysisStatus === 'failed' && (
           <div role="alert">Analysis failed; dependency edges are unavailable.</div>

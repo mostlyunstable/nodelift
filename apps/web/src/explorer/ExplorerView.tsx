@@ -7,6 +7,11 @@ import { ProblemsView } from './ProblemsView'
 import { RunView } from './RunView'
 import { formatBytes } from './tree'
 
+const EXAMPLES = [
+  { label: 'octocat/Spoon-Knife (3 files)', url: 'https://github.com/octocat/Spoon-Knife' },
+  { label: 'pallets/flask (a Python web framework)', url: 'https://github.com/pallets/flask' },
+]
+
 export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
   const e = useExplorer()
   useEffect(() => {
@@ -15,8 +20,8 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
   const rev = e.revision
 
   return (
-    <main className="explorer">
-      <aside className="explorer-side">
+    <main className={`explorer${e.sidebarOpen ? '' : ' side-collapsed'}`}>
+      <aside className="explorer-side" hidden={!e.sidebarOpen}>
         <form
           className="import-form"
           onSubmit={(ev) => {
@@ -66,6 +71,24 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
               {rev.branch} @ <code title={rev.commit_sha}>{rev.commit_sha.slice(0, 7)}</code>
             </div>
             {rev.description && <div className="small">{rev.description}</div>}
+            <div className="row-actions">
+              <button className="link-button" onClick={() => e.closeRevision()}>
+                ◂ All imports
+              </button>
+              <button
+                className="link-button"
+                title="Look for a newer commit of this branch and open it"
+                disabled={e.starting}
+                onClick={() => void e.refreshLatest()}
+              >
+                Check for newer commit
+              </button>
+            </div>
+            {e.notice && (
+              <div className="small" role="status">
+                {e.notice}
+              </div>
+            )}
             {rev.status === 'importing' && (
               <div className="small" role="status" aria-live="polite">
                 {rev.phase}
@@ -114,7 +137,7 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
           <FileTree files={e.files} selected={e.selectedPath} onSelect={(p) => void e.reveal(p)} />
         )}
 
-        {!rev && e.revisions.length > 0 && (
+        {e.revisions.length > 0 && (!rev || rev.status !== 'ready') && (
           <section className="recent" aria-label="Recent imports">
             <h4>Recent</h4>
             <ul>
@@ -144,6 +167,15 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
         {rev?.status === 'ready' ? (
           <>
             <div className="tabs" role="tablist" aria-label="View">
+              <button
+                className="icon-button"
+                aria-label={e.sidebarOpen ? 'Hide the file list' : 'Show the file list'}
+                aria-pressed={!e.sidebarOpen}
+                onClick={() => e.toggleSidebar()}
+                title={e.sidebarOpen ? 'Hide the file list' : 'Show the file list'}
+              >
+                ◧
+              </button>
               <button role="tab" aria-selected={e.tab === 'graph'} onClick={() => e.setTab('graph')}>
                 Graph
               </button>
@@ -178,10 +210,32 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
             )}
           </>
         ) : (
-          <div className="viewer-empty muted">
-            {rev?.status === 'importing'
-              ? 'Importing…'
-              : 'Paste a GitHub URL and press Show Nodes to explore a repository.'}
+          <div className="viewer-empty">
+            {rev?.status === 'importing' ? (
+              <span className="muted">Importing…</span>
+            ) : (
+              <div className="explorer-welcome">
+                <h2>See a codebase as nodes</h2>
+                <p className="muted">
+                  Paste the link of a public GitHub repository. Every file becomes a node, and the imports,
+                  links and calls between them become lines. Nothing from the repository is run.
+                </p>
+                <div className="boot-actions">
+                  <span className="muted small">Or try one:</span>
+                  {EXAMPLES.map((x) => (
+                    <button
+                      key={x.url}
+                      onClick={() => {
+                        e.setUrl(x.url)
+                        void useExplorer.getState().showNodes()
+                      }}
+                    >
+                      {x.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </section>

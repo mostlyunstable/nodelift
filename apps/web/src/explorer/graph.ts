@@ -1,4 +1,3 @@
-import dagre from '@dagrejs/dagre'
 import type { Edge, Node } from '@xyflow/react'
 import type { RepoDiagnostic, RepoEdge, RepoFile } from '../api/client'
 import { buildTree, type TreeDir } from './tree'
@@ -8,6 +7,20 @@ export const FILE_H = 58
 export const DIR_W = 210
 export const DIR_H = 46
 export const DEFAULT_CAP = 300
+/** Nodes drawn when a repository first opens: enough to orient yourself, few enough to read. */
+export const INITIAL_CAP = 120
+
+/** Languages whose files are source code, as opposed to docs, configuration or data. */
+export const CODE_LANGUAGES = new Set([
+  'python', 'javascript', 'typescript', 'go', 'java', 'rust', 'ruby', 'shell', 'html', 'css',
+  'scss', 'less', 'sql', 'c', 'cpp', 'csharp', 'php', 'swift', 'kotlin',
+]) // prettier-ignore
+
+export const isCode = (f: RepoFile): boolean => CODE_LANGUAGES.has(f.language) && f.stored
+
+/** Big repositories open showing code only; small ones show every file. */
+export const shouldDefaultToCodeOnly = (files: RepoFile[]): boolean =>
+  files.length > 60 && files.filter(isCode).length >= 5
 export const DEFAULT_DEP_CAP = 600
 const MAX_RELATIONS_PER_EDGE = 40
 
@@ -46,6 +59,7 @@ export type ExplorerEdge = Edge<ExplorerEdgeData, EdgeKind>
 export interface GraphOptions {
   expanded: ReadonlySet<string> // folder paths; '' is the repository root
   languages: ReadonlySet<string> // empty = every language
+  codeOnly?: boolean // hide documentation, config and data files
   cap?: number
   dependencies?: RepoEdge[] // file-to-file relations from analysis
   diagnostics?: RepoDiagnostic[]
@@ -83,13 +97,15 @@ function noteFor(f: RepoFile): string | null {
  */
 export function buildGraph(files: RepoFile[], repoName: string, opts: GraphOptions): BuiltGraph {
   const cap = opts.cap ?? DEFAULT_CAP
-  const keep = (f: RepoFile) => opts.languages.size === 0 || opts.languages.has(f.language)
+  const keep = (f: RepoFile) =>
+    (opts.languages.size === 0 || opts.languages.has(f.language)) && (!opts.codeOnly || isCode(f))
   const root = buildTree(files.filter(keep))
   const nodes: ExplorerNode[] = []
   const edges: ExplorerEdge[] = []
   let hidden = 0
   const problemsByPath = new Map<string, number>()
   for (const d of opts.diagnostics ?? []) {
+    if (d.severity === 'info') continue // notes (parser limits, build-output imports) are not problems
     problemsByPath.set(d.path, (problemsByPath.get(d.path) ?? 0) + 1)
   }
 
@@ -262,22 +278,61 @@ function buildDependencyEdges(
   return { edges: all.slice(0, cap), hidden: Math.max(0, all.length - cap) }
 }
 
-/** Left-to-right tree layout. Returns new nodes with positions; edges are unchanged. */
+const GAP_X = 70
+const GAP_Y = 12
+const COL_GAP = 16
+
+/**
+ * Left-to-right tree layout. A folder's files are packed into a small grid beside it instead of one
+ * tall column, then its sub-folders are stacked below, so a big folder stays compact and readable.
+ */
 export function layoutGraph(nodes: ExplorerNode[], edges: ExplorerEdge[]): ExplorerNode[] {
-  const g = new dagre.graphlib.Graph()
-  g.setGraph({ rankdir: 'LR', nodesep: 14, ranksep: 70, marginx: 20, marginy: 20 })
-  g.setDefaultEdgeLabel(() => ({}))
-  for (const n of nodes) {
-    g.setNode(n.id, n.type === 'file' ? { width: FILE_W, height: FILE_H } : { width: DIR_W, height: DIR_H })
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const children = new Map<string, ExplorerNode[]>()
+  const hasParent = new Set<string>()
+  for (const e of edges) {
+    if (e.data?.kind !== 'contains') continue
+    const c = byId.get(e.target)
+    if (!c) continue
+    hasParent.add(e.target)
+    children.set(e.source, [...(children.get(e.source) ?? []), c])
   }
-  for (const e of edges) if (e.data?.kind === 'contains') g.setEdge(e.source, e.target)
-  dagre.layout(g)
-  return nodes.map((n) => {
-    const p = g.node(n.id)
+  const pos = new Map<string, { x: number; y: number }>()
+
+  /** Places the subtree rooted at `n` with its top-left at (x, y); returns its height. */
+  const place = (n: ExplorerNode, x: number, y: number): number => {
+    const kids = children.get(n.id) ?? []
     const w = n.type === 'file' ? FILE_W : DIR_W
     const h = n.type === 'file' ? FILE_H : DIR_H
-    return { ...n, position: { x: p.x - w / 2, y: p.y - h / 2 } }
-  })
+    if (kids.length === 0) {
+      pos.set(n.id, { x, y })
+      return h
+    }
+    const files = kids.filter((k) => k.type === 'file')
+    const dirs = kids.filter((k) => k.type === 'dir')
+    const cols = files.length <= 4 ? 1 : files.length <= 14 ? 2 : 3
+    const startX = x + w + GAP_X
+    let cursor = y
+    files.forEach((f, i) => {
+      pos.set(f.id, {
+        x: startX + (i % cols) * (FILE_W + COL_GAP),
+        y: y + Math.floor(i / cols) * (FILE_H + GAP_Y),
+      })
+    })
+    if (files.length > 0) cursor = y + Math.ceil(files.length / cols) * (FILE_H + GAP_Y)
+    const dirX = startX
+    for (const d of dirs) cursor += place(d, dirX, cursor) + GAP_Y
+    const total = Math.max(cursor - y - GAP_Y, h)
+    pos.set(n.id, { x, y: y + Math.min((total - h) / 2, 4 * (FILE_H + GAP_Y)) })
+    return total
+  }
+
+  let top = 20
+  for (const n of nodes) {
+    if (hasParent.has(n.id) || pos.has(n.id)) continue
+    top += place(n, 20, top) + GAP_Y * 3
+  }
+  return nodes.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position }))
 }
 
 /** Languages present, most common first, for the filter chips. */
@@ -288,16 +343,23 @@ export function languageCounts(files: RepoFile[]): [string, number][] {
 }
 
 /**
- * Folders to open when a repository first appears, so its files are already nodes: open level by
- * level, smallest folders first, until the node cap would be exceeded.
+ * Folders to open when a repository first appears, so its files are already nodes: open level by level,
+ * folders that hold code before folders that don't, then smaller before larger, until the node budget is used.
  */
-export function defaultExpanded(files: RepoFile[], cap = DEFAULT_CAP): Set<string> {
-  const root = buildTree(files)
+export function defaultExpanded(files: RepoFile[], cap = INITIAL_CAP, codeOnly = false): Set<string> {
+  const root = buildTree(codeOnly ? files.filter(isCode) : files)
+  const codeIn = new Map<string, number>()
+  for (const f of files)
+    if (isCode(f)) for (const d of ancestorDirs(f.path)) codeIn.set(d, (codeIn.get(d) ?? 0) + 1)
   const open = new Set([''])
   let total = 1 + root.children.length
   let frontier = root.children.filter((c): c is TreeDir => c.kind === 'dir')
   while (frontier.length > 0) {
-    frontier.sort((a, b) => a.children.length - b.children.length)
+    frontier.sort(
+      (a, b) =>
+        Number((codeIn.get(a.path) ?? 0) === 0) - Number((codeIn.get(b.path) ?? 0) === 0) ||
+        a.children.length - b.children.length,
+    )
     const next: TreeDir[] = []
     for (const d of frontier) {
       if (total + d.children.length > cap) continue

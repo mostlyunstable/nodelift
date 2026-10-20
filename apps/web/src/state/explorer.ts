@@ -1,5 +1,12 @@
 import { create } from 'zustand'
-import { allDirs, ancestorDirs, defaultExpanded } from '../explorer/graph'
+import {
+  allDirs,
+  ancestorDirs,
+  defaultExpanded,
+  INITIAL_CAP,
+  isCode,
+  shouldDefaultToCodeOnly,
+} from '../explorer/graph'
 import {
   api,
   ApiError,
@@ -35,6 +42,12 @@ interface ExplorerState {
   expanded: ReadonlySet<string>
   toggleDir: (path: string) => void
   collapseAll: () => void
+  codeOnly: boolean
+  setCodeOnly: (v: boolean) => void
+  sidebarOpen: boolean
+  toggleSidebar: () => void
+  notice: string | null
+  refreshLatest: () => Promise<void>
   expandAll: () => void
   languages: ReadonlySet<string>
   toggleLanguage: (l: string) => void
@@ -92,7 +105,8 @@ export const useExplorer = create<ExplorerState>((set, get) => {
           const files = await api.explorerFiles(id)
           if (mine !== generation) return
           // the file nodes should simply be there when the import finishes
-          set({ files, expanded: defaultExpanded(files) })
+          const codeOnly = shouldDefaultToCodeOnly(files)
+          set({ files, codeOnly, expanded: defaultExpanded(files, INITIAL_CAP, codeOnly) })
         }
         if (rev.analysis_status === 'not_analyzed') {
           // imported before analysis existed (or analysis was never started): static analysis only reads files
@@ -141,6 +155,27 @@ export const useExplorer = create<ExplorerState>((set, get) => {
         return { expanded: next }
       }),
     collapseAll: () => set({ expanded: ROOT_OPEN() }),
+    codeOnly: false,
+    setCodeOnly: (codeOnly) =>
+      set((st) => ({ codeOnly, expanded: defaultExpanded(st.files, INITIAL_CAP, codeOnly) })),
+    sidebarOpen: true,
+    toggleSidebar: () => set((st) => ({ sidebarOpen: !st.sidebarOpen })),
+    notice: null,
+    refreshLatest: async () => {
+      const r = get().revision
+      if (!r) return
+      const before = r.commit_sha
+      set({ url: `https://github.com/${r.full_name}/tree/${r.branch}` })
+      await get().showNodes()
+      const now = get().revision
+      set({
+        notice: !now
+          ? null
+          : now.commit_sha === before
+            ? `You already have the latest commit (${before.slice(0, 7)}).`
+            : `Opened the newer commit ${now.commit_sha.slice(0, 7)}.`,
+      })
+    },
     expandAll: () => set((st) => ({ expanded: allDirs(st.files) })),
     languages: new Set(),
     toggleLanguage: (l) =>
@@ -155,9 +190,11 @@ export const useExplorer = create<ExplorerState>((set, get) => {
     setSelectedEdge: (selectedEdge) => set({ selectedEdge }),
     reveal: async (path, opts) => {
       // open every parent folder so the file's node exists, then ask the canvas to centre on it
+      const file = get().files.find((f) => f.path === path)
       set((st) => ({
         expanded: new Set([...st.expanded, ...ancestorDirs(path)]),
         languages: new Set(),
+        codeOnly: st.codeOnly && !!file && isCode(file), // a file hidden by 'code only' must be shown to be revealed
         focus: { path, n: (st.focus?.n ?? 0) + 1 },
       }))
       await get().selectFile(path, opts)
@@ -185,6 +222,7 @@ export const useExplorer = create<ExplorerState>((set, get) => {
       set({
         starting: true,
         error: null,
+        notice: null,
         revision: null,
         files: [],
         edges: [],

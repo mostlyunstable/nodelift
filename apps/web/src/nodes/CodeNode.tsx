@@ -27,6 +27,9 @@ export function CodeNode({ id, data, selected }: NodeProps<FlowNode>) {
   const done = useStore((s) => s.run?.nodes.findLast((n) => n.node_id === id))
   const live = useStore((s): NodeLiveStatus | undefined => s.liveStatus[id])
   const outputs = useStore((s) => s.nodeDefs.find((d) => d.type === data.nodeType)?.outputs)
+  const lonely = useStore(
+    (st) => st.nodes.length > 1 && !st.edges.some((e) => e.source === id || e.target === id),
+  )
   const state: NodeLiveStatus | 'idle' = live ?? done?.status ?? 'idle'
   const ports =
     outputs && outputs.length > 0
@@ -37,7 +40,7 @@ export function CodeNode({ id, data, selected }: NodeProps<FlowNode>) {
   const fired = done?.activated_ports ?? null
 
   let meta: string
-  if (state === 'idle') meta = data.nodeType
+  if (state === 'idle') meta = lonely ? 'not connected to anything' : data.nodeType
   else if (state === 'running') meta = 'running…'
   else if (state === 'skipped')
     meta = `skipped${done?.skip_reason ? ` · ${SKIP_TEXT[done.skip_reason] ?? done.skip_reason}` : ''}`
@@ -46,7 +49,7 @@ export function CodeNode({ id, data, selected }: NodeProps<FlowNode>) {
 
   return (
     <div
-      className={`code-node ${selected ? 'selected' : ''} status-${state} ${ports.length > 1 ? 'multi-port' : ''}`}
+      className={`code-node ${selected ? 'selected' : ''} ${lonely ? 'lonely' : ''} status-${state} ${ports.length > 1 ? 'multi-port' : ''}`}
     >
       <Handle type="target" position={Position.Left} id="in" />
       <div className="code-node-title">

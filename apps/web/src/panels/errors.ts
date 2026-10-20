@@ -57,7 +57,7 @@ export function explainError(error: NodeError): string {
     case 'invalid_config':
       return `The node settings are not valid: ${error.message}`
     case 'transform_error':
-      return `The transform could not find the data it needs: ${error.message}`
+      return `This node could not use the data it received: ${error.message}. Check that it is connected to a node that produces what it expects.`
     case 'blocked_request':
       return 'The request was blocked: nodes can only reach public internet addresses.'
     case 'network_error':

@@ -7,6 +7,7 @@ export interface MenuItem {
   disabled?: boolean
   danger?: boolean
   separatorBefore?: boolean
+  heading?: string // a small title shown above this item (and the ones after it)
 }
 
 /** A button that opens a list of actions. Arrow keys move, Enter picks, Esc and outside clicks close. */
@@ -66,6 +67,7 @@ export function Menu({
           {items.map((item, i) => (
             <div key={`${item.label}-${i}`}>
               {item.separatorBefore && <hr />}
+              {item.heading && <div className="menu-heading">{item.heading}</div>}
               <button
                 role="menuitem"
                 disabled={item.disabled}

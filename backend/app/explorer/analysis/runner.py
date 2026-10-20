@@ -31,6 +31,28 @@ class AnalysisResult:
     partial: bool = False
 
 
+_ARTIFACT_DIRS = {
+    "node_modules",
+    "dist",
+    "build",
+    "out",
+    "lib-cov",
+    "coverage",
+    ".next",
+    ".nuxt",
+    "target",
+    "generated",
+    "__generated__",
+    "vendor",
+    "native",
+}
+
+
+def _is_artifact_path(spec: str) -> bool:
+    """An import of build output or installed packages: absent from a source checkout by design."""
+    return any(part in _ARTIFACT_DIRS for part in spec.replace("\\", "/").split("/"))
+
+
 def _test_targets(path: str, files: set[str], language: str) -> list[str]:
     """Files a test file is named after (test_foo.py -> foo.py). A guess, reported as one."""
     name = posixpath.basename(path)
@@ -142,12 +164,15 @@ def analyze_files(
                     and edge.kind == "import"
                     and "relative" in (edge.note or "")
                 ):
-                    res.diagnostics.append(
-                        RepoDiagnosticRecord(
-                            path=f.path, line=edge.line, column=0, severity="warning", code="unresolved_import",
-                            message=f"Cannot find {edge.raw or 'this module'} in the repository", source=an.id,
-                        )
-                    )  # fmt: skip
+                    if not _is_artifact_path(edge.raw):
+                        res.diagnostics.append(
+                            RepoDiagnosticRecord(
+                                path=f.path, line=edge.line, column=0,
+                                severity="warning" if f.language == "python" else "info",
+                                code="unresolved_import",
+                                message=f"Cannot find {edge.raw or 'this module'} in the repository", source=an.id,
+                            )
+                        )  # fmt: skip
 
     creators: dict[str, list[str]] = {}
     for sy in res.symbols:

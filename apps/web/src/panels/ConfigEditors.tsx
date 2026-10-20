@@ -1,4 +1,5 @@
 import Editor from '@monaco-editor/react'
+import { SchemaForm } from './SchemaForm'
 import type * as Monaco from 'monaco-editor'
 import { useEffect, useRef, useState } from 'react'
 import type { FlowNode } from '../canvas/mapper'
@@ -249,19 +250,6 @@ function BranchConfig({ node }: { node: FlowNode }) {
 }
 
 /** Plugin or unknown node types get a raw JSON editor so they stay usable without UI work. */
-function RawConfig({ node }: { node: FlowNode }) {
-  const { updateData } = useStore()
-  return (
-    <JsonField
-      key={node.id}
-      label="Config (JSON)"
-      value={node.data.config}
-      rows={10}
-      onChange={(v) => updateData(node.id, { config: (v as Record<string, unknown>) ?? {} })}
-    />
-  )
-}
-
 export function ConfigEditor({ node }: { node: FlowNode }) {
   switch (node.data.nodeType) {
     case 'code.python':
@@ -273,6 +261,6 @@ export function ConfigEditor({ node }: { node: FlowNode }) {
     case 'logic.branch':
       return <BranchConfig node={node} />
     default:
-      return <RawConfig node={node} />
+      return <SchemaForm node={node} />
   }
 }

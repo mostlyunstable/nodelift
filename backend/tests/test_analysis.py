@@ -221,7 +221,9 @@ def test_javascript_symbols_and_syntax_diagnostic(tmp_path: Path) -> None:
     assert ("g", "function", None, True) in syms
     assert ("hidden", "function", None, False) in syms
     bad = [d for d in res.diagnostics if d.path == "web/bad.js"]
-    assert bad and bad[0].code == "syntax_error" and bad[0].severity == "warning"
+    assert (
+        bad and bad[0].code == "parser_note" and bad[0].severity == "info"
+    )  # a parser limitation is a note, not a problem
 
 
 WEB_TREE = {
@@ -592,3 +594,69 @@ def test_sql_symbols_and_heuristic_table_references(tmp_path: Path) -> None:
     assert got == [
         ("db/schema.sql", "users", "heuristic")
     ]  # `orders` is created nowhere, so no edge is invented
+
+
+# ---- false alarms we must not raise ------------------------------------------------------------
+def test_flow_typed_javascript_is_not_reported_as_broken(tmp_path: Path) -> None:
+    res = run(
+        tmp_path,
+        {
+            "a.js": "/** @flow */\nexport function f(x: number): string { return String(x) }\n",
+            "b.js": "function (( {\n",
+        },
+    )
+    assert not [
+        d for d in res.diagnostics if d.path == "a.js"
+    ]  # @flow: syntax the parser does not know
+    assert [d.severity for d in res.diagnostics if d.path == "b.js"] == [
+        "info"
+    ]  # unknown failures are notes
+    assert res.statuses["a.js"] == "analyzed"  # still analysed for imports/symbols
+
+
+def test_imports_of_build_output_and_packages_are_not_problems(tmp_path: Path) -> None:
+    res = run(
+        tmp_path,
+        {
+            "src/a.js": "import x from '../dist/out'\nimport y from '../../node_modules/pkg/index'\nimport z from './missing'\n",
+            "src/p.py": "from .nope import thing\nfrom .generated.api import g\n",
+        },
+    )
+    got = {
+        (d.path, d.severity, d.message.split()[2])
+        for d in res.diagnostics
+        if d.code == "unresolved_import"
+    }
+    assert got == {
+        ("src/a.js", "info", "./missing"),
+        ("src/p.py", "warning", "nope"),
+        ("src/p.py", "warning", "generated.api"),
+    }
+    codes = {(d.path, d.message) for d in res.diagnostics if d.code == "unresolved_import"}
+    assert not any("dist" in m or "node_modules" in m for _, m in codes)
+    assert ("src/a.js", "Cannot find ./missing in the repository") in codes
+    assert [d.severity for d in res.diagnostics if d.path == "src/a.js"] == ["info"]  # JS: a note
+    assert [
+        d.severity for d in res.diagnostics if d.path == "src/p.py" and "nope" in d.message
+    ] == ["warning"]  # Python relative: a warning
+
+
+def test_json_with_comments_is_read_but_real_json_errors_stay_errors(tmp_path: Path) -> None:
+    res = run(
+        tmp_path,
+        {
+            "tsconfig.json": '{\n  // a comment\n  "extends": "./base.json", /* block */\n  "url": "http://x//y",\n  "list": [1, 2,],\n}\n',
+            "base.json": "{}",
+            "data.json": "{not json",
+            ".eslintrc.json": "{ oops",
+        },
+    )
+    assert not [
+        d for d in res.diagnostics if d.path == "tsconfig.json"
+    ]  # comments, trailing commas and `//` inside a string are fine
+    assert ("./base.json", "base.json", "resolved") in {
+        (e.raw, e.dst, e.confidence) for e in res.edges if e.src == "tsconfig.json"
+    }
+    sev = {d.path: d.severity for d in res.diagnostics if d.code == "syntax_error"}
+    assert sev["data.json"] == "error"  # plain JSON must be valid
+    assert sev[".eslintrc.json"] == "warning"  # tolerant file kinds are only warned about
