@@ -162,6 +162,13 @@ def test_registry_rejects_duplicates_and_lists_definitions() -> None:
         "transform.json",
         "logic.branch",
         "http.request",
+        "data.filter",
+        "text.template",
+        "data.csv",
+        "ai.claude",
+        "file.read",
+        "file.write",
+        "db.sqlite",
     ]
     assert reg.get("nope") is None
     with pytest.raises(ValueError, match="already registered"):
@@ -397,7 +404,10 @@ def test_http_valid_config() -> None:
 
 def test_definitions_endpoint(client: TestClient) -> None:
     defs = {d["type"]: d for d in client.get("/api/v1/nodes/definitions").json()}
-    assert set(defs) == {"code.python", "transform.json", "logic.branch", "http.request"}
+    assert set(defs) == {
+        "code.python", "transform.json", "logic.branch", "http.request", "data.filter",
+        "text.template", "data.csv", "ai.claude", "file.read", "file.write", "db.sqlite",
+    }  # fmt: skip
     assert defs["http.request"]["config_schema"]["required"] == ["url"]
     assert defs["transform.json"]["default_config"]["mapping"] == {"value": "$"}
 

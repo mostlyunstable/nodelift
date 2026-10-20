@@ -120,3 +120,18 @@ not fire are not taken, and a node whose incoming edges were all untaken is skip
 `ctx.secrets` resolves `{{credential:NAME}}` references at execution time. Use it instead of reading config values
 directly, never log a resolved value, and never put one in an error message you build yourself; the executor masks values
 it knows about, but only exact matches (see [ADR 0008](adr/0008-secrets.md)).
+
+## Built-in nodes (reference)
+
+| Type                      | What it does                                        | Safety                                                                 |
+| ------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------- |
+| `code.python`             | Your `main(input_data)` in a child process          | macOS: confined (ADR 0010); `allow_network` opt-in                     |
+| `transform.json`          | Reshape JSON with `$.paths`                         | no code runs                                                           |
+| `http.request`            | Call a public API; `{{credential:NAME}}` in headers | SSRF-guarded; secrets masked                                           |
+| `logic.branch`            | Fire `true` or `false`                              | no code runs                                                           |
+| `data.filter`             | Keep list items matching conditions                 | no code runs                                                           |
+| `text.template`           | Fill `{{ $.path }}` into text/HTML (`escape_html`)  | no code runs                                                           |
+| `data.csv`                | Parse CSV to rows / write rows as CSV               | 5 MB, 100k rows                                                        |
+| `file.read`, `file.write` | Text files in `<data dir>/files` only               | no absolute paths, `..` or escaping symlinks                           |
+| `db.sqlite`               | One SQL statement on a SQLite file in that folder   | read-only by default; `ATTACH` blocked; 10k-row cap; time limit        |
+| `ai.claude`               | Ask Claude (Messages API)                           | the prompt leaves your machine; key is a credential, never config text |

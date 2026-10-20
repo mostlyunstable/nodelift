@@ -8,6 +8,13 @@ const BADGES: Record<string, string> = {
   'transform.json': '{ }',
   'http.request': 'http',
   'logic.branch': 'if',
+  'data.filter': 'flt',
+  'text.template': 'tpl',
+  'data.csv': 'csv',
+  'file.read': 'in',
+  'file.write': 'out',
+  'db.sqlite': 'sql',
+  'ai.claude': 'ai',
 }
 
 const SKIP_TEXT: Record<string, string> = {

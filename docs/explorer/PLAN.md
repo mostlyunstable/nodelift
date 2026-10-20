@@ -132,6 +132,7 @@ network probe (script flag stayed 0, no request recorded). Fixed along the way: 
 diff (R6), recent-changes history (no Git history is fetched).
 
 ## R6 status (2026-10-20): implemented
+
 Discovery of test/build/lint commands from the repository's own files with the evidence line (package.json scripts, pytest config,
 Makefile targets, go.mod, Cargo.toml, name-based unittest guess); a full-copy workspace; an approval dialog and a confined runner
 (see ADR 0011); proposed changes with diff, apply/revert on the workspace copy, `.patch` export. Verified end to end in tests: a failing
@@ -141,6 +142,7 @@ Real run on `psf/requests`: full 128-file workspace, confined `python3` ran; `py
 **Not done:** AI-assisted explanations/fix suggestions (no provider configured); parsing test results into per-test pass/fail; Git history.
 
 ## Call relationships and Go to Definition (2026-10-20): implemented
+
 Python (`ast`) and JavaScript/TypeScript (tree-sitter) call sites are tied to definitions through import bindings (`from x import f`, `import x as m`,
 `import * as M`, `require`), same-file functions, `Class.method`, and (heuristic, flagged) `self.method()` / `this.method()`. Calls on values, dynamic
 dispatch, decorators, callbacks, `getattr`, default exports are left out, not guessed. Stored in `repo_references` (migration 0009); each file's
@@ -150,7 +152,8 @@ Cross-checked on `psf/requests`: `sessions.Session()` in api.py:70 resolves to s
 **Not done:** a function-level call graph view; call resolution for other languages; type-based dispatch.
 
 ## More languages (2026-10-20): implemented
+
 Go, Java, Rust, Ruby, shell, Markdown, YAML, JSON, SQL added to the analyzer interface (see ADR 0009), each with fixture tests that assert the exact edges,
-symbols and diagnostics, including what is *not* linked (remote actions, computed shell paths, tables created nowhere). Real run on `psf/requests`: files
+symbols and diagnostics, including what is _not_ linked (remote actions, computed shell paths, tables created nowhere). Real run on `psf/requests`: files
 analysed went from 39 to 64 of 122 readable files (adds README, YAML, JSON), 394 relations, 0 diagnostics.
 **Not analysed:** C#, PHP, Kotlin, Swift, C/C++ (shown and readable only).

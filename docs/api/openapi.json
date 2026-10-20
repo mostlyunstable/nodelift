@@ -43,18 +43,12 @@
             "title": "Output"
           },
           "status": {
-            "enum": [
-              "succeeded",
-              "failed"
-            ],
+            "enum": ["succeeded", "failed"],
             "title": "Status",
             "type": "string"
           }
         },
-        "required": [
-          "status",
-          "duration_ms"
-        ],
+        "required": ["status", "duration_ms"],
         "title": "CodeRunResult",
         "type": "object"
       },
@@ -76,9 +70,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "source"
-        ],
+        "required": ["source"],
         "title": "CodeTestRequest",
         "type": "object"
       },
@@ -123,10 +115,7 @@
             "type": "number"
           }
         },
-        "required": [
-          "command",
-          "approved_command"
-        ],
+        "required": ["command", "approved_command"],
         "title": "CommandRequest",
         "type": "object"
       },
@@ -315,11 +304,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "suggestions",
-          "test_files",
-          "frameworks"
-        ],
+        "required": ["suggestions", "test_files", "frameworks"],
         "title": "DiscoveryRecord",
         "type": "object"
       },
@@ -336,9 +321,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "node"
-        ],
+        "required": ["node"],
         "title": "Endpoint",
         "type": "object"
       },
@@ -361,12 +344,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "title",
-          "description",
-          "nodes"
-        ],
+        "required": ["id", "title", "description", "nodes"],
         "title": "ExampleInfo",
         "type": "object"
       },
@@ -517,10 +495,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "status",
-          "version"
-        ],
+        "required": ["status", "version"],
         "title": "HealthResponse",
         "type": "object"
       },
@@ -541,11 +516,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "valid",
-          "issues",
-          "summary"
-        ],
+        "required": ["valid", "issues", "summary"],
         "title": "ImportPreview",
         "type": "object"
       },
@@ -557,9 +528,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "url"
-        ],
+        "required": ["url"],
         "title": "ImportRequest",
         "type": "object"
       },
@@ -626,10 +595,7 @@
       "LogLine": {
         "properties": {
           "stream": {
-            "enum": [
-              "stdout",
-              "stderr"
-            ],
+            "enum": ["stdout", "stderr"],
             "title": "Stream",
             "type": "string"
           },
@@ -638,10 +604,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "stream",
-          "text"
-        ],
+        "required": ["stream", "text"],
         "title": "LogLine",
         "type": "object"
       },
@@ -670,10 +633,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "name",
-          "value"
-        ],
+        "required": ["name", "value"],
         "title": "NewCredential",
         "type": "object"
       },
@@ -741,11 +701,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "type",
-          "title",
-          "category"
-        ],
+        "required": ["type", "title", "category"],
         "title": "NodeDefinition",
         "type": "object"
       },
@@ -812,10 +768,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "type",
-          "message"
-        ],
+        "required": ["type", "message"],
         "title": "NodeError",
         "type": "object"
       },
@@ -890,20 +843,12 @@
             "title": "Skip Reason"
           },
           "status": {
-            "enum": [
-              "succeeded",
-              "failed",
-              "skipped",
-              "cancelled"
-            ],
+            "enum": ["succeeded", "failed", "skipped", "cancelled"],
             "title": "Status",
             "type": "string"
           }
         },
-        "required": [
-          "node_id",
-          "status"
-        ],
+        "required": ["node_id", "status"],
         "title": "NodeExecution",
         "type": "object"
       },
@@ -930,9 +875,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "type"
-        ],
+        "required": ["type"],
         "title": "NodeTestRequest",
         "type": "object"
       },
@@ -955,10 +898,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "path",
-          "new_content"
-        ],
+        "required": ["path", "new_content"],
         "title": "PatchRequest",
         "type": "object"
       },
@@ -974,9 +914,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "title": "Port",
         "type": "object"
       },
@@ -1161,11 +1099,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "edges",
-          "truncated",
-          "diagnostics"
-        ],
+        "required": ["edges", "truncated", "diagnostics"],
         "title": "RepoGraphRecord",
         "type": "object"
       },
@@ -1515,13 +1449,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "path",
-          "name",
-          "kind",
-          "line",
-          "end_line"
-        ],
+        "required": ["path", "name", "kind", "line", "end_line"],
         "title": "RepoSymbolRecord",
         "type": "object"
       },
@@ -1558,9 +1486,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "value"
-        ],
+        "required": ["value"],
         "title": "RotateCredential",
         "type": "object"
       },
@@ -1590,12 +1516,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "run_id",
-          "seq",
-          "type",
-          "created_at"
-        ],
+        "required": ["run_id", "seq", "type", "created_at"],
         "title": "RunEvent",
         "type": "object"
       },
@@ -1636,12 +1557,7 @@
             "title": "Reason"
           },
           "status": {
-            "enum": [
-              "running",
-              "succeeded",
-              "failed",
-              "cancelled"
-            ],
+            "enum": ["running", "succeeded", "failed", "cancelled"],
             "title": "Status",
             "type": "string"
           },
@@ -1690,13 +1606,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "id",
-          "status",
-          "version_no",
-          "duration_ms",
-          "created_at"
-        ],
+        "required": ["id", "status", "version_no", "duration_ms", "created_at"],
         "title": "RunSummary",
         "type": "object"
       },
@@ -1797,11 +1707,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "name",
-          "definition",
-          "revision"
-        ],
+        "required": ["name", "definition", "revision"],
         "title": "UpdateWorkflow",
         "type": "object"
       },
@@ -1819,10 +1725,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "valid",
-          "issues"
-        ],
+        "required": ["valid", "issues"],
         "title": "ValidateResponse",
         "type": "object"
       },
@@ -1858,11 +1761,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
+        "required": ["loc", "msg", "type"],
         "title": "ValidationError",
         "type": "object"
       },
@@ -1888,10 +1787,7 @@
             "title": "Node Id"
           }
         },
-        "required": [
-          "code",
-          "message"
-        ],
+        "required": ["code", "message"],
         "title": "ValidationIssue",
         "type": "object"
       },
@@ -1949,11 +1845,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "version_no",
-          "content_hash",
-          "created_at"
-        ],
+        "required": ["version_no", "content_hash", "created_at"],
         "title": "VersionSummary",
         "type": "object"
       },
@@ -2016,10 +1908,7 @@
             "$ref": "#/components/schemas/Endpoint"
           }
         },
-        "required": [
-          "source",
-          "target"
-        ],
+        "required": ["source", "target"],
         "title": "WorkflowEdge",
         "type": "object"
       },
@@ -2050,11 +1939,7 @@
             "type": "object"
           }
         },
-        "required": [
-          "format",
-          "format_version",
-          "workflow"
-        ],
+        "required": ["format", "format_version", "workflow"],
         "title": "WorkflowFile",
         "type": "object"
       },
@@ -2082,10 +1967,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "type"
-        ],
+        "required": ["id", "type"],
         "title": "WorkflowNode",
         "type": "object"
       },
@@ -2148,12 +2030,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "name",
-          "revision",
-          "updated_at"
-        ],
+        "required": ["id", "name", "revision", "updated_at"],
         "title": "WorkflowSummary",
         "type": "object"
       },
@@ -2190,12 +2067,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "state",
-          "path",
-          "file_count",
-          "error"
-        ],
+        "required": ["state", "path", "file_count", "error"],
         "title": "WorkspaceRecord",
         "type": "object"
       }
@@ -2227,9 +2099,7 @@
           }
         },
         "summary": "List Credentials",
-        "tags": [
-          "credentials"
-        ]
+        "tags": ["credentials"]
       },
       "post": {
         "operationId": "create_credential_api_v1_credentials_post",
@@ -2266,9 +2136,7 @@
           }
         },
         "summary": "Create Credential",
-        "tags": [
-          "credentials"
-        ]
+        "tags": ["credentials"]
       }
     },
     "/api/v1/credentials/{name}": {
@@ -2301,9 +2169,7 @@
           }
         },
         "summary": "Delete Credential",
-        "tags": [
-          "credentials"
-        ]
+        "tags": ["credentials"]
       },
       "put": {
         "operationId": "rotate_credential_api_v1_credentials__name__put",
@@ -2351,9 +2217,7 @@
           }
         },
         "summary": "Rotate Credential",
-        "tags": [
-          "credentials"
-        ]
+        "tags": ["credentials"]
       }
     },
     "/api/v1/examples": {
@@ -2376,9 +2240,7 @@
           }
         },
         "summary": "List Examples",
-        "tags": [
-          "portability"
-        ]
+        "tags": ["portability"]
       }
     },
     "/api/v1/examples/{example_id}/create": {
@@ -2419,9 +2281,7 @@
           }
         },
         "summary": "Create Example",
-        "tags": [
-          "portability"
-        ]
+        "tags": ["portability"]
       }
     },
     "/api/v1/explorer/imports": {
@@ -2461,9 +2321,7 @@
           }
         },
         "summary": "Start Import",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions": {
@@ -2486,9 +2344,7 @@
           }
         },
         "summary": "List Revisions",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}": {
@@ -2521,9 +2377,7 @@
           }
         },
         "summary": "Delete Revision",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       },
       "get": {
         "operationId": "get_revision_api_v1_explorer_revisions__revision_id__get",
@@ -2561,9 +2415,7 @@
           }
         },
         "summary": "Get Revision",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/analysis": {
@@ -2613,9 +2465,7 @@
           }
         },
         "summary": "File Analysis",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/analyze": {
@@ -2655,9 +2505,7 @@
           }
         },
         "summary": "Analyze",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/cancel": {
@@ -2697,9 +2545,7 @@
           }
         },
         "summary": "Cancel Import",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/commands": {
@@ -2743,9 +2589,7 @@
           }
         },
         "summary": "List Commands",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       },
       "post": {
         "description": "Runs only a command the caller restated verbatim as approved, in the prepared workspace.",
@@ -2794,9 +2638,7 @@
           }
         },
         "summary": "Run Command",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/commands/{run_id}": {
@@ -2845,9 +2687,7 @@
           }
         },
         "summary": "Get Command",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/commands/{run_id}/cancel": {
@@ -2896,9 +2736,7 @@
           }
         },
         "summary": "Cancel Command",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/discovery": {
@@ -2939,9 +2777,7 @@
           }
         },
         "summary": "Discovery",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/file": {
@@ -2991,9 +2827,7 @@
           }
         },
         "summary": "Read File",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/files": {
@@ -3037,9 +2871,7 @@
           }
         },
         "summary": "List Files",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/graph": {
@@ -3079,9 +2911,7 @@
           }
         },
         "summary": "Graph",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/patches": {
@@ -3125,9 +2955,7 @@
           }
         },
         "summary": "List Patches",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       },
       "post": {
         "operationId": "create_patch_api_v1_explorer_revisions__revision_id__patches_post",
@@ -3175,9 +3003,7 @@
           }
         },
         "summary": "Create Patch",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/patches/{patch_id}": {
@@ -3219,9 +3045,7 @@
           }
         },
         "summary": "Delete Patch",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/patches/{patch_id}/apply": {
@@ -3270,9 +3094,7 @@
           }
         },
         "summary": "Apply Patch",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/patches/{patch_id}/diff": {
@@ -3321,9 +3143,7 @@
           }
         },
         "summary": "Patch Diff",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/patches/{patch_id}/export": {
@@ -3373,9 +3193,7 @@
           }
         },
         "summary": "Export Patch",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/patches/{patch_id}/revert": {
@@ -3424,9 +3242,7 @@
           }
         },
         "summary": "Revert Patch",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/explorer/revisions/{revision_id}/workspace": {
@@ -3466,9 +3282,7 @@
           }
         },
         "summary": "Reset Workspace",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       },
       "get": {
         "operationId": "workspace_api_v1_explorer_revisions__revision_id__workspace_get",
@@ -3506,9 +3320,7 @@
           }
         },
         "summary": "Workspace",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       },
       "post": {
         "operationId": "prepare_workspace_api_v1_explorer_revisions__revision_id__workspace_post",
@@ -3546,9 +3358,7 @@
           }
         },
         "summary": "Prepare Workspace",
-        "tags": [
-          "explorer"
-        ]
+        "tags": ["explorer"]
       }
     },
     "/api/v1/health": {
@@ -3567,9 +3377,7 @@
           }
         },
         "summary": "Health",
-        "tags": [
-          "health"
-        ]
+        "tags": ["health"]
       }
     },
     "/api/v1/nodes/code/test": {
@@ -3609,9 +3417,7 @@
           }
         },
         "summary": "Test Code",
-        "tags": [
-          "nodes"
-        ]
+        "tags": ["nodes"]
       }
     },
     "/api/v1/nodes/definitions": {
@@ -3634,9 +3440,7 @@
           }
         },
         "summary": "List Definitions",
-        "tags": [
-          "nodes"
-        ]
+        "tags": ["nodes"]
       }
     },
     "/api/v1/nodes/test": {
@@ -3676,9 +3480,7 @@
           }
         },
         "summary": "Test Node",
-        "tags": [
-          "nodes"
-        ]
+        "tags": ["nodes"]
       }
     },
     "/api/v1/runs/{run_id}": {
@@ -3718,9 +3520,7 @@
           }
         },
         "summary": "Get Run",
-        "tags": [
-          "stored workflows"
-        ]
+        "tags": ["stored workflows"]
       }
     },
     "/api/v1/runs/{run_id}/cancel": {
@@ -3760,9 +3560,7 @@
           }
         },
         "summary": "Cancel Run",
-        "tags": [
-          "stored workflows"
-        ]
+        "tags": ["stored workflows"]
       }
     },
     "/api/v1/runs/{run_id}/events": {
@@ -3829,9 +3627,7 @@
           }
         },
         "summary": "List Events",
-        "tags": [
-          "stored workflows"
-        ]
+        "tags": ["stored workflows"]
       }
     },
     "/api/v1/runs/{run_id}/events/stream": {
@@ -3896,9 +3692,7 @@
           }
         },
         "summary": "Stream Events",
-        "tags": [
-          "stored workflows"
-        ]
+        "tags": ["stored workflows"]
       }
     },
     "/api/v1/runs/{run_id}/resume": {
@@ -3955,9 +3749,7 @@
           }
         },
         "summary": "Resume Run",
-        "tags": [
-          "stored workflows"
-        ]
+        "tags": ["stored workflows"]
       }
     },
     "/api/v1/system/export": {
@@ -3979,9 +3771,7 @@
           }
         },
         "summary": "Export Everything",
-        "tags": [
-          "portability"
-        ]
+        "tags": ["portability"]
       }
     },
     "/api/v1/system/info": {
@@ -4002,9 +3792,7 @@
           }
         },
         "summary": "Info",
-        "tags": [
-          "system"
-        ]
+        "tags": ["system"]
       }
     },
     "/api/v1/system/logs": {
@@ -4048,9 +3836,7 @@
           }
         },
         "summary": "Logs",
-        "tags": [
-          "system"
-        ]
+        "tags": ["system"]
       }
     },
     "/api/v1/system/shutdown": {
@@ -4074,9 +3860,7 @@
           }
         },
         "summary": "Shutdown",
-        "tags": [
-          "system"
-        ]
+        "tags": ["system"]
       }
     },
     "/api/v1/workflows": {
@@ -4099,9 +3883,7 @@
           }
         },
         "summary": "List Workflows",
-        "tags": [
-          "stored workflows"
-        ]
+        "tags": ["stored workflows"]
       },
       "post": {
         "operationId": "create_workflow_api_v1_workflows_post",
@@ -4138,9 +3920,7 @@
           }
         },
         "summary": "Create Workflow",
-        "tags": [
-          "stored workflows"
-        ]
+        "tags": ["stored workflows"]
       }
     },
     "/api/v1/workflows/import": {
@@ -4180,9 +3960,7 @@
           }
         },
         "summary": "Import Workflow",
-        "tags": [
-          "portability"
-        ]
+        "tags": ["portability"]
       }
     },
     "/api/v1/workflows/import/preview": {
@@ -4222,9 +4000,7 @@
           }
         },
         "summary": "Preview Import",
-        "tags": [
-          "portability"
-        ]
+        "tags": ["portability"]
       }
     },
     "/api/v1/workflows/validate": {
@@ -4263,9 +4039,7 @@
           }
         },
         "summary": "Validate",
-        "tags": [
-          "workflows"
-        ]
+        "tags": ["workflows"]
       }
     },
     "/api/v1/workflows/{workflow_id}": {
@@ -4298,9 +4072,7 @@
           }
         },
         "summary": "Delete Workflow",
-        "tags": [
-          "stored workflows"
-        ]
+        "tags": ["stored workflows"]
       },
       "get": {
         "operationId": "get_workflow_api_v1_workflows__workflow_id__get",
@@ -4338,9 +4110,7 @@
           }
         },
         "summary": "Get Workflow",
-        "tags": [
-          "stored workflows"
-        ]
+        "tags": ["stored workflows"]
       },
       "put": {
         "operationId": "update_workflow_api_v1_workflows__workflow_id__put",
@@ -4388,9 +4158,7 @@
           }
         },
         "summary": "Update Workflow",
-        "tags": [
-          "stored workflows"
-        ]
+        "tags": ["stored workflows"]
       }
     },
     "/api/v1/workflows/{workflow_id}/export": {
@@ -4432,9 +4200,7 @@
           }
         },
         "summary": "Export Workflow",
-        "tags": [
-          "portability"
-        ]
+        "tags": ["portability"]
       }
     },
     "/api/v1/workflows/{workflow_id}/runs": {
@@ -4478,9 +4244,7 @@
           }
         },
         "summary": "List Runs",
-        "tags": [
-          "stored workflows"
-        ]
+        "tags": ["stored workflows"]
       },
       "post": {
         "operationId": "start_run_api_v1_workflows__workflow_id__runs_post",
@@ -4528,9 +4292,7 @@
           }
         },
         "summary": "Start Run",
-        "tags": [
-          "stored workflows"
-        ]
+        "tags": ["stored workflows"]
       }
     },
     "/api/v1/workflows/{workflow_id}/versions": {
@@ -4574,9 +4336,7 @@
           }
         },
         "summary": "List Versions",
-        "tags": [
-          "stored workflows"
-        ]
+        "tags": ["stored workflows"]
       },
       "post": {
         "operationId": "create_version_api_v1_workflows__workflow_id__versions_post",
@@ -4614,9 +4374,7 @@
           }
         },
         "summary": "Create Version",
-        "tags": [
-          "stored workflows"
-        ]
+        "tags": ["stored workflows"]
       }
     },
     "/api/v1/workflows/{workflow_id}/versions/{version_no}": {
@@ -4665,9 +4423,7 @@
           }
         },
         "summary": "Get Version",
-        "tags": [
-          "stored workflows"
-        ]
+        "tags": ["stored workflows"]
       }
     }
   }

@@ -34,7 +34,9 @@ def create_app(database_url: str | None = None, settings: Settings | None = None
         app.state.runner = SubprocessRunner(
             settings.node_memory_mb, settings.node_max_file_mb, settings.sandbox
         )
-        registry = default_registry(app.state.runner, settings.http_allow_private)
+        registry = default_registry(
+            app.state.runner, settings.http_allow_private, settings.data_dir / "files"
+        )
         load_plugins(registry, settings.plugin_modules)
         app.state.registry = registry
         app.state.secrets = make_secret_store(settings)

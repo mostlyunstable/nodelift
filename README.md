@@ -35,7 +35,8 @@ Not signed with a Developer ID, not notarized, no auto-update: sharing the build
 
 ## What works
 - Canvas editor with autosave, undo/redo, command palette (⌘K), shortcuts, light/dark theme, a guided "Debug me" example.
-- Python code, JSON transform, HTTP request and branch nodes; plugin nodes ([docs/node-authoring.md](docs/node-authoring.md)).
+- Nodes: Python code, JSON transform, HTTP request, branch, filter list, text/HTML template, CSV, read/write file and SQLite query (confined to
+  `<data folder>/files`), and Ask Claude (key from a saved credential); plugin nodes ([docs/node-authoring.md](docs/node-authoring.md)).
 - Branching by output ports, fail-fast, cancel, retries (opt-in), run budgets, resume from failure.
 - SQLite persistence, immutable versions, run history, live events over SSE with recovery, pre-migration backups.
 - Import/export with preview; credentials in the system keychain, masked in all results.
