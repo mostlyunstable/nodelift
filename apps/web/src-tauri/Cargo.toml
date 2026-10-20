@@ -1,0 +1,29 @@
+[package]
+name = "nodecraft"
+version = "0.1.0"
+description = "Nodecraft: a local-first visual automation IDE"
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "nodecraft_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rand = "0.8"
+libc = "0.2"
+ureq = { version = "2", default-features = false }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

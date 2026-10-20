@@ -1,4 +1,4 @@
-.PHONY: setup dev dev-api dev-web stop test lint check
+.PHONY: setup dev dev-api dev-web stop test lint check app install-app
 
 setup:
 	cd backend && uv sync
@@ -28,3 +28,10 @@ lint:
 	cd apps/web && pnpm typecheck
 
 check: lint test
+
+# Desktop app (macOS). Needs Rust: `brew install rustup && rustup default stable`.
+app:
+	scripts/build_app.sh
+
+install-app:
+	scripts/build_app.sh --install

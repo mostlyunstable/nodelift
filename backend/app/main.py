@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import install_error_handlers
 from app.api.security import SecurityMiddleware
@@ -52,6 +53,15 @@ def create_app(database_url: str | None = None, settings: Settings | None = None
         hosts=settings.host_list,
         origins=settings.origin_list,
         token=settings.api_token,
+    )
+    # Outermost, so a browser's credential-less CORS preflight is answered before the token check.
+    # Only the configured origins (the desktop webview, the dev server) are ever allowed.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.origin_list,
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "Last-Event-ID"],
+        max_age=600,
     )
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(nodes.router, prefix="/api/v1")

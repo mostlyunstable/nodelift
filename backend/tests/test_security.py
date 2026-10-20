@@ -213,3 +213,59 @@ def test_runs_and_node_tests_have_separate_budgets(tmp_path: Path) -> None:
             c.post("/api/v1/nodes/code/test", json=slow_source(0.1)).status_code == 200
         )  # tests unaffected
         c.post(f"/api/v1/runs/{run.json()['id']}/cancel")
+
+
+# ---------------------------------------------------------------- CORS for the desktop webview
+
+
+DESKTOP_ORIGIN = "tauri://localhost"
+
+
+def preflight(c: TestClient, origin: str, headers: str = "authorization,content-type") -> object:
+    return c.options(
+        "/api/v1/workflows",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": headers,
+        },
+    )
+
+
+def test_preflight_from_the_desktop_webview_succeeds_without_a_token(tmp_path: Path) -> None:
+    """Browsers never send credentials on a preflight, so it must not hit the token check."""
+    with make(tmp_path, api_token=TOKEN, allowed_origins=DESKTOP_ORIGIN) as c:
+        r = preflight(c, DESKTOP_ORIGIN)
+        assert r.status_code == 200  # type: ignore[attr-defined]
+        assert r.headers["access-control-allow-origin"] == DESKTOP_ORIGIN  # type: ignore[attr-defined]
+        allowed = r.headers["access-control-allow-headers"].lower()  # type: ignore[attr-defined]
+        assert "authorization" in allowed and "content-type" in allowed
+        # ...but the real request still needs the token
+        assert c.get("/api/v1/workflows", headers={"Origin": DESKTOP_ORIGIN}).status_code == 401
+        ok = c.get(
+            "/api/v1/workflows",
+            headers={"Origin": DESKTOP_ORIGIN, "Authorization": f"Bearer {TOKEN}"},
+        )
+        assert ok.status_code == 200
+        assert ok.headers["access-control-allow-origin"] == DESKTOP_ORIGIN
+
+
+def test_preflight_from_other_origins_is_refused(tmp_path: Path) -> None:
+    with make(tmp_path, api_token=TOKEN, allowed_origins=DESKTOP_ORIGIN) as c:
+        for origin in ("https://evil.example", "http://localhost:5173", "null"):
+            r = preflight(c, origin)
+            assert r.status_code in (400, 403), origin  # type: ignore[attr-defined]
+            assert "access-control-allow-origin" not in r.headers  # type: ignore[attr-defined]
+
+
+def test_cors_does_not_allow_unlisted_headers_or_methods(tmp_path: Path) -> None:
+    with make(tmp_path, allowed_origins=DESKTOP_ORIGIN) as c:
+        assert preflight(c, DESKTOP_ORIGIN, "x-custom-header").status_code == 400  # type: ignore[attr-defined]
+        r = c.options(
+            "/api/v1/workflows",
+            headers={
+                "Origin": DESKTOP_ORIGIN,
+                "Access-Control-Request-Method": "PATCH",
+            },
+        )
+        assert r.status_code == 400

@@ -22,7 +22,9 @@ class Settings(BaseSettings):
     max_concurrent_node_tests: int = 4
     api_token: str | None = None  # when set, every route except /health needs "Bearer <token>"
     allowed_hosts: str = "127.0.0.1,localhost,[::1]"  # Host header allowlist (DNS-rebinding guard)
-    allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"  # browser Origin allowlist
+    allowed_origins: str = (
+        "http://localhost:5173,http://127.0.0.1:5173"  # browser Origin allowlist (+ CORS)
+    )
     reload: bool = False  # dev only; the reloader child can outlive its parent
     log_dir: Path | None = None  # desktop: rotating backend.log lives here
     backup_dir: Path | None = None  # default: <data_dir>/backups

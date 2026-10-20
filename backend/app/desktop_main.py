@@ -62,7 +62,7 @@ def run(settings: Settings) -> int:
         )
     app = create_app(settings=settings)
     config = uvicorn.Config(
-        app, host=settings.host, port=settings.port, log_config=None, access_log=False
+        app, host=settings.host, port=settings.port, log_config=None, access_log=True
     )
     server = uvicorn.Server(config)
     app.state.server = server

@@ -8,3 +8,8 @@ node_modules/
 dist/
 *.db
 .DS_Store
+
+# desktop build outputs
+apps/web/src-tauri/target/
+apps/web/src-tauri/resources/runtime/
+apps/web/src-tauri/gen/
