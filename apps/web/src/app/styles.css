@@ -1312,3 +1312,137 @@ path.xe-dep.xe-heuristic {
   border: 0;
   background: #fff;
 }
+
+/* ---------- run, approval, patches ---------- */
+.run-view {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 14px;
+  min-height: 0;
+}
+.suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.suggestion > button {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+}
+.custom-command {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.custom-command input {
+  flex: 1;
+  font-family: var(--font-mono);
+}
+.approve-command {
+  font-family: var(--font-mono);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 8px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 4px 0 8px;
+}
+.approve-warnings {
+  color: var(--warning-fg);
+  list-style: none;
+  padding: 0;
+  margin: 6px 0;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+.run-output {
+  margin: 10px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.run-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.run-head code {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.run-output pre {
+  margin: 0;
+  padding: 8px;
+  max-height: 320px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+.run-status {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--neutral-bg);
+}
+.run-succeeded {
+  background: var(--success-bg);
+  color: var(--success-fg);
+}
+.run-failed,
+.run-timeout {
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+}
+.diff {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  max-height: 60vh;
+  overflow: auto;
+  background: var(--bg);
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.diff .add {
+  color: var(--success-fg);
+  background: var(--success-bg);
+}
+.diff .del {
+  color: var(--danger-fg);
+  background: var(--danger-bg);
+}
+
+.edit-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.diff-editor {
+  margin: 8px 0;
+  border: 1px solid var(--border);
+}

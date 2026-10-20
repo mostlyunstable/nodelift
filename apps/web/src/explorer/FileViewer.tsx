@@ -19,12 +19,16 @@ export function FileViewer({
   theme,
   diagnostics = [],
   target = null,
+  draft = null,
+  onDraftChange,
 }: {
   file: RepoFileContent | null
   error: string | null
   theme: 'dark' | 'light'
   diagnostics?: RepoDiagnostic[]
   target?: { path: string; line: number; n: number } | null
+  draft?: string | null // when set, the editor shows this editable copy instead of the imported file
+  onDraftChange?: (text: string) => void
 }) {
   const [handle, setHandle] = useState<EditorHandle | null>(null)
   const decorations = useRef<Monaco.editor.IEditorDecorationsCollection | null>(null)
@@ -83,7 +87,8 @@ export function FileViewer({
           {file.path}
         </span>
         <span className="muted">
-          {file.language} · {file.lines} lines · {formatBytes(file.size)} · read-only
+          {file.language} · {file.lines} lines · {formatBytes(file.size)} ·{' '}
+          {draft === null ? 'read-only' : 'editing a copy'}
         </span>
       </div>
       {file.content === null ? (
@@ -94,12 +99,13 @@ export function FileViewer({
         <Editor
           path={file.path}
           language={file.language}
-          value={file.content}
+          value={draft ?? file.content}
           theme={theme === 'dark' ? 'vs-dark' : 'light'}
           onMount={(editor, monaco) => setHandle({ editor, monaco })}
+          onChange={(v) => onDraftChange?.(v ?? '')}
           options={{
-            readOnly: true,
-            domReadOnly: true,
+            readOnly: draft === null,
+            domReadOnly: draft === null,
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
             fontSize: 12.5,

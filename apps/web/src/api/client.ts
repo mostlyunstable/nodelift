@@ -58,6 +58,20 @@ export type RepoEdge = Schemas['RepoEdgeRecord']
 export type RepoDiagnostic = Schemas['RepoDiagnosticRecord']
 export type RepoGraph = Schemas['RepoGraphRecord']
 export type FileAnalysis = Schemas['FileAnalysisRecord']
+export type Discovery = Schemas['DiscoveryRecord']
+export type Suggestion = Schemas['SuggestionRecord']
+export type Workspace = Schemas['WorkspaceRecord']
+export type CommandRun = Schemas['CommandRunRecord']
+export type RepoPatch = Schemas['RepoPatchRecord']
+export interface CommandRequest {
+  command: string
+  approved_command: string
+  cwd?: string
+  timeout_s?: number
+  allow_network?: boolean
+  allow_home_read?: boolean
+  acknowledge_unconfined?: boolean
+}
 
 export const api = {
   explorerImport: (url: string) => request<RepoRevision>('POST', '/explorer/imports', { url }),
@@ -69,6 +83,33 @@ export const api = {
   explorerGraph: (id: string) => request<RepoGraph>('GET', `/explorer/revisions/${id}/graph`),
   explorerAnalysis: (id: string, path: string) =>
     request<FileAnalysis>('GET', `/explorer/revisions/${id}/analysis?path=${encodeURIComponent(path)}`),
+  explorerDiscovery: (id: string) => request<Discovery>('GET', `/explorer/revisions/${id}/discovery`),
+  explorerWorkspace: (id: string) => request<Workspace>('GET', `/explorer/revisions/${id}/workspace`),
+  explorerPrepareWorkspace: (id: string) => request<Workspace>('POST', `/explorer/revisions/${id}/workspace`),
+  explorerResetWorkspace: (id: string) => request<Workspace>('DELETE', `/explorer/revisions/${id}/workspace`),
+  explorerRunCommand: (id: string, body: CommandRequest) =>
+    request<CommandRun>('POST', `/explorer/revisions/${id}/commands`, body),
+  explorerCommands: (id: string) => request<CommandRun[]>('GET', `/explorer/revisions/${id}/commands`),
+  explorerCommand: (id: string, runId: string) =>
+    request<CommandRun>('GET', `/explorer/revisions/${id}/commands/${runId}`),
+  explorerCancelCommand: (id: string, runId: string) =>
+    request<CommandRun>('POST', `/explorer/revisions/${id}/commands/${runId}/cancel`),
+  explorerPatches: (id: string) => request<RepoPatch[]>('GET', `/explorer/revisions/${id}/patches`),
+  explorerCreatePatch: (id: string, body: { path: string; title: string; new_content: string }) =>
+    request<RepoPatch>('POST', `/explorer/revisions/${id}/patches`, body),
+  explorerPatchDiff: async (id: string, patchId: string): Promise<string> => {
+    const res = await fetch(apiUrl(`/explorer/revisions/${id}/patches/${patchId}/diff`), {
+      headers: authHeaders({}),
+    })
+    if (!res.ok) throw new ApiError(`Could not load the diff (${res.status})`, res.status)
+    return res.text()
+  },
+  explorerApplyPatch: (id: string, patchId: string) =>
+    request<RepoPatch>('POST', `/explorer/revisions/${id}/patches/${patchId}/apply`),
+  explorerRevertPatch: (id: string, patchId: string) =>
+    request<RepoPatch>('POST', `/explorer/revisions/${id}/patches/${patchId}/revert`),
+  explorerDeletePatch: (id: string, patchId: string) =>
+    request<null>('DELETE', `/explorer/revisions/${id}/patches/${patchId}`),
   explorerFiles: (id: string) => request<RepoFile[]>('GET', `/explorer/revisions/${id}/files`),
   explorerFile: (id: string, path: string) =>
     request<RepoFileContent>('GET', `/explorer/revisions/${id}/file?path=${encodeURIComponent(path)}`),

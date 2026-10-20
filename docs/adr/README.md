@@ -15,3 +15,4 @@ Newest decisions go at the end. Do not rewrite history: supersede an old ADR wit
 | [0008](0008-secrets.md)                       | Credentials in the system keychain, referenced by name, masked everywhere    |
 | [0009](0009-static-dependency-analysis.md)    | Static dependency analysis with explicit confidence                          |
 | [0010](0010-os-confinement-for-code-nodes.md) | OS confinement for code nodes (macOS Seatbelt, memory watchdog)              |
+| [0011](0011-approved-commands-and-patches.md) | Approved commands and reviewable patches for imported repositories |

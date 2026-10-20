@@ -12,7 +12,7 @@ import {
 } from '../api/client'
 
 export type Mode = 'build' | 'explorer'
-export type ExplorerTab = 'graph' | 'code' | 'problems'
+export type ExplorerTab = 'graph' | 'code' | 'problems' | 'run'
 
 const ROOT_OPEN = () => new Set([''])
 

@@ -4,6 +4,7 @@ import { ExplorerGraph } from './ExplorerGraph'
 import { FileTree } from './FileTree'
 import { FilePanel } from './FilePanel'
 import { ProblemsView } from './ProblemsView'
+import { RunView } from './RunView'
 import { formatBytes } from './tree'
 
 export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
@@ -149,6 +150,9 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
               <button role="tab" aria-selected={e.tab === 'code'} onClick={() => e.setTab('code')}>
                 Code
               </button>
+              <button role="tab" aria-selected={e.tab === 'run'} onClick={() => e.setTab('run')}>
+                Run
+              </button>
               <button role="tab" aria-selected={e.tab === 'problems'} onClick={() => e.setTab('problems')}>
                 Problems
                 {rev.diagnostic_count > 0 && <span className="xn-problems"> ⚠ {rev.diagnostic_count}</span>}
@@ -167,6 +171,8 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
               </div>
             ) : e.tab === 'problems' ? (
               <ProblemsView />
+            ) : e.tab === 'run' ? (
+              <RunView />
             ) : (
               <FilePanel theme={theme} />
             )}

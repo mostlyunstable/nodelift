@@ -130,3 +130,12 @@ clicking `Session.request` highlights and centres line 557; the sandbox configur
 network probe (script flag stayed 0, no request recorded). Fixed along the way: dunder methods were wrongly shown as private.
 **Not done:** call-site navigation (go to definition across files), JSON formatting action, schema validation, Markdown preview, side-by-side
 diff (R6), recent-changes history (no Git history is fetched).
+
+## R6 status (2026-10-20): implemented
+Discovery of test/build/lint commands from the repository's own files with the evidence line (package.json scripts, pytest config,
+Makefile targets, go.mod, Cargo.toml, name-based unittest guess); a full-copy workspace; an approval dialog and a confined runner
+(see ADR 0011); proposed changes with diff, apply/revert on the workspace copy, `.patch` export. Verified end to end in tests: a failing
+unittest repo fails, a proposed fix is applied to the workspace, the same command passes, the imported file is untouched, revert makes it fail
+again; confinement checked from inside (network, home read, writes outside the workspace, inherited secrets); cancel kills a grandchild.
+Real run on `psf/requests`: full 128-file workspace, confined `python3` ran; `pytest` failed honestly because it is not installed.
+**Not done:** AI-assisted explanations/fix suggestions (no provider configured); parsing test results into per-test pass/fail; Git history.

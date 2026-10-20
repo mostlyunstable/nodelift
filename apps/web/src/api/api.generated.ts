@@ -183,6 +183,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/explorer/revisions/{revision_id}/commands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Commands */
+        get: operations["list_commands_api_v1_explorer_revisions__revision_id__commands_get"];
+        put?: never;
+        /**
+         * Run Command
+         * @description Runs only a command the caller restated verbatim as approved, in the prepared workspace.
+         */
+        post: operations["run_command_api_v1_explorer_revisions__revision_id__commands_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions/{revision_id}/commands/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Command */
+        get: operations["get_command_api_v1_explorer_revisions__revision_id__commands__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions/{revision_id}/commands/{run_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Command */
+        post: operations["cancel_command_api_v1_explorer_revisions__revision_id__commands__run_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions/{revision_id}/discovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discovery
+         * @description How the repository says it is tested. Reads files only; runs nothing.
+         */
+        get: operations["discovery_api_v1_explorer_revisions__revision_id__discovery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/explorer/revisions/{revision_id}/file": {
         parameters: {
             query?: never;
@@ -229,6 +304,131 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions/{revision_id}/patches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Patches */
+        get: operations["list_patches_api_v1_explorer_revisions__revision_id__patches_get"];
+        put?: never;
+        /** Create Patch */
+        post: operations["create_patch_api_v1_explorer_revisions__revision_id__patches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions/{revision_id}/patches/{patch_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Patch */
+        delete: operations["delete_patch_api_v1_explorer_revisions__revision_id__patches__patch_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions/{revision_id}/patches/{patch_id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Patch */
+        post: operations["apply_patch_api_v1_explorer_revisions__revision_id__patches__patch_id__apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions/{revision_id}/patches/{patch_id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Patch Diff */
+        get: operations["patch_diff_api_v1_explorer_revisions__revision_id__patches__patch_id__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions/{revision_id}/patches/{patch_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Patch
+         * @description The same diff as a downloadable file you can `git apply` yourself.
+         */
+        get: operations["export_patch_api_v1_explorer_revisions__revision_id__patches__patch_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions/{revision_id}/patches/{patch_id}/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revert Patch */
+        post: operations["revert_patch_api_v1_explorer_revisions__revision_id__patches__patch_id__revert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explorer/revisions/{revision_id}/workspace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Workspace */
+        get: operations["workspace_api_v1_explorer_revisions__revision_id__workspace_get"];
+        put?: never;
+        /** Prepare Workspace */
+        post: operations["prepare_workspace_api_v1_explorer_revisions__revision_id__workspace_post"];
+        /** Reset Workspace */
+        delete: operations["reset_workspace_api_v1_explorer_revisions__revision_id__workspace_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -678,6 +878,72 @@ export interface components {
              */
             timeout_ms: number;
         };
+        /** CommandRequest */
+        CommandRequest: {
+            /**
+             * Acknowledge Unconfined
+             * @default false
+             */
+            acknowledge_unconfined: boolean;
+            /**
+             * Allow Home Read
+             * @default false
+             */
+            allow_home_read: boolean;
+            /**
+             * Allow Network
+             * @default false
+             */
+            allow_network: boolean;
+            /** Approved Command */
+            approved_command: string;
+            /** Command */
+            command: string;
+            /**
+             * Cwd
+             * @default
+             */
+            cwd: string;
+            /**
+             * Timeout S
+             * @default 300
+             */
+            timeout_s: number;
+        };
+        /** CommandRunRecord */
+        CommandRunRecord: {
+            /** Argv */
+            argv: string[];
+            /** Command */
+            command: string;
+            /** Confinement */
+            confinement: {
+                [key: string]: unknown;
+            };
+            /** Cwd */
+            cwd: string;
+            /** Ended At */
+            ended_at: string | null;
+            /** Exit Code */
+            exit_code: number | null;
+            /** Id */
+            id: string;
+            /** Notes */
+            notes: string[];
+            /** Output */
+            output: string;
+            /** Output Truncated */
+            output_truncated: boolean;
+            /** Revision Id */
+            revision_id: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Status */
+            status: string;
+        };
         /** CreateWorkflow */
         CreateWorkflow: {
             /**
@@ -720,6 +986,15 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** DiscoveryRecord */
+        DiscoveryRecord: {
+            /** Frameworks */
+            frameworks: string[];
+            /** Suggestions */
+            suggestions: components["schemas"]["SuggestionRecord"][];
+            /** Test Files */
+            test_files: string[];
         };
         /** Endpoint */
         Endpoint: {
@@ -977,6 +1252,18 @@ export interface components {
             /** Type */
             type: string;
         };
+        /** PatchRequest */
+        PatchRequest: {
+            /** New Content */
+            new_content: string;
+            /** Path */
+            path: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+        };
         /** Port */
         Port: {
             /**
@@ -1053,6 +1340,33 @@ export interface components {
             edges: components["schemas"]["RepoEdgeRecord"][];
             /** Truncated */
             truncated: boolean;
+        };
+        /**
+         * RepoPatchRecord
+         * @description A change someone proposed to one file. The repository's own files are never modified.
+         */
+        RepoPatchRecord: {
+            /** Additions */
+            additions: number;
+            /** Applied */
+            applied: boolean;
+            /** Applied At */
+            applied_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Deletions */
+            deletions: number;
+            /** Id */
+            id: string;
+            /** Path */
+            path: string;
+            /** Revision Id */
+            revision_id: string;
+            /** Title */
+            title: string;
         };
         /**
          * RepoRevisionRecord
@@ -1230,6 +1544,25 @@ export interface components {
             /** Version */
             version?: number | null;
         };
+        /** SuggestionRecord */
+        SuggestionRecord: {
+            /** Argv */
+            argv: string[];
+            /** Cwd */
+            cwd: string;
+            /** Evidence */
+            evidence: string;
+            /** Framework */
+            framework: string;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Notes */
+            notes: string[];
+        };
         /** UpdateWorkflow */
         UpdateWorkflow: {
             definition: components["schemas"]["WorkflowDefinition"];
@@ -1406,6 +1739,17 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** WorkspaceRecord */
+        WorkspaceRecord: {
+            /** Error */
+            error: string | null;
+            /** File Count */
+            file_count: number;
+            /** Path */
+            path: string | null;
+            /** State */
+            state: string;
         };
     };
     responses: never;
@@ -1792,6 +2136,167 @@ export interface operations {
             };
         };
     };
+    list_commands_api_v1_explorer_revisions__revision_id__commands_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandRunRecord"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_command_api_v1_explorer_revisions__revision_id__commands_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommandRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandRunRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_command_api_v1_explorer_revisions__revision_id__commands__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandRunRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_command_api_v1_explorer_revisions__revision_id__commands__run_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandRunRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discovery_api_v1_explorer_revisions__revision_id__discovery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveryRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     read_file_api_v1_explorer_revisions__revision_id__file_get: {
         parameters: {
             query: {
@@ -1874,6 +2379,323 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RepoGraphRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_patches_api_v1_explorer_revisions__revision_id__patches_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepoPatchRecord"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_patch_api_v1_explorer_revisions__revision_id__patches_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepoPatchRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_patch_api_v1_explorer_revisions__revision_id__patches__patch_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+                patch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_patch_api_v1_explorer_revisions__revision_id__patches__patch_id__apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+                patch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepoPatchRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_diff_api_v1_explorer_revisions__revision_id__patches__patch_id__diff_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+                patch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_patch_api_v1_explorer_revisions__revision_id__patches__patch_id__export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+                patch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revert_patch_api_v1_explorer_revisions__revision_id__patches__patch_id__revert_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+                patch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepoPatchRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    workspace_api_v1_explorer_revisions__revision_id__workspace_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prepare_workspace_api_v1_explorer_revisions__revision_id__workspace_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_workspace_api_v1_explorer_revisions__revision_id__workspace_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceRecord"];
                 };
             };
             /** @description Validation Error */
