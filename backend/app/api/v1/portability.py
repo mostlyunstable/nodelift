@@ -14,6 +14,7 @@ from app.api.v1.stored import Service
 from app.domain.migrations import migrate_definition
 from app.domain.records import WorkflowRecord
 from app.domain.workflow import ValidationIssue, WorkflowDefinition, validate_workflow
+from app.examples import load_examples
 
 router = APIRouter(tags=["portability"])
 
@@ -162,3 +163,38 @@ def export_everything(svc: Service) -> dict[str, Any]:
         "exported_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "workflows": files,
     }
+
+
+class ExampleInfo(BaseModel):
+    id: str
+    title: str
+    description: str
+    nodes: int
+
+
+@router.get("/examples", response_model=list[ExampleInfo])
+def list_examples() -> list[ExampleInfo]:
+    return [
+        ExampleInfo(
+            id=e["id"],
+            title=e["title"],
+            description=e["description"],
+            nodes=len(e["definition"]["nodes"]),
+        )
+        for e in load_examples().values()
+    ]
+
+
+@router.post("/examples/{example_id}/create", response_model=WorkflowRecord, status_code=201)
+def create_example(example_id: str, registry: Registry, svc: Service) -> WorkflowRecord:
+    """A fresh copy of a built-in example as a new workflow (it is not run)."""
+    example = load_examples().get(example_id)
+    if example is None:
+        raise AppError(404, "not_found", "Example not found")
+    definition = WorkflowDefinition.model_validate(migrate_definition(example["definition"]))
+    issues = validate_workflow(definition, registry)
+    if issues:  # a shipped example must always be valid; fail loudly if it ever is not
+        raise AppError(
+            500, "bad_example", "The built-in example is invalid", [i.model_dump() for i in issues]
+        )
+    return svc.workflows.create(example["name"], definition)

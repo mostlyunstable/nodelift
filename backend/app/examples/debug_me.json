@@ -1,0 +1,52 @@
+{
+  "id": "debug-me",
+  "title": "Debug me",
+  "description": "Four nodes. One has a bug on purpose: run it, see exactly why it failed, fix it, and resume.",
+  "name": "Debug me (example)",
+  "definition": {
+    "schema_version": 1,
+    "nodes": [
+      {
+        "id": "make_data",
+        "type": "code.python",
+        "name": "Make data",
+        "config": {
+          "source": "def main(input_data):\n    items = [4, 8, 15, 16, 23, 42]\n    print(\"made\", len(items), \"items\")\n    return {\"items\": items, \"count\": 0}\n"
+        }
+      },
+      {
+        "id": "pick_fields",
+        "type": "transform.json",
+        "name": "Pick fields",
+        "config": {"mapping": {"items": "$.items", "count": "$.count"}}
+      },
+      {
+        "id": "average",
+        "type": "code.python",
+        "name": "Average",
+        "config": {
+          "source": "def main(input_data):\n    total = sum(input_data[\"items\"])\n    # BUG: \"count\" is 0, so this divides by zero.\n    # Fix: divide by len(input_data[\"items\"]) instead.\n    return {\"average\": total / input_data[\"count\"]}\n"
+        }
+      },
+      {
+        "id": "report",
+        "type": "transform.json",
+        "name": "Report",
+        "config": {"mapping": {"average": "$.average", "note": {"literal": "all done"}}}
+      }
+    ],
+    "edges": [
+      {"id": "e1", "source": {"node": "make_data", "port": "out"}, "target": {"node": "pick_fields", "port": "in"}},
+      {"id": "e2", "source": {"node": "pick_fields", "port": "out"}, "target": {"node": "average", "port": "in"}},
+      {"id": "e3", "source": {"node": "average", "port": "out"}, "target": {"node": "report", "port": "in"}}
+    ],
+    "ui": {
+      "positions": {
+        "make_data": {"x": 0, "y": 120},
+        "pick_fields": {"x": 260, "y": 120},
+        "average": {"x": 520, "y": 120},
+        "report": {"x": 780, "y": 120}
+      }
+    }
+  }
+}

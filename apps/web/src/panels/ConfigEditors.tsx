@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FlowNode } from '../canvas/mapper'
 import { JsonField } from '../editor/JsonField'
 import { useStore } from '../state/store'
+import { resolveTheme } from '../state/theme'
 import { errorLine, explainError } from './errors'
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']
@@ -13,6 +14,7 @@ function CodeConfig({ node }: { node: FlowNode }) {
   const exec = useStore((s) => s.run?.nodes.findLast((n) => n.node_id === node.id))
   const test = useStore((s) => s.nodeTests[node.id])
   const focus = useStore((s) => s.focusLine)
+  const themeChoice = useStore((s) => s.theme)
   const failure =
     (test?.status === 'failed' ? test.error : null) ?? (exec?.status === 'failed' ? exec.error : null)
   const line = errorLine(failure)
@@ -63,7 +65,7 @@ function CodeConfig({ node }: { node: FlowNode }) {
         <Editor
           height="240px"
           language="python"
-          theme="vs-dark"
+          theme={resolveTheme(themeChoice) === 'light' ? 'vs' : 'vs-dark'}
           value={String(node.data.config.source ?? '')}
           onMount={(editor, monaco) => {
             handle.current = { editor, monaco }

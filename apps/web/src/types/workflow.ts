@@ -122,3 +122,54 @@ export interface NodeDefinition {
   config_schema: Record<string, unknown>
   default_config: Record<string, unknown>
 }
+
+export interface VersionRecord {
+  id: string
+  workflow_id: string
+  version_no: number
+  content_hash: string
+  definition: WorkflowDefinition
+  created_at: string
+}
+
+export interface WorkflowFile {
+  format: string
+  format_version: number
+  exported_at?: string
+  workflow: { name: string; definition: unknown }
+}
+
+export interface ImportSummary {
+  name: string
+  nodes: number
+  edges: number
+  node_types: Record<string, number>
+  code_nodes: number
+  http_hosts: string[]
+  warnings: string[]
+}
+
+export interface ImportPreview {
+  valid: boolean
+  issues: ValidationIssue[]
+  summary: ImportSummary
+}
+
+export interface ExampleInfo {
+  id: string
+  title: string
+  description: string
+  nodes: number
+}
+
+export interface SystemInfo {
+  version: string
+  schema_revision: string | null
+  schema_head: string
+  data_dir: string
+  log_dir: string | null
+  backup_dir: string
+  backups: string[]
+  python: string
+  uptime_s: number
+}

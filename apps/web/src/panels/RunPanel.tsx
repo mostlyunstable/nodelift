@@ -3,7 +3,7 @@ import { formatTime } from '../utils/format'
 import { ResultView } from './ResultView'
 
 export function RunPanel() {
-  const { run, runs, events, resume, busy, runInput, setRunInput, selectedId, nodes, issues, message } = useStore()
+  const { run, runs, events, resume, busy, runInput, setRunInput, selectedId, nodes, issues } = useStore()
   const exec = run?.nodes.findLast((n) => n.node_id === selectedId)
   const nameOf = (id: string) => nodes.find((n) => n.id === id)?.data.name ?? id
   return (
@@ -13,7 +13,6 @@ export function RunPanel() {
           Workflow input (JSON, passed to entry nodes)
           <textarea rows={3} value={runInput} onChange={(e) => setRunInput(e.target.value)} />
         </label>
-        {message && <div className="notice">{message}</div>}
         {issues.length > 0 && (
           <ul className="issues">
             {issues.map((i, k) => (

@@ -10,6 +10,7 @@ import {
 import { create } from 'zustand'
 import { api, ApiError } from '../api/client'
 import { followRun } from '../api/events'
+import { fileSlug, saveTextFile } from '../desktop/files'
 import { checkConnection } from '../canvas/graph'
 import { DEFAULT_SOURCE, fromWorkflow, toWorkflow, type FlowNode, type NodeData } from '../canvas/mapper'
 import { errorLine, firstFailedNodeId } from '../panels/errors'
@@ -19,8 +20,10 @@ import type {
   ExecutionRun,
   NodeDefinition,
   NodeLiveStatus,
+  ImportPreview,
   RunEvent,
   ValidationIssue,
+  VersionRecord,
   VersionSummary,
   WorkflowRecord,
   WorkflowSummary,
@@ -106,7 +109,38 @@ let editSeq = 0 // bumped on every edit; a save only clears "dirty" if nothing c
 let generation = 0 // bumped when a different workflow is opened/reset; stale saves must not apply
 let inFlight: Promise<string | null> | null = null
 
+export type DialogName = 'palette' | 'versions' | 'diagnostics' | 'import' | 'shortcuts'
+export type ThemeChoice = 'dark' | 'light' | 'system'
+export type Tour = 'run' | 'fix' | 'done' | null
+
+const THEME_KEY = 'nodecraft.theme'
+export const loadTheme = (): ThemeChoice => {
+  try {
+    const v = localStorage.getItem(THEME_KEY)
+    return v === 'light' || v === 'dark' || v === 'system' ? v : 'system'
+  } catch {
+    return 'system'
+  }
+}
+
 interface State {
+  dialog: DialogName | null
+  openDialog: (d: DialogName) => void
+  closeDialog: () => void
+  theme: ThemeChoice
+  setTheme: (t: ThemeChoice) => void
+  tour: Tour
+  dismissTour: () => void
+  viewedVersion: VersionRecord | null
+  viewVersion: (n: number) => Promise<void>
+  restoreVersion: (n: number) => Promise<void>
+  deleteWorkflow: (id: string) => Promise<void>
+  exportCurrent: () => Promise<void>
+  exportAll: () => Promise<void>
+  importFile: (file: File) => Promise<void>
+  importPreview: { file: unknown; preview: ImportPreview } | null
+  confirmImport: () => Promise<void>
+  createExample: (id?: string) => Promise<void>
   focusLine: { nodeId: string; line: number; nonce: number } | null
   requestFocusLine: (nodeId: string, line: number) => void
   canUndo: boolean
@@ -191,6 +225,7 @@ function follow(runId: string) {
       const finalRun = await api.getRun(runId)
       useStore.setState({ run: finalRun })
       focusFailure(finalRun)
+      advanceTour(finalRun)
     } finally {
       useStore.setState({ busy: null, message: null })
       await useStore.getState().refresh()
@@ -235,6 +270,13 @@ function follow(runId: string) {
   }
 }
 
+function advanceTour(run: ExecutionRun) {
+  const { tour } = useStore.getState()
+  if (tour === null || tour === 'done') return
+  if (run.status === 'failed') useStore.setState({ tour: 'fix' })
+  else if (run.status === 'succeeded') useStore.setState({ tour: 'done' })
+}
+
 /** After a failed run: jump to the node that failed and ask the editor to show the failing line. */
 function focusFailure(run: ExecutionRun) {
   const id = firstFailedNodeId(run)
@@ -276,6 +318,126 @@ function markDirty() {
 export const useStore = create<State>((set, get) => ({
   nodes: [],
   edges: [],
+  dialog: null,
+  openDialog: (d) => set({ dialog: d }),
+  closeDialog: () => set({ dialog: null, viewedVersion: null, importPreview: null }),
+  theme: loadTheme(),
+  setTheme: (t) => {
+    try {
+      localStorage.setItem(THEME_KEY, t)
+    } catch {
+      /* the choice just will not persist */
+    }
+    set({ theme: t })
+  },
+  tour: null,
+  dismissTour: () => set({ tour: null }),
+  viewedVersion: null,
+  importPreview: null,
+
+  viewVersion: async (n) => {
+    const id = get().workflowId
+    if (!id) return
+    try {
+      set({ viewedVersion: await api.getVersion(id, n) })
+    } catch (e) {
+      set({ message: (e as Error).message })
+    }
+  },
+
+  restoreVersion: async (n) => {
+    const id = get().workflowId
+    if (!id) return
+    try {
+      const v = await api.getVersion(id, n)
+      const { nodes, edges } = fromWorkflow(v.definition)
+      recordHistory() // so ⌘Z brings the current draft back
+      set({
+        nodes,
+        edges,
+        selectedId: null,
+        dialog: null,
+        viewedVersion: null,
+        message: `Restored version ${n} into the editor. Undo (⌘Z) brings back what you had.`,
+      })
+      markDirty()
+    } catch (e) {
+      set({ message: (e as Error).message })
+    }
+  },
+
+  deleteWorkflow: async (id) => {
+    try {
+      await api.deleteWorkflow(id)
+      if (get().workflowId === id) get().reset()
+      set({ message: 'Workflow deleted.' })
+      await get().refresh()
+    } catch (e) {
+      set({ message: (e as Error).message })
+    }
+  },
+
+  exportCurrent: async () => {
+    const id = await get().save()
+    if (!id) return
+    try {
+      const file = await api.exportWorkflow(id)
+      const saved = await saveTextFile(`${fileSlug(get().workflowName)}.nodecraft.json`, JSON.stringify(file, null, 2))
+      if (saved) set({ message: 'Workflow exported.' })
+    } catch (e) {
+      set({ message: `Could not export: ${(e as Error).message}` })
+    }
+  },
+
+  exportAll: async () => {
+    try {
+      const everything = await api.exportEverything()
+      const stamp = new Date().toISOString().slice(0, 10)
+      const saved = await saveTextFile(`nodecraft-backup-${stamp}.json`, JSON.stringify(everything, null, 2))
+      if (saved) set({ message: 'Backup saved. It contains all workflows (not run history).' })
+    } catch (e) {
+      set({ message: `Could not export: ${(e as Error).message}` })
+    }
+  },
+
+  importFile: async (file) => {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(await file.text())
+    } catch {
+      return set({ message: 'That file is not valid JSON, so it cannot be a Nodecraft workflow.' })
+    }
+    try {
+      const preview = await api.previewImport(parsed)
+      set({ importPreview: { file: parsed, preview }, dialog: 'import' })
+    } catch (e) {
+      set({ message: `Cannot import: ${(e as Error).message}` })
+    }
+  },
+
+  confirmImport: async () => {
+    const pending = get().importPreview
+    if (!pending || !pending.preview.valid) return
+    try {
+      const rec = await api.importWorkflow(pending.file)
+      set({ dialog: null, importPreview: null })
+      await get().open(rec.id, rec)
+      set({ message: 'Imported as a new workflow. It has not been run; review the code first.' })
+    } catch (e) {
+      set({ message: `Cannot import: ${(e as Error).message}` })
+    }
+  },
+
+  createExample: async (id = 'debug-me') => {
+    try {
+      const rec = await api.createExample(id)
+      await get().open(rec.id, rec)
+      set({ tour: 'run', dialog: null })
+    } catch (e) {
+      set({ message: `Could not create the example: ${(e as Error).message}` })
+    }
+  },
+
   focusLine: null,
   requestFocusLine: (nodeId, line) => useStore.setState({ focusLine: { nodeId, line, nonce: Date.now() } }),
   canUndo: false,

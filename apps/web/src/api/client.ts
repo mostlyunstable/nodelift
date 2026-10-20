@@ -1,6 +1,11 @@
 import { apiUrl, authHeaders } from './config'
 import type {
   CodeRunResult,
+  ExampleInfo,
+  ImportPreview,
+  SystemInfo,
+  VersionRecord,
+  WorkflowFile,
   NodeDefinition,
   RunEvent,
   RunRecord,
@@ -59,11 +64,31 @@ export const api = {
   cancelRun: (runId: string) => request<RunRecord>('POST', `/runs/${runId}/cancel`),
   resumeRun: (runId: string) => request<RunRecord>('POST', `/runs/${runId}/resume`, {}),
   getRun: (runId: string) => request<RunRecord>('GET', `/runs/${runId}`),
+  getVersion: (id: string, versionNo: number) =>
+    request<VersionRecord>('GET', `/workflows/${id}/versions/${versionNo}`),
+  /** All events after `after`, following the server's paging headers. */
   listEvents: async (runId: string, after = 0) => {
-    const rows = await request<{ seq: number; type: RunEvent['type']; created_at: string; payload: Record<string, unknown> }[]>(
-      'GET',
-      `/runs/${runId}/events?after=${after}`,
-    )
-    return rows.map((r) => ({ seq: r.seq, type: r.type, created_at: r.created_at, ...r.payload }) as RunEvent)
+    type Row = { seq: number; type: RunEvent['type']; created_at: string; payload: Record<string, unknown> }
+    const out: RunEvent[] = []
+    for (let page = 0; page < 100; page++) {
+      const res = await fetch(apiUrl(`/runs/${runId}/events?after=${after}&limit=500`), { headers: authHeaders() })
+      if (!res.ok) {
+        const err = (await res.json().catch(() => null))?.error
+        throw new ApiError(err?.message ?? `Request failed (${res.status})`, res.status, err?.code, err?.details ?? [])
+      }
+      const rows = (await res.json()) as Row[]
+      out.push(...rows.map((r) => ({ seq: r.seq, type: r.type, created_at: r.created_at, ...r.payload }) as RunEvent))
+      if (res.headers.get('x-has-more') !== '1') break
+      after = Number(res.headers.get('x-next-after'))
+    }
+    return out
   },
+  exportWorkflow: (id: string) => request<WorkflowFile>('GET', `/workflows/${id}/export`),
+  exportEverything: () => request<unknown>('GET', '/system/export'),
+  previewImport: (file: unknown) => request<ImportPreview>('POST', '/workflows/import/preview', file),
+  importWorkflow: (file: unknown) => request<WorkflowRecord>('POST', '/workflows/import', file),
+  listExamples: () => request<ExampleInfo[]>('GET', '/examples'),
+  createExample: (id: string) => request<WorkflowRecord>('POST', `/examples/${id}/create`),
+  systemInfo: () => request<SystemInfo>('GET', '/system/info'),
+  systemLogs: (lines = 200) => request<{ path: string | null; lines: string[] }>('GET', `/system/logs?lines=${lines}`),
 }
