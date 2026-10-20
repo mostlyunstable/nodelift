@@ -136,7 +136,9 @@ def test_python_dunder_methods_are_not_marked_private(tmp_path: Path) -> None:
     res = run(
         tmp_path,
         {
-            "a.py": "class A:\n    def __init__(self):\n        pass\n    def _x(self):\n        pass\n"
+            "a.py": (
+                "class A:\n    def __init__(self):\n        pass\n    def _x(self):\n        pass\n"
+            )
         },
     )
     got = {(s.name, s.exported) for s in res.symbols}
