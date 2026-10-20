@@ -1,7 +1,11 @@
 import { create } from 'zustand'
+import { ancestorDirs } from '../explorer/graph'
 import { api, ApiError, type RepoFile, type RepoFileContent, type RepoRevision } from '../api/client'
 
 export type Mode = 'build' | 'explorer'
+export type ExplorerTab = 'graph' | 'code'
+
+const ROOT_OPEN = () => new Set([''])
 
 interface ExplorerState {
   mode: Mode
@@ -12,6 +16,18 @@ interface ExplorerState {
   revisions: RepoRevision[]
   files: RepoFile[]
   selectedPath: string | null
+  tab: ExplorerTab
+  setTab: (t: ExplorerTab) => void
+  expanded: ReadonlySet<string>
+  toggleDir: (path: string) => void
+  collapseAll: () => void
+  languages: ReadonlySet<string>
+  toggleLanguage: (l: string) => void
+  clearLanguages: () => void
+  focus: { path: string; n: number } | null
+  selectedEdge: string | null
+  setSelectedEdge: (id: string | null) => void
+  reveal: (path: string) => Promise<void>
   file: RepoFileContent | null
   fileError: string | null
   error: string | null
@@ -69,6 +85,36 @@ export const useExplorer = create<ExplorerState>((set, get) => {
     revisions: [],
     files: [],
     selectedPath: null,
+    tab: 'graph',
+    setTab: (tab) => set({ tab }),
+    expanded: ROOT_OPEN(),
+    toggleDir: (path) =>
+      set((st) => {
+        const next = new Set(st.expanded)
+        if (!next.delete(path)) next.add(path)
+        return { expanded: next }
+      }),
+    collapseAll: () => set({ expanded: ROOT_OPEN() }),
+    languages: new Set(),
+    toggleLanguage: (l) =>
+      set((st) => {
+        const next = new Set(st.languages)
+        if (!next.delete(l)) next.add(l)
+        return { languages: next }
+      }),
+    clearLanguages: () => set({ languages: new Set() }),
+    focus: null,
+    selectedEdge: null,
+    setSelectedEdge: (selectedEdge) => set({ selectedEdge }),
+    reveal: async (path) => {
+      // open every parent folder so the file's node exists, then ask the canvas to centre on it
+      set((st) => ({
+        expanded: new Set([...st.expanded, ...ancestorDirs(path)]),
+        languages: new Set(),
+        focus: { path, n: (st.focus?.n ?? 0) + 1 },
+      }))
+      await get().selectFile(path)
+    },
     file: null,
     fileError: null,
     error: null,
@@ -86,7 +132,17 @@ export const useExplorer = create<ExplorerState>((set, get) => {
       const url = get().url.trim()
       if (!url || get().starting) return
       stopPolling()
-      set({ starting: true, error: null, revision: null, files: [], selectedPath: null, file: null })
+      set({
+        starting: true,
+        error: null,
+        revision: null,
+        files: [],
+        selectedPath: null,
+        file: null,
+        expanded: ROOT_OPEN(),
+        languages: new Set(),
+        selectedEdge: null,
+      })
       try {
         const rev = await api.explorerImport(url)
         set({ revision: rev, starting: false })
@@ -98,7 +154,16 @@ export const useExplorer = create<ExplorerState>((set, get) => {
 
     openRevision: async (id) => {
       stopPolling()
-      set({ error: null, files: [], selectedPath: null, file: null, fileError: null })
+      set({
+        error: null,
+        files: [],
+        selectedPath: null,
+        file: null,
+        fileError: null,
+        expanded: ROOT_OPEN(),
+        languages: new Set(),
+        selectedEdge: null,
+      })
       try {
         set({ revision: await api.explorerRevision(id) })
         track(id)
@@ -130,14 +195,24 @@ export const useExplorer = create<ExplorerState>((set, get) => {
 
     closeRevision: () => {
       stopPolling()
-      set({ revision: null, files: [], selectedPath: null, file: null, fileError: null, error: null })
+      set({
+        revision: null,
+        files: [],
+        selectedPath: null,
+        file: null,
+        fileError: null,
+        error: null,
+        expanded: ROOT_OPEN(),
+        languages: new Set(),
+        selectedEdge: null,
+      })
     },
 
     selectFile: async (path) => {
       const rev = get().revision
       if (!rev || rev.status !== 'ready') return
       const mine = ++fileGen
-      set({ selectedPath: path, fileError: null })
+      set({ selectedPath: path, fileError: null, selectedEdge: null })
       try {
         const file = await api.explorerFile(rev.id, path)
         if (mine === fileGen) set({ file })

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api, ApiError, type RepoRevision } from '../api/client'
 import { useExplorer } from '../state/explorer'
@@ -88,7 +88,7 @@ describe('Repository Explorer', () => {
     })
     fireEvent.click(button)
 
-    await screen.findByText('octo/hello')
+    await screen.findAllByText('octo/hello')
     fireEvent.click(await screen.findByRole('treeitem', { name: /config\.json/ }))
     const editor = await screen.findByTestId('editor')
     expect(editor).toHaveTextContent('{"a": 1}')
@@ -141,4 +141,88 @@ describe('Repository Explorer', () => {
     render(<ExplorerView theme="dark" />)
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('too large'))
   })
+
+  describe('graph', () => {
+    const many = [file('main.py'), file('src/app.py'), file('src/deep/x.json'), file('docs/readme.json')]
+    const ready = () =>
+      useExplorer.setState({
+        revision: rev(),
+        files: many,
+        expanded: new Set(['']),
+        languages: new Set(),
+        tab: 'graph',
+      })
+
+    it('shows real files as nodes and folders collapsed, with a structure-only legend', () => {
+      ready()
+      render(<ExplorerView theme="dark" />)
+      expect(screen.getByText('main.py', { selector: '.xn-name' })).toBeInTheDocument()
+      expect(screen.getByLabelText('Expand src')).toBeInTheDocument()
+      expect(screen.queryByText('app.py', { selector: '.xn-name' })).not.toBeInTheDocument()
+      expect(screen.getByText(/Folder contains item/)).toBeInTheDocument()
+      expect(screen.getByText(/Dependency edges appear once analysis is available/)).toBeInTheDocument()
+    })
+
+    it('expands a folder on demand', () => {
+      ready()
+      render(<ExplorerView theme="dark" />)
+      fireEvent.click(screen.getByLabelText('Expand src'))
+      expect(screen.getByText('app.py', { selector: '.xn-name' })).toBeInTheDocument()
+      expect(screen.getByLabelText('Collapse src')).toBeInTheDocument()
+    })
+
+    it('clicking a file node opens its source in the dock', async () => {
+      ready()
+      vi.spyOn(api, 'explorerFile').mockResolvedValue({
+        path: 'main.py',
+        language: 'python',
+        size: 10,
+        lines: 1,
+        binary: false,
+        content: 'print(1)',
+        reason: null,
+      })
+      render(<ExplorerView theme="dark" />)
+      fireEvent.click(screen.getByText('main.py', { selector: '.xn-name' }))
+      expect(await screen.findByTestId('editor')).toHaveTextContent('print(1)')
+      expect(api.explorerFile).toHaveBeenCalledWith('rev_1', 'main.py')
+    })
+
+    it('finding a file reveals it by opening its parent folders', async () => {
+      ready()
+      vi.spyOn(api, 'explorerFile').mockResolvedValue({
+        path: 'src/deep/x.json',
+        language: 'json',
+        size: 1,
+        lines: 1,
+        binary: false,
+        content: '{}',
+        reason: null,
+      })
+      render(<ExplorerView theme="dark" />)
+      fireEvent.change(screen.getByLabelText('Find a file in the graph'), { target: { value: 'x.json' } })
+      fireEvent.click(screen.getByRole('button', { name: 'src/deep/x.json' }))
+      await waitFor(() => expect(screen.getByText('x.json', { selector: '.xn-name' })).toBeInTheDocument())
+      expect(useExplorer.getState().selectedPath).toBe('src/deep/x.json')
+    })
+
+    it('filters by language', () => {
+      ready()
+      render(<ExplorerView theme="dark" />)
+      fireEvent.click(screen.getByRole('button', { name: /^python/ }))
+      expect(screen.getByText('main.py', { selector: '.xn-name' })).toBeInTheDocument()
+      expect(screen.queryByLabelText('Expand docs')).not.toBeInTheDocument()
+    })
+
+    it('selecting an edge explains it is structure, not a dependency', () => {
+      ready()
+      render(<ExplorerView theme="dark" />)
+      act(() => useExplorerEdge())
+      expect(screen.getByRole('status')).toHaveTextContent(/not a dependency/)
+    })
+  })
 })
+
+function useExplorerEdge() {
+  useExplorer.getState().setSelectedEdge('e:d:>d:src')
+}

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useExplorer } from '../state/explorer'
+import { ExplorerGraph } from './ExplorerGraph'
 import { FileTree } from './FileTree'
 import { FileViewer } from './FileViewer'
 import { formatBytes } from './tree'
@@ -88,7 +89,7 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
         )}
 
         {rev?.status === 'ready' && (
-          <FileTree files={e.files} selected={e.selectedPath} onSelect={(p) => void e.selectFile(p)} />
+          <FileTree files={e.files} selected={e.selectedPath} onSelect={(p) => void e.reveal(p)} />
         )}
 
         {!rev && e.revisions.length > 0 && (
@@ -119,7 +120,30 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
       </aside>
       <section className="explorer-main">
         {rev?.status === 'ready' ? (
-          <FileViewer file={e.file} error={e.fileError} theme={theme} />
+          <>
+            <div className="tabs" role="tablist" aria-label="View">
+              <button role="tab" aria-selected={e.tab === 'graph'} onClick={() => e.setTab('graph')}>
+                Graph
+              </button>
+              <button role="tab" aria-selected={e.tab === 'code'} onClick={() => e.setTab('code')}>
+                Code
+              </button>
+            </div>
+            {e.tab === 'graph' ? (
+              <div className={`graph-split${e.selectedPath ? ' with-viewer' : ''}`}>
+                <div className="graph-pane">
+                  <ExplorerGraph repoName={rev.full_name} theme={theme} />
+                </div>
+                {e.selectedPath && (
+                  <div className="graph-viewer">
+                    <FileViewer file={e.file} error={e.fileError} theme={theme} />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <FileViewer file={e.file} error={e.fileError} theme={theme} />
+            )}
+          </>
         ) : (
           <div className="viewer-empty muted">
             {rev?.status === 'importing'

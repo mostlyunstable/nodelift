@@ -81,3 +81,14 @@ redirect budget, safe tarball extraction with file-count/size/total limits, lang
 progress, repository card, searchable file tree, read-only Monaco viewer. Not in R2: the graph (R3), dependency analysis (R4),
 symlinks are skipped (counted in neither total), private repositories, token support.
 Verified against real GitHub: `psf/requests@611c616` imported 128 files = GitHub's 130 blobs minus 2 symlinks.
+
+## R3 status (2026-10-20): implemented
+Explorer *Graph* tab on the existing `@xyflow/react` (dagre added only as a layout algorithm): repository root, folder and file
+nodes; curved dashed **contains** edges; folders expand on demand (node cap 300 with a visible "N hidden" notice); language
+filter chips; find-a-file that opens parent folders, centres and selects the node; minimap above 12 nodes; fit/zoom controls;
+selected edge explains it is structure; source dock beside the graph; legend. Nodes are draggable, not connectable.
+**Honest scope:** the only edges are folder-contains-item facts. There are no dependency edges until R4, and the legend says so.
+Not done in R3: graph undo/redo, context menus, edge validation (nothing can be drawn), keyboard open of file nodes beyond focus + the
+file tree, custom edge labels; Build-mode node visuals were not restyled.
+Verified in the browser on `psf/requests@611c616`: expand, reveal-by-search, source dock; Build "Debug me" still runs
+(succeeded, succeeded, failed, skipped as designed).
