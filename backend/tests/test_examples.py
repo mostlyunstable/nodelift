@@ -26,7 +26,8 @@ def test_every_shipped_example_is_valid(client: TestClient) -> None:
 
 def test_examples_are_listed_and_unknown_ones_404(client: TestClient) -> None:
     listing = client.get("/api/v1/examples").json()
-    assert [e["id"] for e in listing] == ["debug-me"] and listing[0]["nodes"] == 4
+    assert sorted(e["id"] for e in listing) == ["debug-me", "route-orders"]
+    assert {e["id"]: e["nodes"] for e in listing} == {"debug-me": 4, "route-orders": 5}
     assert client.post("/api/v1/examples/nope/create").status_code == 404
 
 
@@ -192,3 +193,19 @@ def test_a_node_whose_settings_changed_is_never_reused_even_with_identical_input
     assert by["make_data"]["reused"] is True  # untouched and same input
     assert by["pick_fields"]["reused"] is False  # its settings changed
     assert by["pick_fields"]["output"]["extra"] == 1  # the new setting really took effect
+
+
+def test_the_branching_example_takes_the_path_the_input_selects(client: TestClient) -> None:
+    wf = client.post("/api/v1/examples/route-orders/create").json()
+    big = wait_run(client, start_run(client, wf["id"], input={}))  # default amount is 250
+    by = {n["node_id"]: n for n in big["nodes"]}
+    assert big["status"] == "succeeded"
+    assert by["is_big"]["activated_ports"] == ["true"]
+    assert by["vip"]["status"] == "succeeded" and by["standard"]["status"] == "skipped"
+    assert by["notify"]["output"] == {"message": "Order handled by VIP desk"}
+    small = wait_run(client, start_run(client, wf["id"], input={"amount": 40}))
+    sby = {n["node_id"]: n for n in small["nodes"]}
+    assert sby["is_big"]["activated_ports"] == ["false"]
+    assert sby["vip"]["status"] == "skipped" and sby["standard"]["status"] == "succeeded"
+    assert sby["notify"]["output"] == {"message": "Order handled by standard queue"}
+    assert small["status"] == "succeeded"

@@ -46,6 +46,7 @@ export function App() {
     st.setTheme(loadTheme())
     void st.refresh()
     void st.loadDefinitions()
+    void st.loadExamples()
     void st.restore() // reopen whatever the user was working on
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       const { dirty, saveState } = useStore.getState()
@@ -96,6 +97,7 @@ export function App() {
     workflowId: s.workflowId,
     workflows: s.workflows,
     nodeDefs: s.nodeDefs,
+    examples: s.examples,
     hasVersions: s.versions.length > 0,
     actions: {
       run: () => void s.runWorkflow(),
@@ -115,7 +117,7 @@ export function App() {
         }
       },
       addNode: s.addNode,
-      example: () => void guarded(() => s.createExample()),
+      example: (id) => void guarded(() => s.createExample(id)),
       exportCurrent: () => void s.exportCurrent(),
       exportAll: () => void s.exportAll(),
       importFile: () => fileInput.current?.click(),
@@ -124,7 +126,7 @@ export function App() {
       theme: s.setTheme,
     },
   }
-  const commands = useMemo(() => buildCommands(context), [context.hasNodes, context.busy, context.runStatus, context.canUndo, context.canRedo, context.workflowId, context.workflows, context.nodeDefs, context.hasVersions, s.workflowName]) // eslint-disable-line react-hooks/exhaustive-deps
+  const commands = useMemo(() => buildCommands(context), [context.hasNodes, context.busy, context.runStatus, context.canUndo, context.canRedo, context.workflowId, context.workflows, context.nodeDefs, context.examples, context.hasVersions, s.workflowName]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const addItems: MenuItem[] = (s.nodeDefs.length > 0 ? s.nodeDefs : [{ type: 'code.python', title: 'Python code' }]).map((d) => ({
     label: d.title,
@@ -132,7 +134,10 @@ export function App() {
   }))
   const workflowItems: MenuItem[] = [
     { label: 'New workflow', onSelect: () => void guarded(s.reset) },
-    { label: 'Try the “Debug me” example', onSelect: () => void guarded(() => s.createExample()) },
+    ...s.examples.map((ex) => ({
+      label: `Example: ${ex.title}`,
+      onSelect: () => void guarded(() => s.createExample(ex.id)),
+    })),
     ...s.workflows.map((w, i) => ({
       label: w.name,
       onSelect: () => void guarded(() => s.open(w.id)),
@@ -196,7 +201,9 @@ export function App() {
             onNodesChange={s.onNodesChange}
             onEdgesChange={s.onEdgesChange}
             onConnect={s.onConnect}
-            isValidConnection={(c) => checkConnection(useStore.getState().edges, c.source, c.target).ok}
+            isValidConnection={(c) =>
+              checkConnection(useStore.getState().edges, c.source, c.target, c.sourceHandle, c.targetHandle).ok
+            }
             onNodeDragStart={s.beginDrag}
             onNodeClick={(_, n) => s.select(n.id)}
             onPaneClick={() => s.select(null)}

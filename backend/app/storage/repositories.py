@@ -202,6 +202,8 @@ class SqlRunRepository:
                     duration_ms=record.duration_ms,
                     attempt=record.attempt,
                     reused=record.reused,
+                    activated_ports=record.activated_ports,
+                    skip_reason=record.skip_reason,
                 )
             )
 
@@ -292,6 +294,8 @@ class SqlRunRepository:
                         duration_ms=n.duration_ms,
                         attempt=n.attempt,
                         reused=n.reused,
+                        activated_ports=n.activated_ports,
+                        skip_reason=n.skip_reason,
                     )
                     for n in nodes
                 ],

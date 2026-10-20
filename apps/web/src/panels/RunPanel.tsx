@@ -70,7 +70,7 @@ export function RunPanel() {
                   <span className="muted">
                     {' '}
                     {n.status}
-                    {n.reused ? ' · reused' : ` · ${n.duration_ms}ms`}
+                    {n.status === 'skipped' && n.skip_reason ? ` · ${n.skip_reason.replace(/_/g, ' ')}` : n.reused ? ' · reused' : ` · ${n.duration_ms}ms`}
                     {(n.attempt ?? 1) > 1 ? ` · attempt ${n.attempt}` : ''}
                   </span>
                 </li>

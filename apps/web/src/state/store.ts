@@ -20,6 +20,7 @@ import type {
   ExecutionRun,
   NodeDefinition,
   NodeLiveStatus,
+  ExampleInfo,
   ImportPreview,
   RunEvent,
   ValidationIssue,
@@ -124,6 +125,8 @@ export const loadTheme = (): ThemeChoice => {
 }
 
 interface State {
+  examples: ExampleInfo[]
+  loadExamples: () => Promise<void>
   dialog: DialogName | null
   openDialog: (d: DialogName) => void
   closeDialog: () => void
@@ -318,6 +321,16 @@ function markDirty() {
 export const useStore = create<State>((set, get) => ({
   nodes: [],
   edges: [],
+  // the built-in tutorial is always offered, even before the list arrives or if it cannot be fetched
+  examples: [{ id: 'debug-me', title: 'Debug me', description: 'Find and fix a bug', nodes: 4 }],
+  loadExamples: async () => {
+    try {
+      const examples = await api.listExamples()
+      if (examples.length > 0) set({ examples })
+    } catch {
+      /* keep the built-in entry */
+    }
+  },
   dialog: null,
   openDialog: (d) => set({ dialog: d }),
   closeDialog: () => set({ dialog: null, viewedVersion: null, importPreview: null }),
@@ -491,9 +504,11 @@ export const useStore = create<State>((set, get) => ({
     if (c.some((ch) => ch.type !== 'select')) markDirty()
   },
   onConnect: (c) => {
-    if (!checkConnection(get().edges, c.source, c.target).ok) return // the canvas already refuses these
+    if (!checkConnection(get().edges, c.source, c.target, c.sourceHandle, c.targetHandle).ok) return
     recordHistory()
-    set({ edges: addEdge({ ...c, id: `e_${c.source}_${c.target}` }, get().edges) })
+    const port = c.sourceHandle ?? 'out'
+    const id = `e_${c.source}:${port}_${c.target}:${c.targetHandle ?? 'in'}`
+    set({ edges: addEdge({ ...c, id, ...(port !== 'out' ? { label: port } : {}) }, get().edges) })
     markDirty()
   },
 

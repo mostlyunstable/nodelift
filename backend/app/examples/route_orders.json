@@ -1,0 +1,61 @@
+{
+  "id": "route-orders",
+  "title": "Route by value",
+  "description": "A branch sends big orders to one path and small orders to another, then both paths merge.",
+  "name": "Route by value (example)",
+  "definition": {
+    "schema_version": 1,
+    "nodes": [
+      {
+        "id": "order",
+        "type": "code.python",
+        "name": "Order",
+        "config": {
+          "source": "def main(input_data):\n    # Try the workflow input {\"amount\": 40} to see the other path.\n    amount = input_data.get(\"amount\", 250) if isinstance(input_data, dict) else 250\n    return {\"order_id\": 7, \"amount\": amount}\n"
+        }
+      },
+      {
+        "id": "is_big",
+        "type": "logic.branch",
+        "name": "Is it over 100?",
+        "config": {"path": "$.amount", "operator": "gt", "value": 100}
+      },
+      {
+        "id": "vip",
+        "type": "code.python",
+        "name": "VIP desk",
+        "config": {"source": "def main(input_data):\n    return {\"handled_by\": \"VIP desk\", \"order\": input_data}\n"}
+      },
+      {
+        "id": "standard",
+        "type": "code.python",
+        "name": "Standard queue",
+        "config": {"source": "def main(input_data):\n    return {\"handled_by\": \"standard queue\", \"order\": input_data}\n"}
+      },
+      {
+        "id": "notify",
+        "type": "code.python",
+        "name": "Notify",
+        "config": {
+          "source": "def main(input_data):\n    # Only the path that ran is here, keyed by the node that produced it.\n    who = next(iter(input_data.values()))[\"handled_by\"]\n    return {\"message\": f\"Order handled by {who}\"}\n"
+        }
+      }
+    ],
+    "edges": [
+      {"id": "e1", "source": {"node": "order", "port": "out"}, "target": {"node": "is_big", "port": "in"}},
+      {"id": "e2", "source": {"node": "is_big", "port": "true"}, "target": {"node": "vip", "port": "in"}},
+      {"id": "e3", "source": {"node": "is_big", "port": "false"}, "target": {"node": "standard", "port": "in"}},
+      {"id": "e4", "source": {"node": "vip", "port": "out"}, "target": {"node": "notify", "port": "in"}},
+      {"id": "e5", "source": {"node": "standard", "port": "out"}, "target": {"node": "notify", "port": "in"}}
+    ],
+    "ui": {
+      "positions": {
+        "order": {"x": 0, "y": 150},
+        "is_big": {"x": 250, "y": 150},
+        "vip": {"x": 520, "y": 60},
+        "standard": {"x": 520, "y": 240},
+        "notify": {"x": 790, "y": 150}
+      }
+    }
+  }
+}

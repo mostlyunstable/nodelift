@@ -157,7 +157,12 @@ def test_parse_path() -> None:
 
 def test_registry_rejects_duplicates_and_lists_definitions() -> None:
     reg = default_registry(SubprocessRunner())
-    assert [d.type for d in reg.definitions()] == ["code.python", "transform.json", "http.request"]
+    assert [d.type for d in reg.definitions()] == [
+        "code.python",
+        "transform.json",
+        "logic.branch",
+        "http.request",
+    ]
     assert reg.get("nope") is None
     with pytest.raises(ValueError, match="already registered"):
         reg.register(JsonTransformNode())
@@ -392,7 +397,7 @@ def test_http_valid_config() -> None:
 
 def test_definitions_endpoint(client: TestClient) -> None:
     defs = {d["type"]: d for d in client.get("/api/v1/nodes/definitions").json()}
-    assert set(defs) == {"code.python", "transform.json", "http.request"}
+    assert set(defs) == {"code.python", "transform.json", "logic.branch", "http.request"}
     assert defs["http.request"]["config_schema"]["required"] == ["url"]
     assert defs["transform.json"]["default_config"]["mapping"] == {"value": "$"}
 

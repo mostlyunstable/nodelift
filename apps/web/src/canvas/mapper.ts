@@ -35,8 +35,8 @@ export function toWorkflow(nodes: FlowNode[], edges: Edge[], name = 'Untitled'):
     })),
     edges: edges.map((e) => ({
       id: e.id,
-      source: { node: e.source, port: 'out' },
-      target: { node: e.target, port: 'in' },
+      source: { node: e.source, port: e.sourceHandle ?? 'out' },
+      target: { node: e.target, port: e.targetHandle ?? 'in' },
     })),
     ui: { positions: Object.fromEntries(nodes.map((n) => [n.id, n.position])) },
   }
@@ -61,9 +61,12 @@ export function fromWorkflow(wf: WorkflowDefinition): { nodes: FlowNode[]; edges
       }
     }),
     edges: wf.edges.map((e) => ({
-      id: e.id || `${e.source.node}->${e.target.node}`,
+      id: e.id || `${e.source.node}:${e.source.port}->${e.target.node}`,
       source: e.source.node,
       target: e.target.node,
+      sourceHandle: e.source.port,
+      targetHandle: e.target.port,
+      ...(e.source.port !== 'out' ? { label: e.source.port } : {}), // name the branch an edge leaves from
     })),
   }
 }

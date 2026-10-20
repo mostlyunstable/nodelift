@@ -38,8 +38,23 @@ describe('checkConnection', () => {
   it('explains each refusal', () => {
     expect(checkConnection([], null, 'a')).toMatchObject({ ok: false })
     expect(checkConnection([], 'a', 'a')).toEqual({ ok: false, reason: 'A node cannot connect to itself' })
-    expect(checkConnection(chain, 'a', 'b')).toEqual({ ok: false, reason: 'These nodes are already connected' })
+    expect(checkConnection(chain, 'a', 'b')).toEqual({ ok: false, reason: 'That connection already exists' })
     expect(checkConnection(chain, 'd', 'a')).toEqual({ ok: false, reason: 'That connection would create a loop' })
     expect(checkConnection(chain, 'a', 'd')).toEqual({ ok: true })
+  })
+})
+
+describe('checkConnection with ports', () => {
+  const branchEdges = [{ source: 'b', target: 't', sourceHandle: 'true', targetHandle: 'in' }]
+  it('allows the two outputs of a branch to feed the same node', () => {
+    expect(checkConnection(branchEdges, 'b', 't', 'false', 'in')).toEqual({ ok: true })
+  })
+  it('still refuses an exact duplicate, treating missing handles as the defaults', () => {
+    expect(checkConnection(branchEdges, 'b', 't', 'true', 'in')).toMatchObject({ ok: false })
+    expect(checkConnection([{ source: 'a', target: 'c' }], 'a', 'c', 'out', 'in')).toMatchObject({ ok: false })
+    expect(checkConnection([{ source: 'a', target: 'c' }], 'a', 'c', null, null)).toMatchObject({ ok: false })
+  })
+  it('still refuses loops regardless of ports', () => {
+    expect(checkConnection(branchEdges, 't', 'b', 'out', 'in')).toMatchObject({ ok: false })
   })
 })

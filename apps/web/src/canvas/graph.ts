@@ -1,6 +1,8 @@
 export interface Link {
   source: string
   target: string
+  sourceHandle?: string | null
+  targetHandle?: string | null
 }
 
 /** True if adding source -> target would create a cycle (including a self-loop). */
@@ -22,11 +24,23 @@ export function wouldCreateCycle(edges: Link[], source: string, target: string):
 
 export type ConnectionCheck = { ok: true } | { ok: false; reason: string }
 
-export function checkConnection(edges: Link[], source: string | null, target: string | null): ConnectionCheck {
+export function checkConnection(
+  edges: Link[],
+  source: string | null,
+  target: string | null,
+  sourceHandle: string | null = null,
+  targetHandle: string | null = null,
+): ConnectionCheck {
   if (!source || !target) return { ok: false, reason: 'Connect an output to an input' }
   if (source === target) return { ok: false, reason: 'A node cannot connect to itself' }
-  if (edges.some((e) => e.source === source && e.target === target)) {
-    return { ok: false, reason: 'These nodes are already connected' }
+  const handle = (h: string | null | undefined, fallback: string) => h ?? fallback
+  const same = (e: Link) =>
+    e.source === source &&
+    e.target === target &&
+    handle(e.sourceHandle, 'out') === handle(sourceHandle, 'out') &&
+    handle(e.targetHandle, 'in') === handle(targetHandle, 'in')
+  if (edges.some(same)) {
+    return { ok: false, reason: 'That connection already exists' }
   }
   if (wouldCreateCycle(edges, source, target)) {
     return { ok: false, reason: 'That connection would create a loop' }

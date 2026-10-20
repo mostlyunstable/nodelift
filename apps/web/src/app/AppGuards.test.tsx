@@ -158,7 +158,7 @@ describe('App shell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Workflows' }))
     expect(screen.getByRole('menuitem', { name: 'Alpha' })).toBeDisabled()
     expect(screen.getByRole('menuitem', { name: 'Beta' })).toBeEnabled()
-    expect(screen.getByRole('menuitem', { name: /Debug me/ })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Example: Debug me/ })).toBeInTheDocument()
   })
 
   it('applies the chosen theme to the page', () => {

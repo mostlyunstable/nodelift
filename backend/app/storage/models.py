@@ -96,6 +96,8 @@ class NodeExecutionRow(Base):
     duration_ms: Mapped[int] = mapped_column(Integer)
     attempt: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     reused: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    activated_ports: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    skip_reason: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class RunEventRow(Base):

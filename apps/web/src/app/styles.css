@@ -188,3 +188,8 @@ h4 { margin: 10px 0 4px; font-size: 11px; color: var(--text-muted); text-transfo
 .boot-card { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; max-width: 560px; padding: 24px; }
 .boot-log { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; font-family: var(--font-mono); font-size: 11px; max-height: 220px; overflow: auto; width: 100%; white-space: pre-wrap; margin: 0; }
 .boot-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.code-node.multi-port { min-height: 64px; }
+.port-label { position: absolute; right: 12px; top: -7px; font-size: 10px; color: var(--text-muted); pointer-events: none; }
+.port-label.dim { opacity: 0.4; }
+.react-flow__edge-textbg { fill: var(--surface); }
+.react-flow__edge-text { fill: var(--text-muted); font-size: 10px; }

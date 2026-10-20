@@ -8,21 +8,30 @@ from typing import Any
 
 from app.domain.nodes import NodeContext, NodeRegistry
 from app.domain.run import ExecutionRun, NodeExecution, NodeStatus, RunObserver, RunStatus
-from app.domain.workflow import WorkflowDefinition, retry_policy, topological_order
+from app.domain.workflow import WorkflowDefinition, WorkflowEdge, retry_policy, topological_order
 
 # Deterministic failures are never retried: running the same code again cannot change them.
 RETRIABLE_ERRORS = {"runtime_error", "timeout", "worker_crashed", "network_error", "http_error"}
 
 
+def _port_active(fired: list[str] | None, port: str) -> bool:
+    return fired is None or port in fired
+
+
 def _node_input(
-    wf: WorkflowDefinition, node_id: str, outputs: dict[str, Any], run_input: Any
+    incoming: list[WorkflowEdge],
+    active: list[WorkflowEdge],
+    outputs: dict[str, Any],
+    run_input: Any,
 ) -> Any:
-    sources = [e.source.node for e in wf.edges if e.target.node == node_id]
-    if not sources:
+    """What a node receives. The SHAPE depends only on the graph (one incoming edge: the value;
+    several: an object keyed by upstream node id), so it does not change with which branch ran.
+    Only edges that actually fired contribute."""
+    if not incoming:
         return run_input
-    if len(sources) == 1:
-        return outputs[sources[0]]
-    return {s: outputs[s] for s in sources}  # fan-in: keyed by upstream node id
+    if len(incoming) == 1:
+        return outputs[active[0].source.node]
+    return {e.source.node: outputs[e.source.node] for e in active}
 
 
 def _same_json(a: Any, b: Any) -> bool:
@@ -63,7 +72,8 @@ async def execute_workflow(
         raise ValueError("workflow has a cycle")
     nodes = {n.id: n for n in wf.nodes}
     outputs: dict[str, Any] = {}
-    blocked: set[str] = set()
+    fired: dict[str, list[str] | None] = {}  # succeeded node -> output ports that fired
+    dead: set[str] = set()  # failed, cancelled, or skipped because of one of those
     records: list[NodeExecution] = []
     final: dict[str, NodeStatus] = {}
     reason: str | None = None
@@ -74,20 +84,31 @@ async def execute_workflow(
         if observer:
             await observer.node_finished(rec, will_retry)
 
+    async def skip(nid: str, why: str) -> None:
+        final[nid] = "skipped"
+        await emit_finished(NodeExecution(node_id=nid, status="skipped", skip_reason=why))
+
     for nid in order:
-        upstream = [e.source.node for e in wf.edges if e.target.node == nid]
+        incoming = [e for e in wf.edges if e.target.node == nid]
         if reason is None and cancel is not None and cancel.is_set():
             reason = "cancelled"
         if reason is None and max_run_s is not None and time.monotonic() - start >= max_run_s:
             reason = "run_timeout"
-        if reason is not None or any(u in blocked for u in upstream):
-            blocked.add(nid)
-            final[nid] = "skipped"
-            await emit_finished(NodeExecution(node_id=nid, status="skipped"))
+        if reason is not None or any(e.source.node in dead for e in incoming):
+            dead.add(nid)  # fail-fast: whatever depends on a failure does not run
+            await skip(nid, "run_stopped" if reason is not None else "upstream_failed")
+            continue
+        active = [
+            e
+            for e in incoming
+            if e.source.node in outputs and _port_active(fired.get(e.source.node), e.source.port)
+        ]
+        if incoming and not active:
+            await skip(nid, "branch_not_taken")  # every way in was a branch that did not fire
             continue
 
-        inp = _node_input(wf, nid, outputs, run_input)
-        if node_inputs and nid in node_inputs and not upstream:
+        inp = _node_input(incoming, active, outputs, run_input)
+        if node_inputs and nid in node_inputs and not incoming:
             inp = node_inputs[nid]
         previous = completed.get(nid) if completed else None
         if previous and previous.status == "succeeded" and _same_json(previous.input, inp):
@@ -97,6 +118,7 @@ async def execute_workflow(
                 update={"reused": True, "attempt": 1, "duration_ms": 0, "logs": []}
             )
             outputs[nid] = reused.output
+            fired[nid] = reused.activated_ports
             final[nid] = "succeeded"
             await emit_finished(reused)
             continue
@@ -123,6 +145,7 @@ async def execute_workflow(
             rec = NodeExecution(
                 node_id=nid, status=status, input=inp, output=res.output, logs=res.logs,
                 error=res.error, duration_ms=res.duration_ms, attempt=attempt,
+                activated_ports=res.activated_ports if status == "succeeded" else None,
             )  # fmt: skip
             await emit_finished(rec, will_retry)
             final[nid] = status
@@ -132,8 +155,9 @@ async def execute_workflow(
 
         if final[nid] == "succeeded":
             outputs[nid] = records[-1].output
+            fired[nid] = records[-1].activated_ports
         else:
-            blocked.add(nid)
+            dead.add(nid)
             if final[nid] == "cancelled":
                 reason = "cancelled"
 

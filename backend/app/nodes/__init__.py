@@ -3,6 +3,7 @@ import logging
 
 from app.domain.nodes import NodeRegistry
 from app.domain.ports import CodeRunner
+from app.nodes.builtin.branch import BranchNode
 from app.nodes.builtin.code_python import CodePythonNode
 from app.nodes.builtin.http_request import HttpRequestNode
 from app.nodes.builtin.json_transform import JsonTransformNode
@@ -15,6 +16,7 @@ def default_registry(runner: CodeRunner, allow_private_http: bool = False) -> No
     registry = NodeRegistry()
     registry.register(CodePythonNode(runner))
     registry.register(JsonTransformNode())
+    registry.register(BranchNode())
     registry.register(HttpRequestNode(allow_private=allow_private_http))
     return registry
 

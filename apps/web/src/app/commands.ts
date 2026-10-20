@@ -1,4 +1,4 @@
-import type { NodeDefinition, WorkflowSummary } from '../types/workflow'
+import type { ExampleInfo, NodeDefinition, WorkflowSummary } from '../types/workflow'
 import { rank } from '../utils/fuzzy'
 
 export interface Command {
@@ -19,6 +19,7 @@ export interface CommandContext {
   workflowId: string | null
   workflows: WorkflowSummary[]
   nodeDefs: NodeDefinition[]
+  examples: ExampleInfo[]
   hasVersions: boolean
   actions: {
     run: () => void
@@ -34,7 +35,7 @@ export interface CommandContext {
     open: (id: string) => void
     deleteCurrent: () => void
     addNode: (type: string) => void
-    example: () => void
+    example: (id: string) => void
     exportCurrent: () => void
     exportAll: () => void
     importFile: () => void
@@ -69,7 +70,7 @@ export function buildCommands(c: CommandContext): Command[] {
   add('new', 'New workflow', 'Workflow', a.newWorkflow)
   add('import', 'Import a workflow file…', 'Workflow', a.importFile)
   add('export-all', 'Export everything (backup)…', 'Workflow', a.exportAll)
-  add('example', 'Try the "Debug me" example', 'Learn', a.example)
+  for (const ex of c.examples) add(`example:${ex.id}`, `Try the example: ${ex.title}`, 'Learn', () => a.example(ex.id))
   for (const w of c.workflows) {
     if (w.id !== c.workflowId) add(`open:${w.id}`, `Open: ${w.name}`, 'Open', () => a.open(w.id))
   }

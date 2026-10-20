@@ -44,6 +44,7 @@ class CodeRunResult(BaseModel):
     logs: list[LogLine] = []
     duration_ms: int
     error: NodeError | None = None
+    activated_ports: list[str] | None = None  # None: every output port; else only these
 
 
 class CodeRunner(Protocol):

@@ -19,6 +19,10 @@ class NodeExecution(BaseModel):
     duration_ms: int = 0
     attempt: int = 1
     reused: bool = False  # output carried over from an earlier run (resume), not re-executed
+    activated_ports: list[str] | None = None  # which output ports fired (None: all)
+    skip_reason: str | None = (
+        None  # why a node did not run: upstream_failed, run_stopped, branch_not_taken
+    )
 
 
 class ExecutionRun(BaseModel):

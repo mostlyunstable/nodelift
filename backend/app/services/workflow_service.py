@@ -53,6 +53,8 @@ class RunRecorder:
                 "attempt": record.attempt,
                 "will_retry": will_retry,
                 "reused": record.reused,
+                "skip_reason": record.skip_reason,
+                "activated_ports": record.activated_ports,
             },
         )
 

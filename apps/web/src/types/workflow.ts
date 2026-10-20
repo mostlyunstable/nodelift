@@ -49,6 +49,8 @@ export interface NodeExecution {
   status: 'succeeded' | 'failed' | 'skipped' | 'cancelled'
   attempt?: number
   reused?: boolean
+  activated_ports?: string[] | null
+  skip_reason?: string | null
   input: unknown
   output: unknown
   logs: LogLine[]
@@ -106,6 +108,7 @@ export interface RunEvent {
   status?: string
   duration_ms?: number
   error_type?: string | null
+  skip_reason?: string | null
   attempt?: number
   will_retry?: boolean
   reused?: boolean
@@ -121,6 +124,8 @@ export interface NodeDefinition {
   description: string
   config_schema: Record<string, unknown>
   default_config: Record<string, unknown>
+  inputs?: { name: string }[]
+  outputs?: { name: string }[]
 }
 
 export interface VersionRecord {

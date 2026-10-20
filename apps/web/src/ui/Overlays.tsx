@@ -56,6 +56,7 @@ export function EmptyCanvas() {
         <button className="primary" onClick={() => void createExample()}>
           Try the “Debug me” example
         </button>
+        <button onClick={() => void createExample('route-orders')}>See branching</button>
         <button onClick={() => addNode('code.python')}>Add a Python node</button>
       </div>
       <p className="muted">

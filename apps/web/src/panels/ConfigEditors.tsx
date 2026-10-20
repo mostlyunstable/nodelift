@@ -153,6 +153,58 @@ function HttpConfig({ node }: { node: FlowNode }) {
   )
 }
 
+const OPERATORS: [string, string][] = [
+  ['truthy', 'has a value (not empty / false / 0)'],
+  ['exists', 'exists'],
+  ['eq', 'equals'],
+  ['ne', 'does not equal'],
+  ['gt', 'is greater than'],
+  ['gte', 'is at least'],
+  ['lt', 'is less than'],
+  ['lte', 'is at most'],
+  ['contains', 'contains'],
+]
+const NEEDS_VALUE = new Set(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains'])
+
+function BranchConfig({ node }: { node: FlowNode }) {
+  const { updateConfig } = useStore()
+  const c = node.data.config
+  const op = String(c.operator ?? 'truthy')
+  return (
+    <>
+      <label className="field">
+        Look at (a path into the input)
+        <input value={String(c.path ?? '')} placeholder="$.order.total" onChange={(e) => updateConfig(node.id, { path: e.target.value })} />
+      </label>
+      <label className="field">
+        Send it down “true” when it
+        <select value={op} onChange={(e) => updateConfig(node.id, { operator: e.target.value })}>
+          {OPERATORS.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {NEEDS_VALUE.has(op) && (
+        <JsonField
+          key={`${node.id}-${op}`}
+          label="this value (JSON)"
+          value={c.value}
+          rows={2}
+          onChange={(v) => updateConfig(node.id, { value: v })}
+        />
+      )}
+      <label className="check">
+        <input type="checkbox" checked={c.strict === true} onChange={(e) => updateConfig(node.id, { strict: e.target.checked })} /> Fail when the path is missing
+      </label>
+      <div className="muted">
+        Otherwise it goes down “false”. Connect each output to what should run next; the other side is skipped.
+      </div>
+    </>
+  )
+}
+
 /** Plugin or unknown node types get a raw JSON editor so they stay usable without UI work. */
 function RawConfig({ node }: { node: FlowNode }) {
   const { updateData } = useStore()
@@ -175,6 +227,8 @@ export function ConfigEditor({ node }: { node: FlowNode }) {
       return <TransformConfig node={node} />
     case 'http.request':
       return <HttpConfig node={node} />
+    case 'logic.branch':
+      return <BranchConfig node={node} />
     default:
       return <RawConfig node={node} />
   }

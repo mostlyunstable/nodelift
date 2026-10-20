@@ -7,6 +7,7 @@ function context(over: Partial<CommandContext> = {}): CommandContext {
     hasNodes: true, busy: null, runStatus: null, canUndo: false, canRedo: false, workflowId: 'wf_1',
     workflows: [{ id: 'wf_1', name: 'Current', revision: 1, updated_at: '' }, { id: 'wf_2', name: 'Orders', revision: 1, updated_at: '' }],
     nodeDefs: [{ type: 'code.python', version: 1, title: 'Python code', category: 'Code', description: '', config_schema: {}, default_config: {} }],
+    examples: [{ id: 'debug-me', title: 'Debug me', description: '', nodes: 4 }, { id: 'route-orders', title: 'Route by value', description: '', nodes: 5 }],
     hasVersions: true,
     actions: new Proxy({}, { get: () => noop }) as CommandContext['actions'],
     ...over,
@@ -39,7 +40,7 @@ describe('buildCommands', () => {
   })
   it('lists a command per node type, and always offers help and the example', () => {
     expect(ids(context())).toContain('add:code.python')
-    expect(ids(context({ hasNodes: false, workflowId: null }))).toEqual(expect.arrayContaining(['example', 'shortcuts', 'diagnostics', 'new', 'import']))
+    expect(ids(context({ hasNodes: false, workflowId: null }))).toEqual(expect.arrayContaining(['example:debug-me', 'example:route-orders', 'shortcuts', 'diagnostics', 'new', 'import']))
   })
   it('commands call the matching action', () => {
     const run = vi.fn()
