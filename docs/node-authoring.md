@@ -102,3 +102,14 @@ See `backend/tests/test_nodes.py` for examples, including a local HTTP server an
   Never set it on a shared or hosted deployment.
 - Not covered yet: egress allow-lists, per-user quotas, a credential store, proxies. Before hosting, run these calls from
   an isolated worker with network policy enforced at the infrastructure level (the in-process guard is defence in depth).
+
+## Output ports and branching
+A node declares its output ports in its definition (default: one port, `out`). To fire only some of them, return
+`NodeResult(output=..., activated_ports={"true"})`; leaving it unset fires all ports. Edges leaving a port that did
+not fire are not taken, and a node whose incoming edges were all untaken is skipped with `skip_reason="branch_not_taken"`
+(not a failure). See [ADR 0007](adr/0007-branching-semantics.md). Edge ports are validated against your definition.
+
+## Credentials
+`ctx.secrets` resolves `{{credential:NAME}}` references at execution time. Use it instead of reading config values
+directly, never log a resolved value, and never put one in an error message you build yourself; the executor masks values
+it knows about, but only exact matches (see [ADR 0008](adr/0008-secrets.md)).

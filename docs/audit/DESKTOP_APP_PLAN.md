@@ -146,3 +146,10 @@ start until the macOS app is stable.
 - Upgrading across a schema change preserves data and creates a backup.
 - Two launches → one window.
 - Port already in use → a different port is chosen; no hard-coded 8000 anywhere in the packaged build.
+
+## Implementation status (2026-10-20)
+D0–D7 are **done and verified on this Mac** (Tauri 2 shell, bundled python-build-standalone runtime, free port + token,
+readiness, supervised restart, graceful shutdown, data-dir copy-migration, pre-migration backups, ad-hoc-signed `.app`).
+Lifecycle was checked in the installed app via processes, logs and HTTP (not screenshots). **D8 (Developer ID signing +
+notarization) and D9 (auto-update) are not done**: they need a paid Apple Developer account. The Tauri dialog/fs
+plugins for native save dialogs are the remaining shell work. Windows/Linux not started.

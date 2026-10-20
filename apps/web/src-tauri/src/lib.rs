@@ -366,6 +366,8 @@ pub fn run() {
             }
         }))
         .manage(shared)
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![wait_for_backend, restart_backend, reveal_logs])
         .setup(|app| {
             start_backend(app.handle());

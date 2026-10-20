@@ -201,3 +201,9 @@ Do **not** start: Postgres/Kubernetes/queues, parallel execution, multi-user fea
 ### Known gaps in current tests (be aware)
 Frontend tests never mount the full `App`; the file-size-limit test asserts only that the node failed; the macOS
 memory-limit test is skipped; concurrency tests rely on short sleeps; `worker_entry.py` is covered only indirectly.
+
+## Status after the full implementation pass (2026-10-20)
+Done: P0 items; branching; credentials; import/export; version UI and format migrations; undo/redo, palette, themes,
+first-run tutorial; desktop D0–D7; ESLint/Prettier/import-linter; OpenAPI-generated types; CI workflow
+(`.github/workflows/ci.yml`, **written but never run on GitHub**); ADRs and `docs/architecture.md`.
+Still open: D8/D9, Playwright e2e, Windows/Linux, sandboxed execution, Postgres, scheduling, parallel execution.

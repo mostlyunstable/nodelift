@@ -21,40 +21,31 @@ Stop with Ctrl+C (or `make stop`). Config: copy `.env.example` to `.env`.
 make check   # ruff, mypy, pytest, tsc, vitest
 ```
 
-## Layout
-`backend/app/{api,domain,engine,runtime}` — FastAPI, contracts, workflow engine, code runner.
-`apps/web` — React + React Flow + Monaco editor. Plan: see docs/.
+## Desktop app (macOS)
+```bash
+make app           # builds the bundled runtime + Nodecraft.app (ad-hoc signed)
+make install-app   # copies it to /Applications
+```
+Data lives in `~/Library/Application Support/Nodecraft` (an existing `~/.nodecraft` database is copied, never moved).
+Not signed with a Developer ID, not notarized, no auto-update: sharing the build needs right-click → Open.
 
-## Status
-- M1: code-node runner (`POST /api/v1/nodes/code/test`).
-- M2: canvas, Monaco, inspector, test-input and output panels.
-- M3 core: validation, sequential dependency-ordered execution, fail-fast.
-- M4: SQLite persistence (`~/.nodecraft/nodecraft.db`, override with `NODECRAFT_DATA_DIR`), Alembic migrations applied
-  automatically on start, immutable workflow versions (layout changes don't create versions), runs pinned to a version,
-  stored per-node input/output/logs/errors, optimistic concurrency on saves (409 on stale revision).
-- M5: runs are asynchronous (`POST /workflows/{id}/runs` returns 202). Every run records ordered events
-  (`run.started`, `node.started`, `node.finished`, `run.finished`) in `run_events`. Watch live with SSE at
-  `GET /runs/{id}/events/stream` (resumes from `Last-Event-ID`/`?after=`), or catch up with `GET /runs/{id}/events?after=N`.
-  Runs orphaned by a server crash are closed as failed (`server_restarted`) on startup. The UI shows live node status,
-  an event timeline, and falls back to polling if the stream stalls.
-- M6: server-side cancel (`POST /runs/{id}/cancel`, idempotent; kills the running node's process, skips the rest, run ends
-  `cancelled`). Limits: per-node timeout, whole-run wall-clock budget (`NODECRAFT_MAX_RUN_SECONDS`, default 300),
-  concurrent runs (`NODECRAFT_MAX_CONCURRENT_RUNS`, default 4, then HTTP 429), file-size/open-file rlimits per node, memory
-  limit (`NODECRAFT_NODE_MEMORY_MB`, **Linux only**: macOS does not enforce it). Retries are opt-in: a node needs
-  `config.idempotent: true` plus `config.retry {max_attempts<=5, backoff_ms}`; only runtime errors, timeouts and worker
-  crashes are retried, each attempt is its own record. `POST /runs/{id}/resume` starts a new run on the same version that
-  reuses already-succeeded nodes (never re-runs them). Worker processes exit by themselves if the server is killed.
-- M7: node registry (`GET /nodes/definitions`, generic `POST /nodes/test`), built-in `transform.json` and `http.request`
-  nodes, plugin loading via `NODECRAFT_NODE_PLUGINS`. HTTP calls are SSRF-guarded (public addresses only, checked and
-  pinned at connect time, no redirects). See [docs/node-authoring.md](docs/node-authoring.md).
-- P0 hardening (see [docs/audit](docs/audit/ROADMAP.md)): requests with an unexpected `Host`/`Origin` are rejected and an
-  optional bearer token protects every route (DNS-rebinding defence); one execution gate enforces the concurrency caps
-  for runs and single-node tests (the unmetered `POST /runs` endpoint was removed); all timestamps are explicit UTC;
-  the editor autosaves, shows Saved/Unsaved, restores your last workflow on launch and warns before discarding work;
-  the dev server no longer runs a reloader unless `NODECRAFT_RELOAD=1`; the HTTPS path of `http.request` is tested.
-- Not yet: node log streaming, container-level isolation (see docs/security.md), credential store, branching, auth,
-  Project entity, Postgres/hosted deployment adapters.
-- Monaco loads its editor files from a CDN, so the first load needs internet access.
+## Layout
+`backend/app/{domain,engine,nodes,runtime,services,storage,api}` — layered backend (see [docs/architecture.md](docs/architecture.md)).
+`apps/web` — React + React Flow + Monaco editor; `apps/web/src-tauri` — desktop shell. Decisions: [docs/adr](docs/adr/README.md).
+
+## What works
+- Canvas editor with autosave, undo/redo, command palette (⌘K), shortcuts, light/dark theme, a guided "Debug me" example.
+- Python code, JSON transform, HTTP request and branch nodes; plugin nodes ([docs/node-authoring.md](docs/node-authoring.md)).
+- Branching by output ports, fail-fast, cancel, retries (opt-in), run budgets, resume from failure.
+- SQLite persistence, immutable versions, run history, live events over SSE with recovery, pre-migration backups.
+- Import/export with preview; credentials in the system keychain, masked in all results.
+- Local API protection: Host/Origin checks and a per-launch bearer token ([docs/security.md](docs/security.md)).
+
+## Limits (read these)
+- Code nodes run **unsandboxed** as you. The memory limit is Linux-only.
+- No Developer ID signing, notarization or auto-update; no Windows/Linux builds.
+- No scheduling/triggers, parallel execution, hosted mode or Postgres.
+- Playwright end-to-end tests are not written; the native window itself is verified by logs and HTTP, not screenshots.
 
 ## Database migrations
 ```bash

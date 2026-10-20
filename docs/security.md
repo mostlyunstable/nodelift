@@ -31,3 +31,8 @@ privileges and must be trusted.
 Container/microVM isolation, read-only filesystem, seccomp, non-root user, cgroup memory/pids limits,
 network deny-by-default, authentication, per-user quotas, secret injection and log redaction.
 Never expose `/api/v1/nodes/code/test` or workflow runs to the public internet.
+
+## Status of the hardening work
+Implemented and tested: Host/Origin checks, per-launch bearer token, CORS allowlist, single execution gate, keychain
+credentials with masking, SSRF guard, import preview (nothing runs on import). Unchanged: **code nodes are not sandboxed**
+(ADR 0004), masking only recognises exact secret values, memory limits are Linux-only.
