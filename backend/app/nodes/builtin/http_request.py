@@ -11,7 +11,7 @@ import re
 import ssl
 import time
 from typing import Any, ClassVar
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import certifi
 import httpcore
@@ -19,6 +19,7 @@ import httpcore
 from app.domain.nodes import NodeContext, NodeDefinition, NodeResult
 from app.domain.ports import JsonValue, LogLine, NodeError
 from app.domain.secrets import REFERENCE, MissingCredential, SecretsUnavailable
+from app.nodes.builtin.json_transform import _MISSING, parse_path, resolve
 from app.runtime.net_guard import BlockedAddress, GuardedBackend
 
 METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"}
@@ -28,6 +29,34 @@ MAX_RESPONSE_KB = 5120
 FORBIDDEN_HEADERS = {"host", "content-length", "transfer-encoding", "connection", "upgrade"}
 RETURNED_HEADERS = {"content-type", "content-length", "date", "etag", "last-modified", "location"}
 _HEADER_NAME = re.compile(r"^[A-Za-z0-9!#$%&'*+.^_`|~-]+$")
+
+
+_PLACEHOLDER = re.compile(r"\{\{\s*(\$[^{}]*?)\s*\}\}")
+
+
+def _literal_host(url: str) -> str:
+    """The URL with placeholders swapped for a harmless word, to check what is left is valid.
+
+    Placeholders are allowed after the host (path and query) only: input data must never choose
+    where a request goes, and its values are percent-encoded so they cannot add parameters.
+    """
+    scheme_end = url.find("://")
+    rest = url[scheme_end + 3 :] if scheme_end >= 0 else url
+    host_part = rest.split("/", 1)[0].split("?", 1)[0]
+    if "{{" in host_part:
+        return "invalid://"
+    return _PLACEHOLDER.sub("x", url)
+
+
+def render_url(url: str, data: Any) -> str:
+    def swap(m: re.Match[str]) -> str:
+        value = resolve(data, parse_path(m.group(1)))
+        if value is _MISSING:
+            raise KeyError(m.group(1))
+        text = value if isinstance(value, str) else json.dumps(value)
+        return quote(text, safe="")
+
+    return _PLACEHOLDER.sub(swap, url)
 
 
 class HttpRequestNode:
@@ -66,7 +95,7 @@ class HttpRequestNode:
         if not isinstance(url, str):
             problems.append("config.url must be a string")
         else:
-            parts = urlsplit(url)
+            parts = urlsplit(_literal_host(url))
             if "{{credential:" in url:
                 problems.append("credentials can only be used in header values, not in the URL")
             elif parts.scheme not in ("http", "https") or not parts.hostname:
@@ -147,11 +176,13 @@ class HttpRequestNode:
         except SecretsUnavailable as e:
             return fail("secrets_unavailable", str(e))
 
+        try:
+            url = render_url(config["url"], input_data)
+        except KeyError as e:
+            return fail("transform_error", f"No value at {e.args[0]} for the URL")
         timeout = min(float(config.get("timeout_s", 10)), ctx.timeout_s)
         cap = int(config.get("max_response_kb", 1024)) * 1024
-        task = asyncio.ensure_future(
-            self._request(method, config["url"], headers, body, timeout, cap)
-        )
+        task = asyncio.ensure_future(self._request(method, url, headers, body, timeout, cap))
         cancel_wait = asyncio.ensure_future(ctx.cancel.wait()) if ctx.cancel else None
         try:
             waiting: set[asyncio.Future[Any]] = {task}
@@ -184,7 +215,7 @@ class HttpRequestNode:
             if cancel_wait:
                 cancel_wait.cancel()
 
-        parts = urlsplit(config["url"])
+        parts = urlsplit(url)
         # query strings often carry secrets, so they are never logged
         log = LogLine(
             stream="stdout",

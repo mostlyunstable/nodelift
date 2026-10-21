@@ -43,6 +43,8 @@ export interface CommandContext {
     diagnostics: () => void
     credentials: () => void
     triggers: () => void
+    templates: () => void
+    files: () => void
     shortcuts: () => void
     theme: (t: 'dark' | 'light' | 'system') => void
     tidy?: () => void // arrange the workflow's nodes in tidy columns
@@ -95,6 +97,8 @@ export function buildCommands(c: CommandContext): Command[] {
     if (w.id !== c.workflowId) add(`open:${w.id}`, `Open: ${w.name}`, 'Open', () => a.open(w.id))
   }
 
+  add('templates', 'Templates: ready-made workflows…', 'Learn', a.templates)
+  add('files', 'Files: notes, data and results…', 'App', a.files)
   add('triggers', 'Triggers: schedules and webhooks…', 'Workflow', a.triggers)
   add('credentials', 'Manage credentials…', 'App', a.credentials)
   add('diagnostics', 'Diagnostics…', 'App', a.diagnostics)

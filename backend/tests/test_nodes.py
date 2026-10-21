@@ -166,6 +166,7 @@ def test_registry_rejects_duplicates_and_lists_definitions() -> None:
         "text.template",
         "data.csv",
         "ai.claude",
+        "file.list",
         "file.read",
         "file.write",
         "db.sqlite",
@@ -406,7 +407,8 @@ def test_definitions_endpoint(client: TestClient) -> None:
     defs = {d["type"]: d for d in client.get("/api/v1/nodes/definitions").json()}
     assert set(defs) == {
         "code.python", "transform.json", "logic.branch", "http.request", "data.filter",
-        "text.template", "data.csv", "ai.claude", "file.read", "file.write", "db.sqlite",
+        "text.template", "data.csv", "ai.claude", "file.list", "file.read", "file.write",
+        "db.sqlite",
     }  # fmt: skip
     assert defs["http.request"]["config_schema"]["required"] == ["url"]
     assert defs["transform.json"]["default_config"]["mapping"] == {"value": "$"}
@@ -479,3 +481,26 @@ def test_blocked_request_is_never_retried(tmp_path: Path, server: str) -> None:
         assert run["status"] == "failed" and len(run["nodes"]) == 1
         assert run["nodes"][0]["error"]["type"] == "blocked_request"
     assert Handler.hits == []
+
+
+# ------------------------------------------------------------------ URL placeholders
+def test_url_placeholders_fill_path_and_query_and_are_percent_encoded(server: str) -> None:
+    async def go() -> Any:
+        return await LOCAL.execute(
+            ctx(),
+            {"who": "a b&c=d", "n": 3},
+            {"url": f"{server}/echo?q={{{{ $.who }}}}&n={{{{ $.n }}}}"},
+        )
+
+    res = asyncio.run(go())
+    assert res.status == "succeeded"
+    assert Handler.hits[0]["path"] == "/echo?q=a%20b%26c%3Dd&n=3"  # cannot add a parameter
+
+
+def test_url_placeholders_cannot_choose_the_host_and_missing_values_fail_clearly() -> None:
+    node = HttpRequestNode()
+    assert node.validate_config({"url": "https://{{ $.host }}/x"})  # refused when saving
+    assert node.validate_config({"url": "https://api.example.com/{{ $.id }}?x=1"}) == []
+    res = asyncio.run(node.execute(ctx(), {}, {"url": "https://api.example.com/{{ $.id }}"}))
+    assert res.status == "failed" and res.error is not None
+    assert res.error.type == "transform_error" and "$.id" in res.error.message

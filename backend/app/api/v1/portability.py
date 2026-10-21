@@ -2,10 +2,11 @@
 
 import math
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel, ValidationError
 
 from app.api.errors import AppError
@@ -16,6 +17,7 @@ from app.domain.records import WorkflowRecord
 from app.domain.secrets import references
 from app.domain.workflow import ValidationIssue, WorkflowDefinition, validate_workflow
 from app.examples import load_examples
+from app.nodes.builtin.data_nodes import safe_path
 
 router = APIRouter(tags=["portability"])
 
@@ -199,8 +201,22 @@ def list_examples() -> list[ExampleInfo]:
     ]
 
 
+def _seed_files(request: Request, files: dict[str, str]) -> None:
+    """Sample inputs an example needs (notes, a messy CSV); never overwrites your own files."""
+    if not files:
+        return
+    base: Path = request.app.state.settings.data_dir / "files"
+    for rel, text in files.items():
+        target = safe_path(base, rel)
+        if not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text, encoding="utf-8")
+
+
 @router.post("/examples/{example_id}/create", response_model=WorkflowRecord, status_code=201)
-def create_example(example_id: str, registry: Registry, svc: Service) -> WorkflowRecord:
+def create_example(
+    example_id: str, registry: Registry, svc: Service, request: Request
+) -> WorkflowRecord:
     """A fresh copy of a built-in example as a new workflow (it is not run)."""
     example = load_examples().get(example_id)
     if example is None:
@@ -211,4 +227,5 @@ def create_example(example_id: str, registry: Registry, svc: Service) -> Workflo
         raise AppError(
             500, "bad_example", "The built-in example is invalid", [i.model_dump() for i in issues]
         )
+    _seed_files(request, example.get("files", {}))
     return svc.workflows.create(example["name"], definition)

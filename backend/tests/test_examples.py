@@ -25,9 +25,9 @@ def test_every_shipped_example_is_valid(client: TestClient) -> None:
 
 
 def test_examples_are_listed_and_unknown_ones_404(client: TestClient) -> None:
-    listing = client.get("/api/v1/examples").json()
-    assert sorted(e["id"] for e in listing) == ["debug-me", "route-orders"]
-    assert {e["id"]: e["nodes"] for e in listing} == {"debug-me": 4, "route-orders": 5}
+    listing = {e["id"]: e for e in client.get("/api/v1/examples").json()}
+    assert listing["debug-me"]["nodes"] == 4 and listing["route-orders"]["nodes"] == 5
+    assert len(listing) == 11
     assert client.post("/api/v1/examples/nope/create").status_code == 404
 
 

@@ -1,0 +1,213 @@
+{
+  "id": "github-daily-report",
+  "title": "Daily GitHub report",
+  "description": "Lists the issues and pull requests updated in the last day across your repositories and has Claude group them by what needs action. Appends to reports/github-daily.md in the files folder. Needs a GitHub token saved as a credential named \"github\" (Explorer > GitHub access does this) and an Anthropic API key saved as a credential named \"anthropic\" (⋯ > Credentials). Edit REPOS in the first node. Add a schedule under ⋯ > Triggers.",
+  "name": "Daily GitHub report",
+  "definition": {
+    "schema_version": 1,
+    "nodes": [
+      {
+        "id": "repos",
+        "type": "code.python",
+        "name": "Which repositories",
+        "config": {
+          "source": "# Edit this list. A run can also pass {\"repos\": [\"owner/name\"]} as its input.\nREPOS = [\"octocat/Hello-World\"]\n\nfrom datetime import datetime, timedelta, timezone\n\n\ndef main(input_data):\n    repos = REPOS\n    if isinstance(input_data, dict) and input_data.get(\"repos\"):\n        repos = input_data[\"repos\"]\n    since = (datetime.now(timezone.utc) - timedelta(days=1)).strftime(\"%Y-%m-%d\")\n    q = \" \".join(\"repo:\" + r for r in repos) + \" updated:>=\" + since\n    return {\"q\": q, \"since\": since}\n"
+        }
+      },
+      {
+        "id": "fetch",
+        "type": "http.request",
+        "name": "Search GitHub",
+        "config": {
+          "url": "https://api.github.com/search/issues?q={{ $.q }}&sort=updated&order=desc&per_page=40",
+          "method": "GET",
+          "headers": {
+            "Accept": "application/vnd.github+json",
+            "Authorization": "Bearer {{credential:github}}"
+          }
+        }
+      },
+      {
+        "id": "shape",
+        "type": "code.python",
+        "name": "Shape the list",
+        "config": {
+          "source": "def main(input_data):\n    body = input_data.get(\"body\") or {}\n    items = body.get(\"items\", []) if isinstance(body, dict) else []\n    lines = []\n    for it in items:\n        repo = it[\"repository_url\"].split(\"/repos/\")[-1]\n        kind = \"PR\" if \"pull_request\" in it else \"issue\"\n        labels = \", \".join(label[\"name\"] for label in it.get(\"labels\", []))\n        extra = \", labels: \" + labels if labels else \"\"\n        lines.append(\n            \"- [%s] %s#%s %s (by %s, %s%s)\"\n            % (kind, repo, it[\"number\"], it[\"title\"], it[\"user\"][\"login\"], it[\"state\"], extra)\n        )\n    return {\"count\": len(lines), \"digest\": \"\\n\".join(lines)}\n"
+        }
+      },
+      {
+        "id": "has_items",
+        "type": "logic.branch",
+        "name": "Anything updated?",
+        "config": {
+          "path": "$.count",
+          "operator": "gt",
+          "value": 0
+        }
+      },
+      {
+        "id": "summarize",
+        "type": "ai.claude",
+        "name": "Brief me",
+        "config": {
+          "system": "You write a short, plain daily engineering briefing.",
+          "prompt": "These GitHub issues and pull requests were updated in the last day. Group them under 'Needs action today', 'Waiting on others' and 'FYI'. One line each, keep the repo#number references, no preamble.\n\n{{ $.digest }}",
+          "max_tokens": 1200,
+          "credential": "anthropic"
+        }
+      },
+      {
+        "id": "quiet",
+        "type": "code.python",
+        "name": "Nothing new",
+        "config": {
+          "source": "def main(input_data):\n    return {\"text\": \"Nothing was updated in the last day.\"}\n"
+        }
+      },
+      {
+        "id": "report",
+        "type": "code.python",
+        "name": "Dated entry",
+        "config": {
+          "source": "from datetime import datetime\n\n\ndef main(input_data):\n    text = next(iter(input_data.values()))[\"text\"]\n    stamp = datetime.now().astimezone().strftime(\"%Y-%m-%d %H:%M\")\n    return {\"text\": \"## \" + stamp + \"\\n\\n\" + text.strip() + \"\\n\\n---\\n\\n\"}\n"
+        }
+      },
+      {
+        "id": "save",
+        "type": "file.write",
+        "name": "Add to report",
+        "config": {
+          "path": "reports/github-daily.md",
+          "content_path": "$.text",
+          "append": true
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "repos_fetch_out",
+        "source": {
+          "node": "repos",
+          "port": "out"
+        },
+        "target": {
+          "node": "fetch",
+          "port": "in"
+        }
+      },
+      {
+        "id": "fetch_shape_out",
+        "source": {
+          "node": "fetch",
+          "port": "out"
+        },
+        "target": {
+          "node": "shape",
+          "port": "in"
+        }
+      },
+      {
+        "id": "shape_has_items_out",
+        "source": {
+          "node": "shape",
+          "port": "out"
+        },
+        "target": {
+          "node": "has_items",
+          "port": "in"
+        }
+      },
+      {
+        "id": "has_items_summarize_true",
+        "source": {
+          "node": "has_items",
+          "port": "true"
+        },
+        "target": {
+          "node": "summarize",
+          "port": "in"
+        }
+      },
+      {
+        "id": "has_items_quiet_false",
+        "source": {
+          "node": "has_items",
+          "port": "false"
+        },
+        "target": {
+          "node": "quiet",
+          "port": "in"
+        }
+      },
+      {
+        "id": "summarize_report_out",
+        "source": {
+          "node": "summarize",
+          "port": "out"
+        },
+        "target": {
+          "node": "report",
+          "port": "in"
+        }
+      },
+      {
+        "id": "quiet_report_out",
+        "source": {
+          "node": "quiet",
+          "port": "out"
+        },
+        "target": {
+          "node": "report",
+          "port": "in"
+        }
+      },
+      {
+        "id": "report_save_out",
+        "source": {
+          "node": "report",
+          "port": "out"
+        },
+        "target": {
+          "node": "save",
+          "port": "in"
+        }
+      }
+    ],
+    "ui": {
+      "positions": {
+        "repos": {
+          "x": 0,
+          "y": 150
+        },
+        "fetch": {
+          "x": 270,
+          "y": 150
+        },
+        "shape": {
+          "x": 540,
+          "y": 150
+        },
+        "has_items": {
+          "x": 810,
+          "y": 150
+        },
+        "summarize": {
+          "x": 1080,
+          "y": 60
+        },
+        "quiet": {
+          "x": 1080,
+          "y": 240
+        },
+        "report": {
+          "x": 1350,
+          "y": 150
+        },
+        "save": {
+          "x": 1620,
+          "y": 150
+        }
+      }
+    }
+  }
+}

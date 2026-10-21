@@ -97,3 +97,26 @@ test('the graph stays in view when the inspector opens', async ({ page }) => {
     expect(b.x + b.width).toBeLessThanOrEqual(canvas.x + canvas.width + 1)
   }
 })
+
+test('a template runs from start to finish on its sample file, and the result is in Files', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Workflows' }).click()
+  await page.getByRole('menuitem', { name: 'More templates…' }).click()
+  const templates = page.getByRole('dialog', { name: 'Templates' })
+  await expect(templates.getByText('Weekly backup report')).toBeVisible()
+  await templates.getByRole('button', { name: 'Use this template: Messy CSV cleaner' }).click()
+  await expect(page.locator('.code-node')).toHaveCount(6)
+
+  await page.getByRole('button', { name: /Run/ }).first().click()
+  await expect(page.locator('.code-node.status-succeeded')).toHaveCount(6, { timeout: 30_000 })
+
+  await page.getByRole('button', { name: 'More actions' }).click()
+  await page.getByRole('menuitem', { name: 'Files…' }).click()
+  const files = page.getByRole('dialog', { name: 'Files' })
+  await expect(files.getByText('inbox/raw.csv')).toBeVisible()
+  await files.getByRole('button', { name: 'Open inbox/clean.csv' }).click()
+  await expect(files.getByLabel('Contents')).toHaveValue(/customer_name,signup_date,amount_paid,notes/)
+  await expect(files.getByLabel('Contents')).toHaveValue(/Ana Lopez,2026-04-03,1200.5,vip/)
+})

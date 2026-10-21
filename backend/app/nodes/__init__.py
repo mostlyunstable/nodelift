@@ -9,6 +9,7 @@ from app.nodes.builtin.claude_node import ClaudeNode
 from app.nodes.builtin.code_python import CodePythonNode
 from app.nodes.builtin.data_nodes import (
     CsvNode,
+    FileListNode,
     FileReadNode,
     FileWriteNode,
     FilterNode,
@@ -36,6 +37,7 @@ def default_registry(
     registry.register(CsvNode())
     registry.register(ClaudeNode(http))
     base = files_dir or Path.home() / ".nodecraft" / "files"
+    registry.register(FileListNode(base))
     registry.register(FileReadNode(base))
     registry.register(FileWriteNode(base))
     registry.register(SqliteQueryNode(base))

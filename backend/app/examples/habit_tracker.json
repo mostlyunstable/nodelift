@@ -1,0 +1,54 @@
+{
+  "id": "habit-tracker",
+  "title": "Daily habit tracker",
+  "description": "Records one habit entry (habit, value, note) as a line in habits/log.csv. Press Run to log a sample, or add a webhook under ⋯ > Triggers and call it from a phone shortcut or script with {\"habit\": \"walk\", \"value\": 30, \"note\": \"evening\"}. Pair it with Weekly habit stats. Needs nothing else.",
+  "name": "Daily habit tracker",
+  "definition": {
+    "schema_version": 1,
+    "nodes": [
+      {
+        "id": "entry",
+        "type": "code.python",
+        "name": "Make the log line",
+        "config": {
+          "source": "import csv\nimport io\nfrom datetime import datetime\n\nSAMPLE = {\"habit\": \"walk\", \"value\": 30, \"note\": \"sample entry\"}\n\n\ndef main(input_data):\n    d = input_data if isinstance(input_data, dict) and input_data.get(\"habit\") else SAMPLE\n    habit = str(d[\"habit\"]).strip().lower()[:50]\n    if not habit:\n        raise ValueError(\"habit is empty\")\n    try:\n        value = float(d.get(\"value\", 1))\n    except (TypeError, ValueError):\n        raise ValueError(\"value must be a number\")\n    now = datetime.now().astimezone()\n    out = io.StringIO()\n    csv.writer(out, lineterminator=\"\\n\").writerow(\n        [now.strftime(\"%Y-%m-%d\"), now.strftime(\"%H:%M\"), habit, value, str(d.get(\"note\", \"\"))[:200]])\n    return {\"line\": out.getvalue(), \"habit\": habit}\n"
+        }
+      },
+      {
+        "id": "save",
+        "type": "file.write",
+        "name": "Add to the log",
+        "config": {
+          "path": "habits/log.csv",
+          "content_path": "$.line",
+          "append": true
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "entry_save_out",
+        "source": {
+          "node": "entry",
+          "port": "out"
+        },
+        "target": {
+          "node": "save",
+          "port": "in"
+        }
+      }
+    ],
+    "ui": {
+      "positions": {
+        "entry": {
+          "x": 0,
+          "y": 100
+        },
+        "save": {
+          "x": 270,
+          "y": 100
+        }
+      }
+    }
+  }
+}

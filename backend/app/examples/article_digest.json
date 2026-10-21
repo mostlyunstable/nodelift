@@ -1,0 +1,128 @@
+{
+  "id": "article-digest",
+  "title": "Reading digest",
+  "description": "Fetches an RSS or Atom feed (Hacker News by default), and has Claude pick the five articles that match your interests with a line on why. Appends to reading/digest.md. Edit INTERESTS and the feed address. Add a schedule under ⋯ > Triggers. Needs an Anthropic API key saved as a credential named \"anthropic\" (⋯ > Credentials).",
+  "name": "Reading digest",
+  "definition": {
+    "schema_version": 1,
+    "nodes": [
+      {
+        "id": "feed",
+        "type": "http.request",
+        "name": "Fetch the feed",
+        "config": {
+          "url": "https://hnrss.org/frontpage?count=20",
+          "method": "GET",
+          "max_response_kb": 1024
+        }
+      },
+      {
+        "id": "parse",
+        "type": "code.python",
+        "name": "Read the entries",
+        "config": {
+          "source": "# Edit this: what you want to read about.\nINTERESTS = \"developer tools, Python, AI, privacy, productivity\"\n\nimport re\nimport xml.etree.ElementTree as ET\n\n\ndef tag(el):\n    return el.tag.rsplit(\"}\", 1)[-1]\n\n\ndef main(input_data):\n    root = ET.fromstring(input_data[\"body\"])\n    entries = [e for e in root.iter() if tag(e) in (\"item\", \"entry\")][:20]\n    lines = []\n    for e in entries:\n        parts = {tag(c): c for c in e}\n        title = (parts[\"title\"].text or \"\").strip() if \"title\" in parts else \"\"\n        link = \"\"\n        if \"link\" in parts:\n            link = (parts[\"link\"].text or parts[\"link\"].attrib.get(\"href\", \"\")).strip()\n        blurb = \"\"\n        for key in (\"description\", \"summary\"):\n            if key in parts and parts[key].text:\n                blurb = re.sub(r\"<[^>]+>\", \" \", parts[key].text)\n                blurb = re.sub(r\"\\s+\", \" \", blurb).strip()[:200]\n        lines.append(\"- %s (%s) %s\" % (title, link, blurb))\n    if not lines:\n        raise ValueError(\"No entries found. Is this an RSS or Atom feed?\")\n    return {\"interests\": INTERESTS, \"list\": \"\\n\".join(lines), \"count\": len(lines)}\n"
+        }
+      },
+      {
+        "id": "pick",
+        "type": "ai.claude",
+        "name": "Pick what matters",
+        "config": {
+          "system": "You are a careful reading assistant. Never invent articles or links.",
+          "prompt": "I care about: {{ $.interests }}.\n\nFrom the articles below choose the 5 most relevant. For each give the title, the link and one sentence on why it matters to me. If fewer than 5 fit, say so.\n\n{{ $.list }}",
+          "max_tokens": 900,
+          "credential": "anthropic"
+        }
+      },
+      {
+        "id": "entry",
+        "type": "code.python",
+        "name": "Dated entry",
+        "config": {
+          "source": "from datetime import datetime\n\n\ndef main(input_data):\n    stamp = datetime.now().astimezone().strftime(\"%Y-%m-%d\")\n    return {\"text\": \"## \" + stamp + \"\\n\\n\" + input_data[\"text\"].strip() + \"\\n\\n---\\n\\n\"}\n"
+        }
+      },
+      {
+        "id": "save",
+        "type": "file.write",
+        "name": "Add to the digest",
+        "config": {
+          "path": "reading/digest.md",
+          "content_path": "$.text",
+          "append": true
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "feed_parse_out",
+        "source": {
+          "node": "feed",
+          "port": "out"
+        },
+        "target": {
+          "node": "parse",
+          "port": "in"
+        }
+      },
+      {
+        "id": "parse_pick_out",
+        "source": {
+          "node": "parse",
+          "port": "out"
+        },
+        "target": {
+          "node": "pick",
+          "port": "in"
+        }
+      },
+      {
+        "id": "pick_entry_out",
+        "source": {
+          "node": "pick",
+          "port": "out"
+        },
+        "target": {
+          "node": "entry",
+          "port": "in"
+        }
+      },
+      {
+        "id": "entry_save_out",
+        "source": {
+          "node": "entry",
+          "port": "out"
+        },
+        "target": {
+          "node": "save",
+          "port": "in"
+        }
+      }
+    ],
+    "ui": {
+      "positions": {
+        "feed": {
+          "x": 0,
+          "y": 100
+        },
+        "parse": {
+          "x": 270,
+          "y": 100
+        },
+        "pick": {
+          "x": 540,
+          "y": 100
+        },
+        "entry": {
+          "x": 810,
+          "y": 100
+        },
+        "save": {
+          "x": 1080,
+          "y": 100
+        }
+      }
+    }
+  }
+}

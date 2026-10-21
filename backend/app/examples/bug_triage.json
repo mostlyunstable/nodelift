@@ -1,0 +1,173 @@
+{
+  "id": "bug-triage",
+  "title": "Bug triage",
+  "description": "Takes a bug report (title, body, reporter), flags urgent ones by keyword, and has Claude suggest likely causes and first checks for those. Appends every report to triage/bugs.md. Press Run to see a sample, or add a webhook under ⋯ > Triggers and POST your report to it as JSON. Needs an Anthropic API key saved as a credential named \"anthropic\" (⋯ > Credentials) (only for urgent reports).",
+  "name": "Bug triage",
+  "definition": {
+    "schema_version": 1,
+    "nodes": [
+      {
+        "id": "report",
+        "type": "code.python",
+        "name": "Read the report",
+        "config": {
+          "source": "URGENT = [\"crash\", \"data loss\", \"lost data\", \"security\", \"password\", \"payment\", \"charged\",\n          \"outage\", \"cannot log in\", \"can't log in\", \"corrupt\", \"deleted\"]\nSAMPLE = {\n    \"title\": \"App crashes when saving a workflow\",\n    \"body\": \"Every time I press save the window closes and my last edits are gone.\",\n    \"reporter\": \"sample\",\n}\n\n\ndef main(input_data):\n    d = input_data if isinstance(input_data, dict) and input_data.get(\"title\") else SAMPLE\n    title = str(d[\"title\"]).strip()[:200]\n    body = str(d.get(\"body\", \"\"))[:4000]\n    text = (title + \" \" + body).lower()\n    hits = [w for w in URGENT if w in text]\n    return {\"title\": title, \"body\": body, \"reporter\": str(d.get(\"reporter\", \"unknown\")),\n            \"urgent\": bool(hits), \"signals\": \", \".join(hits)}\n"
+        }
+      },
+      {
+        "id": "is_urgent",
+        "type": "logic.branch",
+        "name": "Urgent?",
+        "config": {
+          "path": "$.urgent",
+          "operator": "eq",
+          "value": true
+        }
+      },
+      {
+        "id": "analyze",
+        "type": "ai.claude",
+        "name": "Suggest causes",
+        "config": {
+          "system": "You are a careful senior engineer triaging a bug report.",
+          "prompt": "This bug report was flagged urgent because it mentions: {{ $.signals }}.\n\nTitle: {{ $.title }}\nDetails: {{ $.body }}\n\nGive (1) the most likely causes, (2) the first three things to check, (3) who should be told. Under 150 words.",
+          "max_tokens": 600,
+          "credential": "anthropic"
+        }
+      },
+      {
+        "id": "routine",
+        "type": "code.python",
+        "name": "Routine",
+        "config": {
+          "source": "def main(input_data):\n    return {\"text\": \"Routine: no urgent signals. Queue for the normal backlog.\"}\n"
+        }
+      },
+      {
+        "id": "entry",
+        "type": "code.python",
+        "name": "Write the entry",
+        "config": {
+          "source": "from datetime import datetime\n\n\ndef main(input_data):\n    r = input_data[\"report\"]\n    analysis = (input_data.get(\"analyze\") or input_data.get(\"routine\"))[\"text\"]\n    flag = \"URGENT\" if r[\"urgent\"] else \"routine\"\n    stamp = datetime.now().astimezone().strftime(\"%Y-%m-%d %H:%M\")\n    text = \"## %s [%s] %s\\nReported by %s\\n\\n%s\\n\\n---\\n\\n\" % (\n        stamp, flag, r[\"title\"], r[\"reporter\"], analysis.strip())\n    return {\"text\": text}\n"
+        }
+      },
+      {
+        "id": "save",
+        "type": "file.write",
+        "name": "Add to the log",
+        "config": {
+          "path": "triage/bugs.md",
+          "content_path": "$.text",
+          "append": true
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "report_is_urgent_out",
+        "source": {
+          "node": "report",
+          "port": "out"
+        },
+        "target": {
+          "node": "is_urgent",
+          "port": "in"
+        }
+      },
+      {
+        "id": "is_urgent_analyze_true",
+        "source": {
+          "node": "is_urgent",
+          "port": "true"
+        },
+        "target": {
+          "node": "analyze",
+          "port": "in"
+        }
+      },
+      {
+        "id": "is_urgent_routine_false",
+        "source": {
+          "node": "is_urgent",
+          "port": "false"
+        },
+        "target": {
+          "node": "routine",
+          "port": "in"
+        }
+      },
+      {
+        "id": "report_entry_out",
+        "source": {
+          "node": "report",
+          "port": "out"
+        },
+        "target": {
+          "node": "entry",
+          "port": "in"
+        }
+      },
+      {
+        "id": "analyze_entry_out",
+        "source": {
+          "node": "analyze",
+          "port": "out"
+        },
+        "target": {
+          "node": "entry",
+          "port": "in"
+        }
+      },
+      {
+        "id": "routine_entry_out",
+        "source": {
+          "node": "routine",
+          "port": "out"
+        },
+        "target": {
+          "node": "entry",
+          "port": "in"
+        }
+      },
+      {
+        "id": "entry_save_out",
+        "source": {
+          "node": "entry",
+          "port": "out"
+        },
+        "target": {
+          "node": "save",
+          "port": "in"
+        }
+      }
+    ],
+    "ui": {
+      "positions": {
+        "report": {
+          "x": 0,
+          "y": 150
+        },
+        "is_urgent": {
+          "x": 270,
+          "y": 150
+        },
+        "analyze": {
+          "x": 540,
+          "y": 60
+        },
+        "routine": {
+          "x": 540,
+          "y": 240
+        },
+        "entry": {
+          "x": 810,
+          "y": 150
+        },
+        "save": {
+          "x": 1080,
+          "y": 150
+        }
+      }
+    }
+  }
+}

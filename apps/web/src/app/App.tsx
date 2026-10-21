@@ -18,6 +18,8 @@ import {
   VersionsDialog,
 } from '../ui/Dialogs'
 import { Menu, type MenuItem } from '../ui/Menu'
+import { FilesDialog } from '../ui/FilesDialog'
+import { TemplatesDialog } from '../ui/TemplatesDialog'
 import { TriggersDialog } from '../ui/TriggersDialog'
 import { EmptyCanvas, LonelyNodesNotice, RunAnnouncer, Toast, TourBanner } from '../ui/Overlays'
 import { buildCommands, type CommandContext } from './commands'
@@ -190,6 +192,8 @@ export function App() {
       importFile: () => setImportRequests((n) => n + 1),
       credentials: () => s.openDialog('credentials'),
       triggers: () => s.openDialog('triggers'),
+      templates: () => s.openDialog('templates'),
+      files: () => s.openDialog('files'),
       diagnostics: () => s.openDialog('diagnostics'),
       shortcuts: () => s.openDialog('shortcuts'),
       theme: s.setTheme,
@@ -222,10 +226,13 @@ export function App() {
     }))
   const workflowItems: MenuItem[] = [
     { label: 'New workflow', onSelect: () => void guarded(s.reset) },
-    ...s.examples.map((ex) => ({
-      label: `Example: ${ex.title}`,
-      onSelect: () => void guarded(() => s.createExample(ex.id)),
-    })),
+    ...s.examples
+      .filter((ex) => ['debug-me', 'route-orders'].includes(ex.id))
+      .map((ex) => ({
+        label: `Example: ${ex.title}`,
+        onSelect: () => void guarded(() => s.createExample(ex.id)),
+      })),
+    { label: 'More templates…', onSelect: () => s.openDialog('templates') },
     ...s.workflows.map((w, i) => ({
       label: w.name,
       onSelect: () => void guarded(() => s.open(w.id)),
@@ -246,6 +253,8 @@ export function App() {
     },
     { label: 'Import a workflow…', onSelect: () => setImportRequests((n) => n + 1) },
     { label: 'Export everything…', onSelect: () => void s.exportAll() },
+    { label: 'Templates…', onSelect: () => s.openDialog('templates') },
+    { label: 'Files…', onSelect: () => s.openDialog('files') },
     { label: 'Triggers…', onSelect: () => s.openDialog('triggers'), disabled: !s.workflowId },
     { label: 'Credentials…', onSelect: () => s.openDialog('credentials'), separatorBefore: true },
     { label: 'Diagnostics…', onSelect: () => s.openDialog('diagnostics') },
@@ -414,6 +423,8 @@ export function App() {
       {s.dialog === 'diagnostics' && <DiagnosticsDialog />}
       {s.dialog === 'credentials' && <CredentialsDialog />}
       {s.dialog === 'triggers' && <TriggersDialog />}
+      {s.dialog === 'templates' && <TemplatesDialog />}
+      {s.dialog === 'files' && <FilesDialog />}
       {s.dialog === 'import' && <ImportDialog />}
       {s.dialog === 'shortcuts' && <ShortcutsDialog />}
     </div>

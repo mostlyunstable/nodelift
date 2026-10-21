@@ -1,0 +1,204 @@
+{
+  "id": "repo-brief",
+  "title": "Brief me on a repository",
+  "description": "Give it a GitHub repository (owner/name) and Claude explains what it is, how it is organised and where to start reading, from its description and README. Appends to briefs/repo-briefs.md. Then paste the same link into the Explorer to see the map of every file. Needs a GitHub token saved as a credential named \"github\" (Explorer > GitHub access does this) and an Anthropic API key saved as a credential named \"anthropic\" (⋯ > Credentials). Run it with the input {\"repo\": \"pallets/click\"}.",
+  "name": "Brief me on a repository",
+  "definition": {
+    "schema_version": 1,
+    "nodes": [
+      {
+        "id": "target",
+        "type": "code.python",
+        "name": "Which repository",
+        "config": {
+          "source": "import re\n\nSAMPLE = {\"repo\": \"pallets/click\"}\n\n\ndef main(input_data):\n    d = input_data if isinstance(input_data, dict) and input_data.get(\"repo\") else SAMPLE\n    repo = str(d[\"repo\"]).strip().removeprefix(\"https://github.com/\").strip(\"/\")\n    if not re.fullmatch(r\"[\\w.-]+/[\\w.-]+\", repo):\n        raise ValueError(\"Use the form owner/name, for example pallets/click\")\n    return {\"repo\": repo}\n"
+        }
+      },
+      {
+        "id": "info",
+        "type": "http.request",
+        "name": "Repository details",
+        "config": {
+          "url": "https://api.github.com/repos/{{ $.repo }}",
+          "method": "GET",
+          "headers": {
+            "Accept": "application/vnd.github+json",
+            "Authorization": "Bearer {{credential:github}}"
+          }
+        }
+      },
+      {
+        "id": "readme",
+        "type": "http.request",
+        "name": "Read the README",
+        "config": {
+          "url": "https://api.github.com/repos/{{ $.repo }}/readme",
+          "method": "GET",
+          "headers": {
+            "Accept": "application/vnd.github+json",
+            "Authorization": "Bearer {{credential:github}}"
+          }
+        }
+      },
+      {
+        "id": "compose",
+        "type": "code.python",
+        "name": "Gather the facts",
+        "config": {
+          "source": "import base64\n\n\ndef main(input_data):\n    info = input_data[\"info\"][\"body\"]\n    body = input_data[\"readme\"][\"body\"]\n    readme = base64.b64decode(body.get(\"content\", \"\")).decode(\"utf-8\", \"replace\") if isinstance(body, dict) else \"\"\n    facts = [\n        \"Repository: \" + info[\"full_name\"],\n        \"Description: \" + str(info.get(\"description\")),\n        \"Main language: \" + str(info.get(\"language\")),\n        \"Stars: %s, open issues: %s\" % (info.get(\"stargazers_count\"), info.get(\"open_issues_count\")),\n        \"Topics: \" + \", \".join(info.get(\"topics\", [])),\n        \"License: \" + str((info.get(\"license\") or {}).get(\"name\")),\n        \"Default branch: \" + info[\"default_branch\"],\n    ]\n    return {\"repo\": info[\"full_name\"], \"facts\": \"\\n\".join(facts) + \"\\n\\nREADME (cut to 12,000 characters):\\n\" + readme[:12000]}\n"
+        }
+      },
+      {
+        "id": "explain",
+        "type": "ai.claude",
+        "name": "Explain it",
+        "config": {
+          "system": "You explain codebases to developers who have never seen them. Be concrete and honest about what you cannot tell from a README.",
+          "prompt": "Explain this repository. Use these headings: What it is; How it is organised (infer from the README, say if you are guessing); Where to start reading; What to be careful about. Under 300 words.\n\n{{ $.facts }}",
+          "max_tokens": 900,
+          "credential": "anthropic"
+        }
+      },
+      {
+        "id": "entry",
+        "type": "code.python",
+        "name": "Dated entry",
+        "config": {
+          "source": "from datetime import datetime\n\n\ndef main(input_data):\n    repo = input_data[\"compose\"][\"repo\"]\n    stamp = datetime.now().astimezone().strftime(\"%Y-%m-%d %H:%M\")\n    return {\"text\": \"## %s (%s)\\n\\n%s\\n\\nSee the map: paste https://github.com/%s into the Explorer.\\n\\n---\\n\\n\"\n            % (repo, stamp, input_data[\"explain\"][\"text\"].strip(), repo)}\n"
+        }
+      },
+      {
+        "id": "save",
+        "type": "file.write",
+        "name": "Add to the briefs",
+        "config": {
+          "path": "briefs/repo-briefs.md",
+          "content_path": "$.text",
+          "append": true
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "target_info_out",
+        "source": {
+          "node": "target",
+          "port": "out"
+        },
+        "target": {
+          "node": "info",
+          "port": "in"
+        }
+      },
+      {
+        "id": "target_readme_out",
+        "source": {
+          "node": "target",
+          "port": "out"
+        },
+        "target": {
+          "node": "readme",
+          "port": "in"
+        }
+      },
+      {
+        "id": "info_compose_out",
+        "source": {
+          "node": "info",
+          "port": "out"
+        },
+        "target": {
+          "node": "compose",
+          "port": "in"
+        }
+      },
+      {
+        "id": "readme_compose_out",
+        "source": {
+          "node": "readme",
+          "port": "out"
+        },
+        "target": {
+          "node": "compose",
+          "port": "in"
+        }
+      },
+      {
+        "id": "compose_explain_out",
+        "source": {
+          "node": "compose",
+          "port": "out"
+        },
+        "target": {
+          "node": "explain",
+          "port": "in"
+        }
+      },
+      {
+        "id": "compose_entry_out",
+        "source": {
+          "node": "compose",
+          "port": "out"
+        },
+        "target": {
+          "node": "entry",
+          "port": "in"
+        }
+      },
+      {
+        "id": "explain_entry_out",
+        "source": {
+          "node": "explain",
+          "port": "out"
+        },
+        "target": {
+          "node": "entry",
+          "port": "in"
+        }
+      },
+      {
+        "id": "entry_save_out",
+        "source": {
+          "node": "entry",
+          "port": "out"
+        },
+        "target": {
+          "node": "save",
+          "port": "in"
+        }
+      }
+    ],
+    "ui": {
+      "positions": {
+        "target": {
+          "x": 0,
+          "y": 150
+        },
+        "info": {
+          "x": 270,
+          "y": 60
+        },
+        "readme": {
+          "x": 270,
+          "y": 240
+        },
+        "compose": {
+          "x": 540,
+          "y": 150
+        },
+        "explain": {
+          "x": 810,
+          "y": 60
+        },
+        "entry": {
+          "x": 1080,
+          "y": 150
+        },
+        "save": {
+          "x": 1350,
+          "y": 150
+        }
+      }
+    }
+  }
+}

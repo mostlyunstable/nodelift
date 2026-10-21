@@ -112,7 +112,15 @@ let generation = 0 // bumped when a different workflow is opened/reset; stale sa
 let inFlight: Promise<string | null> | null = null
 
 export type DialogName =
-  'palette' | 'versions' | 'diagnostics' | 'import' | 'shortcuts' | 'credentials' | 'triggers'
+  | 'palette'
+  | 'versions'
+  | 'diagnostics'
+  | 'import'
+  | 'shortcuts'
+  | 'credentials'
+  | 'triggers'
+  | 'templates'
+  | 'files'
 export type ThemeChoice = 'dark' | 'light' | 'system'
 export type Tour = 'run' | 'fix' | 'done' | null
 

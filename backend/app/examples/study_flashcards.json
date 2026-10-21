@@ -1,0 +1,106 @@
+{
+  "id": "study-flashcards",
+  "title": "Study notes to flashcards",
+  "description": "Reads study/notes.txt from the files folder (a sample is added for you) and has Claude turn it into question and answer cards, saved as study/flashcards.csv, which Anki and most flashcard apps can import. Replace the notes with your own under ⋯ > Files. Needs an Anthropic API key saved as a credential named \"anthropic\" (⋯ > Credentials).",
+  "name": "Study notes to flashcards",
+  "definition": {
+    "schema_version": 1,
+    "nodes": [
+      {
+        "id": "notes",
+        "type": "file.read",
+        "name": "Read my notes",
+        "config": {
+          "path": "study/notes.txt"
+        }
+      },
+      {
+        "id": "cards",
+        "type": "ai.claude",
+        "name": "Make cards",
+        "config": {
+          "system": "You turn study notes into good flashcards: one fact or idea per card, no trick questions.",
+          "prompt": "Turn these notes into 10 to 20 flashcards. Reply with ONLY CSV that has the header question,answer and nothing else. Quote any field that contains a comma.\n\nNOTES:\n{{ $.text }}",
+          "max_tokens": 3000,
+          "credential": "anthropic"
+        }
+      },
+      {
+        "id": "clean",
+        "type": "code.python",
+        "name": "Check the cards",
+        "config": {
+          "source": "import csv\nimport io\n\n\ndef main(input_data):\n    text = input_data[\"text\"].strip()\n    if text.startswith(\"```\"):\n        text = text.strip(\"`\").split(\"\\n\", 1)[-1].rsplit(\"```\", 1)[0]\n    rows = list(csv.reader(io.StringIO(text.strip())))\n    if not rows or [c.strip().lower() for c in rows[0]] != [\"question\", \"answer\"]:\n        raise ValueError(\"Claude's reply was not the flashcard CSV it was asked for. Run again, or check the notes.\")\n    rows = rows[1:]\n    seen, cards = set(), []\n    for r in rows:\n        if len(r) < 2 or not r[0].strip() or not r[1].strip():\n            continue\n        key = r[0].strip().lower()\n        if key not in seen:\n            seen.add(key)\n            cards.append((r[0].strip(), \",\".join(r[1:]).strip()))\n    if not cards:\n        raise ValueError(\"The reply had a header but no usable cards. Run again, or check the notes.\")\n    out = io.StringIO()\n    w = csv.writer(out, lineterminator=\"\\n\")\n    w.writerow([\"question\", \"answer\"])\n    w.writerows(cards)\n    return {\"csv\": out.getvalue(), \"count\": len(cards)}\n"
+        }
+      },
+      {
+        "id": "save",
+        "type": "file.write",
+        "name": "Save the cards",
+        "config": {
+          "path": "study/flashcards.csv",
+          "content_path": "$.csv",
+          "append": false
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "notes_cards_out",
+        "source": {
+          "node": "notes",
+          "port": "out"
+        },
+        "target": {
+          "node": "cards",
+          "port": "in"
+        }
+      },
+      {
+        "id": "cards_clean_out",
+        "source": {
+          "node": "cards",
+          "port": "out"
+        },
+        "target": {
+          "node": "clean",
+          "port": "in"
+        }
+      },
+      {
+        "id": "clean_save_out",
+        "source": {
+          "node": "clean",
+          "port": "out"
+        },
+        "target": {
+          "node": "save",
+          "port": "in"
+        }
+      }
+    ],
+    "ui": {
+      "positions": {
+        "notes": {
+          "x": 0,
+          "y": 150
+        },
+        "cards": {
+          "x": 270,
+          "y": 150
+        },
+        "clean": {
+          "x": 540,
+          "y": 150
+        },
+        "save": {
+          "x": 810,
+          "y": 150
+        }
+      }
+    }
+  },
+  "files": {
+    "study/notes.txt": "Cell biology (sample notes: replace these with your own)\n\nThe cell is the basic unit of life. Cells come from other cells.\nMitochondria produce most of a cell's ATP through aerobic respiration.\nThe nucleus stores DNA; the nucleolus builds ribosomes.\nRibosomes assemble proteins from amino acids using mRNA as a template.\nThe Golgi apparatus modifies, sorts and ships proteins and lipids.\nPlant cells have a cell wall and chloroplasts; animal cells do not.\nOsmosis is the diffusion of water across a semi-permeable membrane toward higher solute concentration.\n"
+  }
+}

@@ -13,6 +13,7 @@ import json
 import re
 import sqlite3
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -328,9 +329,16 @@ class FileReadNode:
         config_schema={
             "type": "object",
             "required": ["path"],
-            "properties": {"path": {"type": "string"}},
+            "properties": {
+                "path": {"type": "string"},
+                "optional": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "when the file does not exist, continue with empty text instead of failing",
+                },
+            },
         },
-        default_config={"path": "input.txt"},
+        default_config={"path": "input.txt", "optional": False},
     )
 
     def __init__(self, base: Path) -> None:
@@ -355,12 +363,91 @@ class FileReadNode:
         except ValueError as e:
             return _fail("invalid_config", str(e), start)
         except FileNotFoundError:
+            if config.get("optional") is True:
+                return _done(
+                    {"path": config["path"], "text": "", "bytes": 0, "missing": True}, start
+                )
             return _fail(
                 "invalid_config", f"No file named {config['path']!r} in the files folder", start
             )
         except (OSError, UnicodeDecodeError) as e:
             return _fail("runtime_error", f"Could not read the file: {type(e).__name__}", start)
         return _done({"path": config["path"], "text": text, "bytes": len(text.encode())}, start)
+
+
+class FileListNode:
+    definition: ClassVar[NodeDefinition] = NodeDefinition(
+        type="file.list",
+        title="List files",
+        category="Files",
+        description="List the files in a folder inside Nodecraft's files folder, with sizes and modified times.",
+        config_schema={
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "default": ".",
+                    "description": "a folder, relative to the files folder",
+                },
+                "recursive": {"type": "boolean", "default": True},
+                "max_items": {"type": "integer", "minimum": 1, "maximum": 5000, "default": 1000},
+            },
+        },
+        default_config={"path": ".", "recursive": True, "max_items": 1000},
+    )
+
+    def __init__(self, base: Path) -> None:
+        self.base = base
+
+    def _folder(self, rel: str) -> Path:
+        return self.base.resolve() if rel in ("", ".") else safe_path(self.base, rel)
+
+    def validate_config(self, config: dict[str, Any]) -> list[str]:
+        try:
+            self._folder(config.get("path", "."))
+        except ValueError as e:
+            return [str(e)]
+        return []
+
+    async def execute(
+        self, ctx: NodeContext, input_data: JsonValue, config: dict[str, Any]
+    ) -> NodeResult:
+        start = time.monotonic()
+        try:
+            folder = self._folder(config.get("path", "."))
+        except ValueError as e:
+            return _fail("invalid_config", str(e), start)
+        if not folder.is_dir():
+            return _fail(
+                "invalid_config",
+                f"No folder named {config.get('path')!r} in the files folder",
+                start,
+            )
+        root = self.base.resolve()
+        limit = int(config.get("max_items", 1000))
+        items: list[dict[str, Any]] = []
+        walker = folder.rglob("*") if config.get("recursive", True) else folder.glob("*")
+        truncated = False
+        for p in sorted(walker):
+            if (
+                p.is_symlink()
+                or not p.is_file()
+                or any(part.startswith(".") for part in p.relative_to(folder).parts)
+            ):
+                continue
+            if len(items) >= limit:
+                truncated = True
+                break
+            st = p.stat()
+            items.append(
+                {
+                    "path": str(p.relative_to(root)),
+                    "name": p.name,
+                    "bytes": st.st_size,
+                    "modified": datetime.fromtimestamp(st.st_mtime, UTC).isoformat(),
+                }
+            )
+        return _done({"files": items, "count": len(items), "truncated": truncated}, start)
 
 
 class FileWriteNode:

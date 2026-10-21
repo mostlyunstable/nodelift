@@ -454,6 +454,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Files */
+        get: operations["list_files_api_v1_files_get"];
+        put?: never;
+        post?: never;
+        /** Delete File */
+        delete: operations["delete_file_api_v1_files_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read File */
+        get: operations["read_file_api_v1_files_content_get"];
+        /** Write File */
+        put: operations["write_file_api_v1_files_content_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -1147,6 +1183,37 @@ export interface components {
             /** Size */
             size: number;
         };
+        /** FileInfo */
+        FileInfo: {
+            /** Bytes */
+            bytes: number;
+            /**
+             * Modified
+             * Format: date-time
+             */
+            modified: string;
+            /** Path */
+            path: string;
+        };
+        /** FileListing */
+        FileListing: {
+            /** Files */
+            files: components["schemas"]["FileInfo"][];
+            /** Folder */
+            folder: string;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /** FileText */
+        FileText: {
+            /** Path */
+            path: string;
+            /** Text */
+            text: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1219,6 +1286,13 @@ export interface components {
             name: string;
             /** Value */
             value: string;
+        };
+        /** NewFile */
+        NewFile: {
+            /** Path */
+            path: string;
+            /** Text */
+            text: string;
         };
         /** NewTrigger */
         NewTrigger: {
@@ -2936,6 +3010,119 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkspaceRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_files_api_v1_files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileListing"];
+                };
+            };
+        };
+    };
+    delete_file_api_v1_files_delete: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_file_api_v1_files_content_get: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileText"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    write_file_api_v1_files_content_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewFile"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileInfo"];
                 };
             };
             /** @description Validation Error */

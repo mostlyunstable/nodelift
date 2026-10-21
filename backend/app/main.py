@@ -9,6 +9,7 @@ from app.api.security import SecurityMiddleware
 from app.api.v1 import (
     credentials,
     explorer,
+    files,
     health,
     nodes,
     portability,
@@ -101,6 +102,7 @@ def create_app(database_url: str | None = None, settings: Settings | None = None
     app.include_router(credentials.router, prefix="/api/v1")
     app.include_router(explorer.router, prefix="/api/v1")
     app.include_router(triggers.router, prefix="/api/v1")
+    app.include_router(files.router, prefix="/api/v1")
     return app
 
 

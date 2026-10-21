@@ -1,0 +1,78 @@
+{
+  "id": "habit-weekly-stats",
+  "title": "Weekly habit stats",
+  "description": "Reads habits/log.csv and writes habits/weekly.md: for each habit, days done in the last 7 days, total, current streak and best day. Add a schedule (for example daily at 21:00) under ⋯ > Triggers. Use it with Daily habit tracker. Needs nothing else.",
+  "name": "Weekly habit stats",
+  "definition": {
+    "schema_version": 1,
+    "nodes": [
+      {
+        "id": "log",
+        "type": "file.read",
+        "name": "Read the log",
+        "config": {
+          "path": "habits/log.csv",
+          "optional": true
+        }
+      },
+      {
+        "id": "stats",
+        "type": "code.python",
+        "name": "Work out the week",
+        "config": {
+          "source": "import csv\nimport io\nfrom datetime import date, datetime, timedelta\n\n\ndef main(input_data):\n    today = datetime.now().astimezone().date()\n    week = {today - timedelta(days=i) for i in range(7)}\n    days = {}      # habit -> {date: total}\n    for r in csv.reader(io.StringIO(input_data.get(\"text\", \"\"))):\n        if len(r) < 4 or r[0] == \"date\":\n            continue\n        try:\n            d, habit, v = date.fromisoformat(r[0]), r[2], float(r[3])\n        except ValueError:\n            continue\n        days.setdefault(habit, {})\n        days[habit][d] = days[habit].get(d, 0) + v\n    if not days:\n        return {\"text\": \"# Habits this week\\n\\nNo entries yet. Run Daily habit tracker first.\\n\", \"habits\": 0}\n    lines = [\"# Habits this week (to %s)\\n\" % today, \"| habit | days done | total | streak | best day |\", \"|---|---|---|---|---|\"]\n    for habit in sorted(days):\n        per = days[habit]\n        done = sorted(d for d in per if d in week)\n        total = sum(per[d] for d in done)\n        streak, d = 0, today if today in per else today - timedelta(days=1)\n        while d in per:\n            streak += 1\n            d -= timedelta(days=1)\n        best = max(done, key=lambda x: per[x]) if done else None\n        lines.append(\"| %s | %d/7 | %g | %d | %s |\" % (habit, len(done), total, streak,\n                     \"%s (%g)\" % (best, per[best]) if best else \"-\"))\n    return {\"text\": \"\\n\".join(lines) + \"\\n\", \"habits\": len(days)}\n"
+        }
+      },
+      {
+        "id": "save",
+        "type": "file.write",
+        "name": "Save the summary",
+        "config": {
+          "path": "habits/weekly.md",
+          "content_path": "$.text",
+          "append": false
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "log_stats_out",
+        "source": {
+          "node": "log",
+          "port": "out"
+        },
+        "target": {
+          "node": "stats",
+          "port": "in"
+        }
+      },
+      {
+        "id": "stats_save_out",
+        "source": {
+          "node": "stats",
+          "port": "out"
+        },
+        "target": {
+          "node": "save",
+          "port": "in"
+        }
+      }
+    ],
+    "ui": {
+      "positions": {
+        "log": {
+          "x": 0,
+          "y": 100
+        },
+        "stats": {
+          "x": 270,
+          "y": 100
+        },
+        "save": {
+          "x": 540,
+          "y": 100
+        }
+      }
+    }
+  }
+}

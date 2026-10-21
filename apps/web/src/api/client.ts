@@ -52,6 +52,8 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
 
 type Schemas = components['schemas']
 export type Trigger = Schemas['TriggerRecord']
+export type FileInfo = Schemas['FileInfo']
+export type FileListing = Schemas['FileListing']
 export type TriggerCreated = Schemas['TriggerCreated']
 export type RepoRevision = Schemas['RepoRevisionRecord']
 export type RepoFile = Schemas['RepoFileRecord']
@@ -191,5 +193,10 @@ export const api = {
   setTriggerEnabled: (id: string, enabled: boolean) =>
     request<Trigger>('PUT', `/triggers/${id}`, { enabled }),
   deleteTrigger: (id: string) => request<null>('DELETE', `/triggers/${id}`),
+  listFiles: () => request<FileListing>('GET', '/files'),
+  readFile: (path: string) =>
+    request<Schemas['FileText']>('GET', `/files/content?path=${encodeURIComponent(path)}`),
+  writeFile: (path: string, text: string) => request<FileInfo>('PUT', '/files/content', { path, text }),
+  deleteFile: (path: string) => request<null>('DELETE', `/files?path=${encodeURIComponent(path)}`),
   deleteCredential: (name: string) => request<null>('DELETE', `/credentials/${encodeURIComponent(name)}`),
 }

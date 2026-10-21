@@ -42,6 +42,13 @@ for (const scheme of ['dark', 'light'] as const) {
       await page.getByRole('button', { name: 'More actions' }).click()
       await page.getByRole('menuitem', { name: /Credentials/ }).click()
       await expectAccessible(page, 'credentials dialog')
+      await page.keyboard.press('Escape')
+      for (const name of ['Templates…', 'Files…', 'Triggers…']) {
+        await page.getByRole('button', { name: 'More actions' }).click()
+        await page.getByRole('menuitem', { name }).click()
+        await expectAccessible(page, name)
+        await page.keyboard.press('Escape')
+      }
     })
 
     test('explorer welcome has no violations', async ({ page }) => {

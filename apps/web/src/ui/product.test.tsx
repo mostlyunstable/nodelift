@@ -115,3 +115,56 @@ describe('ErrorBoundary', () => {
     expect(recordedErrors().some((e) => e.includes('kaboom'))).toBe(true)
   })
 })
+
+describe('Templates and Files', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    useStore.setState({
+      dialog: 'templates',
+      examples: [
+        { id: 'csv-cleaner', title: 'Messy CSV cleaner', description: 'Tidies a messy CSV file.', nodes: 5 },
+      ],
+    })
+  })
+
+  it('lists templates with what they do, and creating one closes the dialog', async () => {
+    const create = vi.spyOn(useStore.getState(), 'createExample').mockResolvedValue()
+    useStore.setState({ createExample: create })
+    const { TemplatesDialog } = await import('./TemplatesDialog')
+    render(<TemplatesDialog />)
+    expect(screen.getByText('Tidies a messy CSV file.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Use this template: Messy CSV cleaner' }))
+    expect(create).toHaveBeenCalledWith('csv-cleaner')
+    expect(useStore.getState().dialog).toBeNull()
+  })
+
+  it('shows the files folder, opens a file, and saves a new one under its folder name', async () => {
+    const info = { path: 'study/notes.txt', bytes: 12, modified: '2026-10-21T08:00:00Z' }
+    const list = vi
+      .spyOn(api, 'listFiles')
+      .mockResolvedValue({ folder: '/data/files', files: [info], truncated: false })
+    vi.spyOn(api, 'readFile').mockResolvedValue({ path: 'study/notes.txt', text: 'hello notes' })
+    const write = vi.spyOn(api, 'writeFile').mockResolvedValue(info)
+    const { FilesDialog } = await import('./FilesDialog')
+    render(<FilesDialog />)
+    expect(await screen.findByText('study/notes.txt')).toBeInTheDocument()
+    expect(screen.getByText('/data/files')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open study/notes.txt' }))
+    expect(await screen.findByDisplayValue('hello notes')).toBeInTheDocument()
+    fireEvent.change(screen.getByDisplayValue('hello notes'), { target: { value: 'changed' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(write).toHaveBeenCalledWith('study/notes.txt', 'changed'))
+    expect(list.mock.calls.length).toBeGreaterThan(1)
+  })
+
+  it('says why a file could not be saved', async () => {
+    vi.spyOn(api, 'listFiles').mockResolvedValue({ folder: '/f', files: [], truncated: false })
+    vi.spyOn(api, 'writeFile').mockRejectedValue(new Error('path must be relative, inside the files folder'))
+    const { FilesDialog } = await import('./FilesDialog')
+    render(<FilesDialog />)
+    fireEvent.click(await screen.findByRole('button', { name: 'New file' }))
+    fireEvent.change(screen.getByLabelText(/Name/), { target: { value: '../x.txt' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('inside the files folder')
+  })
+})

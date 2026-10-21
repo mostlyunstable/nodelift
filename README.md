@@ -43,10 +43,14 @@ you do, Nodecraft's *Run a command* feature (which uses the system Python) and t
 ## What works
 - Canvas editor with autosave, undo/redo, command palette (⌘K), shortcuts, light/dark theme, a guided "Debug me" example.
 - Nodes: Python code, JSON transform, HTTP request, branch, filter list, text/HTML template, CSV, read/write file and SQLite query (confined to
-  `<data folder>/files`), and Ask Claude (key from a saved credential); plugin nodes ([docs/node-authoring.md](docs/node-authoring.md)).
+  `<data folder>/files`), and Ask Claude (key from a saved credential), List files; plugin nodes ([docs/node-authoring.md](docs/node-authoring.md)).
 - Branching by output ports, fail-fast, cancel, retries (opt-in), run budgets, resume from failure.
 - SQLite persistence, immutable versions, run history, live events over SSE with recovery, pre-migration backups.
 - Import/export with preview; credentials in the system keychain, masked in all results.
+- Templates (*Workflows → More templates…*): ready-made workflows for real jobs, each a normal workflow you can change: daily GitHub
+  report, bug triage, study notes to flashcards, daily habit tracker and weekly stats, weekly backup report, messy CSV cleaner,
+  brief me on a repository, and a reading digest. Sample input files are added for you; none needs anything but a saved
+  credential for GitHub and/or Claude where noted. *⋯ → Files* is the one folder workflows can read and write.
 - Triggers: a workflow can run on a schedule (every N minutes, or daily at a time; only while Nodecraft is open) or from a
   private webhook address on this computer (*⋯ → Triggers*).
 - Repository Explorer (R2): paste a GitHub URL (private repositories and 5,000 requests an hour with a token saved under *GitHub access*), press *Show Nodes*, browse the files at a pinned commit and read them

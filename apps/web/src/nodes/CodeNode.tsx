@@ -11,6 +11,7 @@ const BADGES: Record<string, string> = {
   'data.filter': 'flt',
   'text.template': 'tpl',
   'data.csv': 'csv',
+  'file.list': 'ls',
   'file.read': 'in',
   'file.write': 'out',
   'db.sqlite': 'sql',

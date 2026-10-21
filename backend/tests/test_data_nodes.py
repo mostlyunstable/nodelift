@@ -395,3 +395,31 @@ async def test_a_real_workflow_through_the_engine_without_any_code_node(tmp_path
         "<p>2 kept</p>" in html_text and "&quot;ann&quot;" in html_text and "bob" not in html_text
     )
     assert run.nodes[-1].output["text"] == html_text
+
+
+def test_optional_read_continues_with_empty_text(tmp_path: Path) -> None:
+    r = FileReadNode(tmp_path)
+    out = run(r, None, {"path": "nope.txt", "optional": True}).output
+    assert out["text"] == "" and out["missing"] is True
+    assert fails(r, None, {"path": "nope.txt"}).type == "invalid_config"  # still strict by default
+
+
+def test_file_list_lists_confined_files(tmp_path: Path) -> None:
+    from app.nodes.builtin.data_nodes import FileListNode
+
+    (tmp_path / "backups").mkdir()
+    (tmp_path / "backups" / "a.zip").write_bytes(b"12345")
+    (tmp_path / "backups" / "sub").mkdir()
+    (tmp_path / "backups" / "sub" / "b.zip").write_bytes(b"1")
+    (tmp_path / "backups" / ".hidden").write_text("x")
+    (tmp_path / "other.txt").write_text("x")
+    node = FileListNode(tmp_path)
+    out = run(node, None, {"path": "backups"}).output
+    assert [f["path"] for f in out["files"]] == ["backups/a.zip", "backups/sub/b.zip"]
+    assert out["files"][0]["bytes"] == 5 and out["count"] == 2 and out["truncated"] is False
+    flat = run(node, None, {"path": "backups", "recursive": False}).output
+    assert [f["name"] for f in flat["files"]] == ["a.zip"]
+    assert run(node, None, {"path": "backups", "max_items": 1}).output["truncated"] is True
+    assert node.validate_config({"path": "../etc"})
+    assert fails(node, None, {"path": "nope"}).type == "invalid_config"
+    assert len(run(node, None, {}).output["files"]) == 3  # the whole files folder

@@ -1,0 +1,131 @@
+{
+  "id": "backup-report",
+  "title": "Weekly backup report",
+  "description": "Lists the files in the backups folder (inside the files folder) and compares them with the last run: new, changed and missing files, empty files, and a warning when nothing new has arrived for a week. Writes reports/backup-report.md. Add a schedule under ⋯ > Triggers. Put your backups, or a copy of the list, in the backups folder under ⋯ > Files. Needs nothing else.",
+  "name": "Weekly backup report",
+  "definition": {
+    "schema_version": 1,
+    "nodes": [
+      {
+        "id": "files",
+        "type": "file.list",
+        "name": "List the backups",
+        "config": {
+          "path": "backups",
+          "recursive": true,
+          "max_items": 2000
+        }
+      },
+      {
+        "id": "previous",
+        "type": "file.read",
+        "name": "Last run's list",
+        "config": {
+          "path": "reports/backup-manifest.json",
+          "optional": true
+        }
+      },
+      {
+        "id": "report",
+        "type": "code.python",
+        "name": "Compare",
+        "config": {
+          "source": "import json\nfrom datetime import datetime, timezone\n\nSTALE_DAYS = 7\n\n\ndef main(input_data):\n    now_files = {f[\"path\"]: f for f in input_data[\"files\"][\"files\"]}\n    try:\n        before = json.loads(input_data[\"previous\"].get(\"text\") or \"{}\")\n    except ValueError:\n        before = {}\n    first = not before\n    new = sorted(p for p in now_files if p not in before)\n    changed = sorted(p for p in now_files if p in before and before[p][\"bytes\"] != now_files[p][\"bytes\"])\n    missing = sorted(p for p in before if p not in now_files)\n    empty = sorted(p for p, f in now_files.items() if f[\"bytes\"] == 0)\n    total = sum(f[\"bytes\"] for f in now_files.values())\n    newest = max((f[\"modified\"] for f in now_files.values()), default=None)\n    warnings = []\n    if not now_files:\n        warnings.append(\"The backups folder is empty.\")\n    if newest:\n        age = (datetime.now(timezone.utc) - datetime.fromisoformat(newest)).days\n        if age >= STALE_DAYS:\n            warnings.append(\"Nothing new has arrived for %d days.\" % age)\n    if missing:\n        warnings.append(\"%d file(s) that were here last time are gone.\" % len(missing))\n    if empty:\n        warnings.append(\"%d empty file(s).\" % len(empty))\n    lines = [\"# Backup report (%s)\\n\" % datetime.now().astimezone().strftime(\"%Y-%m-%d %H:%M\"),\n             \"%d files, %.1f MB.\" % (len(now_files), total / 1048576)]\n    lines.append(\"First run: everything counts as new.\" if first else \"Since the last run: %d new, %d changed, %d missing.\" % (len(new), len(changed), len(missing)))\n    lines.append(\"\\n## Needs attention\\n\" + (\"\\n\".join(\"- \" + w for w in warnings) if warnings else \"Nothing.\"))\n    for title, items in ((\"New\", new), (\"Changed\", changed), (\"Missing\", missing), (\"Empty\", empty)):\n        if items:\n            lines.append(\"\\n## \" + title + \"\\n\" + \"\\n\".join(\"- \" + p for p in items[:50]) + (\"\\n- ...\" if len(items) > 50 else \"\"))\n    manifest = {p: {\"bytes\": f[\"bytes\"]} for p, f in now_files.items()}\n    return {\"text\": \"\\n\".join(lines) + \"\\n\", \"manifest\": json.dumps(manifest)}\n"
+        }
+      },
+      {
+        "id": "save_report",
+        "type": "file.write",
+        "name": "Save the report",
+        "config": {
+          "path": "reports/backup-report.md",
+          "content_path": "$.text",
+          "append": false
+        }
+      },
+      {
+        "id": "save_manifest",
+        "type": "file.write",
+        "name": "Remember this list",
+        "config": {
+          "path": "reports/backup-manifest.json",
+          "content_path": "$.manifest",
+          "append": false
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "files_report_out",
+        "source": {
+          "node": "files",
+          "port": "out"
+        },
+        "target": {
+          "node": "report",
+          "port": "in"
+        }
+      },
+      {
+        "id": "previous_report_out",
+        "source": {
+          "node": "previous",
+          "port": "out"
+        },
+        "target": {
+          "node": "report",
+          "port": "in"
+        }
+      },
+      {
+        "id": "report_save_report_out",
+        "source": {
+          "node": "report",
+          "port": "out"
+        },
+        "target": {
+          "node": "save_report",
+          "port": "in"
+        }
+      },
+      {
+        "id": "report_save_manifest_out",
+        "source": {
+          "node": "report",
+          "port": "out"
+        },
+        "target": {
+          "node": "save_manifest",
+          "port": "in"
+        }
+      }
+    ],
+    "ui": {
+      "positions": {
+        "files": {
+          "x": 0,
+          "y": 60
+        },
+        "previous": {
+          "x": 0,
+          "y": 240
+        },
+        "report": {
+          "x": 270,
+          "y": 150
+        },
+        "save_report": {
+          "x": 540,
+          "y": 60
+        },
+        "save_manifest": {
+          "x": 540,
+          "y": 240
+        }
+      }
+    }
+  },
+  "files": {
+    "backups/README.txt": "Put your backups (or a copy of what is in your backup folder) here.\n"
+  }
+}

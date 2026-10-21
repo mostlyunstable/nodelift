@@ -526,6 +526,74 @@
         "title": "FileContent",
         "type": "object"
       },
+      "FileInfo": {
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "modified": {
+            "format": "date-time",
+            "title": "Modified",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "bytes",
+          "modified"
+        ],
+        "title": "FileInfo",
+        "type": "object"
+      },
+      "FileListing": {
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/FileInfo"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "folder": {
+            "title": "Folder",
+            "type": "string"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "folder",
+          "files"
+        ],
+        "title": "FileListing",
+        "type": "object"
+      },
+      "FileText": {
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "text"
+        ],
+        "title": "FileText",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -708,6 +776,27 @@
           "value"
         ],
         "title": "NewCredential",
+        "type": "object"
+      },
+      "NewFile": {
+        "properties": {
+          "path": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 5242880,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "text"
+        ],
+        "title": "NewFile",
         "type": "object"
       },
       "NewTrigger": {
@@ -3846,6 +3935,143 @@
         "summary": "Prepare Workspace",
         "tags": [
           "explorer"
+        ]
+      }
+    },
+    "/api/v1/files": {
+      "delete": {
+        "operationId": "delete_file_api_v1_files_delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "maxLength": 300,
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete File",
+        "tags": [
+          "files"
+        ]
+      },
+      "get": {
+        "operationId": "list_files_api_v1_files_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileListing"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Files",
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/api/v1/files/content": {
+      "get": {
+        "operationId": "read_file_api_v1_files_content_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "maxLength": 300,
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileText"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read File",
+        "tags": [
+          "files"
+        ]
+      },
+      "put": {
+        "operationId": "write_file_api_v1_files_content_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewFile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Write File",
+        "tags": [
+          "files"
         ]
       }
     },
