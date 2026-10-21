@@ -1848,111 +1848,67 @@ path.xe-dep.dir-in {
   stroke-width: 2.4;
 }
 
-/* ---------- explorer network: round nodes joined by lines ---------- */
+/* ---------- explorer tree: n8n-style boxes joined by curves ---------- */
 .xt {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  --hue: 210;
-}
-.xt .xn-dot {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  padding: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  position: relative;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text);
-  cursor: pointer;
-  background: hsl(var(--hue) 55% 45% / 0.28);
-  border: 2px solid hsl(var(--hue) 60% 58%);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-  transition:
-    box-shadow 0.12s,
-    border-color 0.12s;
-}
-.xt .xn-dot:hover {
-  box-shadow: 0 0 0 4px hsl(var(--hue) 60% 58% / 0.28);
-}
-.xt-folder .xn-dot {
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  padding: 0 12px 0 8px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 12px;
   background: var(--raised);
-  border: 2px solid var(--border-strong);
-  font-size: 13px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  font-size: 12px;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
-.xt-folder.open .xn-dot {
+.xt:hover {
   border-color: var(--accent);
 }
-.xt-folder.root .xn-dot {
-  background: var(--accent-bg);
+.xt-file.selected {
   border-color: var(--accent);
-  cursor: default;
-}
-.xt-file.selected .xn-dot {
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 45%, transparent);
-  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 .xt-file.unreadable {
-  opacity: 0.7;
+  opacity: 0.75;
 }
-.xn-warn {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: var(--warning);
-  color: #000;
-  font-size: 10px;
-  line-height: 15px;
-  text-align: center;
+.xt-folder.root {
+  border-color: var(--accent);
+  background: var(--accent-bg);
 }
-.xt .xn-label {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-top: 4px;
-  width: 112px;
-  text-align: center;
-  pointer-events: none;
+.xt .xn-badge {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
 }
-.xt .xn-open {
-  pointer-events: auto;
-  display: inline-block;
-  max-width: 100%;
+.xt-text {
+  flex: 1;
+  min-width: 0;
+}
+.xt-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
-  border-radius: 4px;
-  padding: 0 4px;
 }
-.xt .xt-meta {
-  color: var(--text-muted);
-  font-size: 10px;
-  white-space: nowrap;
-}
-.xn-port.react-flow__handle {
-  top: 50%;
-  left: 50%;
-  right: auto;
-  width: 1px;
-  height: 1px;
-  min-width: 0;
-  min-height: 0;
-  opacity: 0;
-  border: 0;
-  transform: none;
+.xt .xn-open {
+  display: block;
+  width: 100%;
+  font-size: 13px;
+  text-align: left;
 }
 .xe-tree {
   fill: none;
   stroke: var(--border-strong);
-  stroke-width: 1.4;
-  opacity: 0.7;
+  stroke-width: 2;
 }

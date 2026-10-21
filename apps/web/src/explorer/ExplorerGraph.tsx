@@ -3,12 +3,12 @@ import {
   Background,
   Controls,
   EdgeLabelRenderer,
+  getBezierPath,
   MarkerType,
   MiniMap,
   Panel,
   ReactFlow,
   ReactFlowProvider,
-  useInternalNode,
   useReactFlow,
   type EdgeProps,
   type ReactFlowInstance,
@@ -36,22 +36,21 @@ function DependencyEdge({
   sourceY,
   targetX,
   targetY,
-  target,
+  sourcePosition,
+  targetPosition,
   selected,
   data,
   markerEnd,
 }: EdgeProps<ExplorerEdge>) {
-  // Lines run between the centres of two circles, so stop at the edge of the target one, where the arrowhead can be seen.
-  const radius = (useInternalNode(target)?.measured.width ?? 28) / 2 + 3
-  const dx = targetX - sourceX
-  const dy = targetY - sourceY
-  const len = Math.max(1, Math.hypot(dx, dy))
-  const tx = targetX - (dx / len) * radius
-  const ty = targetY - (dy / len) * radius
-  const bend = Math.min(60, len * 0.15)
-  const lx = (sourceX + tx) / 2 - (dy / len) * bend
-  const ly = (sourceY + ty) / 2 + (dx / len) * bend
-  const path = `M ${sourceX} ${sourceY} Q ${lx} ${ly} ${tx} ${ty}`
+  const [path, lx, ly] = getBezierPath({
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+    curvature: 0.4,
+  })
   const kind = data?.confidence === 'heuristic' ? 'heuristic' : 'resolved'
   return (
     <>
@@ -76,9 +75,18 @@ function DependencyEdge({
   )
 }
 
-/** The thin line from a folder to what it holds. */
-function TreeEdge({ id, sourceX, sourceY, targetX, targetY }: EdgeProps<ExplorerEdge>) {
-  return <BaseEdge id={id} path={`M ${sourceX} ${sourceY} L ${targetX} ${targetY}`} className="xe-tree" />
+/** The curve from a folder to what it holds. */
+function TreeEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+}: EdgeProps<ExplorerEdge>) {
+  const [path] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition })
+  return <BaseEdge id={id} path={path} className="xe-tree" />
 }
 
 const nodeTypes = { file: FileNode, folder: FolderNode }
@@ -165,7 +173,7 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
   useEffect(() => {
     if (lastFit.current === fitKey || built.nodes.length < 2) return
     lastFit.current = fitKey
-    showRect(rf, canvas.current, boundsOf(built.nodes), { minZoom: 0.2, duration: 0 })
+    showRect(rf, canvas.current, boundsOf(built.nodes), { minZoom: 0.4, duration: 0 })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitKey, built.nodes.length])
 
@@ -175,7 +183,7 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
     const t = setTimeout(
       () =>
         showRect(rf, canvas.current, boundsUnder(built.nodes, opened.path), {
-          minZoom: 0.45,
+          minZoom: 0.5,
           margin: 40,
           duration: 250,
         }),
@@ -327,7 +335,7 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
             <details className="legend-details">
               <summary>Legend</summary>
               <div>
-                Big circles are folders, small ones are files (bigger = longer). Click a ▸ folder to open it.
+                The tree reads left to right: a folder, then what it holds. Click a folder to open it.
               </div>
               <div>
                 <svg width="28" height="8" aria-hidden="true">

@@ -40,32 +40,33 @@ const opts = (over: Partial<GraphOptions> = {}): GraphOptions => ({
 })
 
 const isDep = (e: { type?: string }) => e.type === 'dependency'
-const centre = (n: ExplorerNode) => ({
-  x: n.position.x + n.data.width / 2,
-  y: n.position.y + n.data.height / 2,
-})
-const dist = (a: ExplorerNode, b: ExplorerNode) =>
-  Math.hypot(centre(a).x - centre(b).x, centre(a).y - centre(b).y)
+const overlap = (a: ExplorerNode, b: ExplorerNode) =>
+  a.position.x < b.position.x + b.data.width &&
+  b.position.x < a.position.x + a.data.width &&
+  a.position.y < b.position.y + b.data.height &&
+  b.position.y < a.position.y + a.data.height
 
-describe('folders are hubs, files are nodes, lines join them', () => {
-  it('the root is the centre; its folders start as hubs you can open, its files are nodes', () => {
+describe('the repository is a tree read left to right', () => {
+  it('the root starts it; its folders are closed boxes you can open, its files are boxes', () => {
     const g = buildGraph(files, 'octo/hello', opts())
     const byId = new Map(g.nodes.map((n) => [n.id, n]))
     expect(byId.get(dirId(''))!.type).toBe('folder')
     expect(byId.get(dirId(''))!.data.expanded).toBe(true)
-    expect(centre(byId.get(dirId(''))!)).toEqual({ x: 0, y: 0 })
+    expect(byId.get(dirId(''))!.position.x).toBe(0)
     expect(byId.get(dirId('src'))!.data.expanded).toBe(false)
     expect(byId.get(fileId('main.py'))!.type).toBe('file')
-    // a thin line joins every node to its folder, and nothing else is drawn
     expect(g.edges.every((e) => e.type === 'tree' && e.source === dirId(''))).toBe(true)
     expect(g.edges).toHaveLength(g.nodes.length - 1)
   })
 
-  it('an open folder becomes a hub whose files hang off it', () => {
+  it('what a folder holds sits one column to its right, joined by a line', () => {
     const g = buildGraph(files, 'r', opts({ expanded: new Set(['', 'src', 'src/deep']) }))
-    const byId = new Map(g.nodes.map((n) => [n.id, n]))
-    expect(byId.get(dirId('src'))!.data.expanded).toBe(true)
-    expect(byId.get(dirId('src'))!.data.count).toBe(2)
+    const by = new Map(g.nodes.map((n) => [n.id, n]))
+    expect(by.get(dirId('src'))!.data.expanded).toBe(true)
+    expect(by.get(dirId('src'))!.data.count).toBe(2)
+    const x = (id: string) => by.get(id)!.position.x
+    expect(x(dirId('src/deep'))).toBeGreaterThan(x(dirId('src')))
+    expect(x(fileId('src/deep/x.js'))).toBeGreaterThan(x(dirId('src/deep')))
     const lines = g.edges.map((e) => `${e.source}>${e.target}`)
     expect(lines).toContain(`${dirId('src')}>${dirId('src/deep')}`)
     expect(lines).toContain(`${dirId('src/deep')}>${fileId('src/deep/x.js')}`)
@@ -129,7 +130,7 @@ describe('folders are hubs, files are nodes, lines join them', () => {
   })
 })
 
-describe('the layout is a network in rings, not a long line', () => {
+describe('the layout is tidy', () => {
   const synthetic = {
     'one flat folder of 120 files': Array.from({ length: 120 }, (_, i) => f(`a${i}.py`, 'python')),
     'eight folders of 15': Array.from({ length: 120 }, (_, i) => f(`pkg${i % 8}/m${i}.py`, 'python')),
@@ -145,36 +146,28 @@ describe('the layout is a network in rings, not a long line', () => {
     ],
   }
   for (const [name, repo] of Object.entries(synthetic)) {
-    it(`${name}: no two nodes touch, and the shape is round rather than a strip`, () => {
+    it(`${name}: no two nodes overlap and a folder sits level with what it holds`, () => {
       const g = buildGraph(repo, 'r', opts({ expanded: allDirs(repo), cap: 500 }))
       for (let i = 0; i < g.nodes.length; i++)
-        for (let j = i + 1; j < g.nodes.length; j++) {
-          const a = g.nodes[i]!
-          const b = g.nodes[j]!
-          expect(dist(a, b), `${a.id} / ${b.id}`).toBeGreaterThan((a.data.width + b.data.width) / 2 + 8)
-        }
-      const { width, height } = g.size
-      expect(width / height, `${width}x${height}`).toBeGreaterThan(0.5)
-      expect(width / height).toBeLessThan(2)
+        for (let j = i + 1; j < g.nodes.length; j++)
+          expect(overlap(g.nodes[i]!, g.nodes[j]!), `${g.nodes[i]!.id} / ${g.nodes[j]!.id}`).toBe(false)
+      const by = new Map(g.nodes.map((n) => [n.id, n]))
+      for (const e of g.edges.filter((x) => x.type === 'tree')) {
+        const parent = by.get(e.source)!
+        const kids = g.edges
+          .filter((x) => x.type === 'tree' && x.source === e.source)
+          .map((x) => by.get(x.target)!.position.y)
+        expect(parent.position.y).toBeGreaterThanOrEqual(Math.min(...kids))
+        expect(parent.position.y).toBeLessThanOrEqual(Math.max(...kids))
+      }
     })
   }
 
-  it('files sit around their folder, clear of its circle', () => {
+  it('files of one folder stack in a single column', () => {
     const repo = Array.from({ length: 20 }, (_, i) => f(`pkg/m${i}.py`, 'python'))
     const g = buildGraph(repo, 'r', opts({ expanded: new Set(['', 'pkg']) }))
-    const hub = g.nodes.find((n) => n.id === dirId('pkg'))!
-    for (const n of g.nodes.filter((x) => x.type === 'file'))
-      expect(dist(n, hub)).toBeGreaterThan(hub.data.width / 2 + 20)
-  })
-
-  it('bigger files are bigger circles', () => {
-    const g = buildGraph(
-      [f('small.py', 'python', { lines: 3 }), f('big.py', 'python', { lines: 2000 })],
-      'r',
-      opts(),
-    )
-    const w = (p: string) => g.nodes.find((n) => n.id === fileId(p))!.data.width
-    expect(w('big.py')).toBeGreaterThan(w('small.py'))
+    const xs = new Set(g.nodes.filter((n) => n.type === 'file').map((n) => n.position.x))
+    expect(xs.size).toBe(1)
   })
 })
 

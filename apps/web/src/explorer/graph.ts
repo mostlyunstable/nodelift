@@ -2,14 +2,16 @@ import type { Edge, Node } from '@xyflow/react'
 import type { RepoDiagnostic, RepoEdge, RepoFile } from '../api/client'
 import { buildTree, type TreeDir } from './tree'
 
-// ---- layout constants (px). The map is a network: round nodes joined by lines, laid out in rings around the root.
-export const FILE_W = 28 // typical node diameter, for older imports
-const GAP = 14 // clear space between neighbours
-const LEAF_R = 46 // room a file or closed folder takes up, label included
+// ---- layout constants (px). The repository is a tree read left to right: a folder, then what it holds.
+export const NODE_W = 210
+export const NODE_H = 46
+export const FILE_W = NODE_W // kept for older imports
+const COL_GAP = 90 // between a folder and what it holds
+const ROW_GAP = 12 // between neighbouring nodes in a column
 
 export const DEFAULT_CAP = 300
 /** Nodes drawn when a repository first opens: enough to orient yourself, few enough to read. */
-export const INITIAL_CAP = 45
+export const INITIAL_CAP = 60
 export const DEFAULT_DEP_CAP = 600
 const MAX_RELATIONS_PER_EDGE = 40
 
@@ -26,8 +28,8 @@ export const shouldDefaultToCodeOnly = (files: RepoFile[]): boolean =>
   files.length > 60 && files.filter(isCode).length >= 5
 
 /**
- * The repository is a network: every folder is a hub, every file a node, and a thin line joins each to its folder.
- * A collapsed folder is a hub you can open. Dependencies are the coloured curves on top.
+ * The repository is a tree read left to right: every folder and file is a node, joined to its folder by a curve.
+ * A collapsed folder is a node you can open. Dependencies are the coloured curves on top.
  */
 export type NodeKind = 'file' | 'folder'
 export interface GraphNodeData extends Record<string, unknown> {
@@ -84,7 +86,7 @@ export interface BuiltGraph {
   matchingFiles: number
   dependencyEdges: number // drawn
   hiddenDependencyEdges: number
-  size: { width: number; height: number } // of the whole network
+  size: { width: number; height: number } // of the whole tree
 }
 
 export const fileId = (path: string) => `f:${path}`
@@ -105,24 +107,9 @@ function noteFor(f: RepoFile): string | null {
 
 interface Hub {
   dir: TreeDir
-  name: string
-  open: boolean
   kids: Item[]
 }
 type Item = { kind: 'hub'; hub: Hub } | { kind: 'folder'; dir: TreeDir } | { kind: 'file'; file: RepoFile }
-
-const leaves = (it: Item): number =>
-  it.kind === 'hub'
-    ? Math.max(
-        1,
-        it.hub.kids.reduce((n, k) => n + leaves(k), 0),
-      )
-    : 1
-
-/** Node diameters: files grow slowly with their length, hubs with the number of files they hold. */
-const fileDiameter = (lines: number) => Math.round(Math.min(46, 22 + 4.5 * Math.log2(lines + 1)))
-const hubDiameter = (count: number, root: boolean) =>
-  root ? 76 : Math.round(Math.min(64, 40 + 4 * Math.log2(count + 1)))
 
 // ---- build ---------------------------------------------------------------------------------------------
 
@@ -146,12 +133,12 @@ export function buildGraph(files: RepoFile[], repoName: string, opts: GraphOptio
   // 1. which folders open, within the node budget
   let used = 0
   let hidden = 0
-  const makeHub = (dir: TreeDir, name: string): Hub => {
-    used++ // the hub itself
-    const hub: Hub = { dir, name, open: true, kids: [] }
+  const makeHub = (dir: TreeDir): Hub => {
+    used++ // the folder itself
+    const hub: Hub = { dir, kids: [] }
     for (const c of dir.children) {
       if (c.kind === 'dir') {
-        if (opts.expanded.has(c.path) && used < cap) hub.kids.push({ kind: 'hub', hub: makeHub(c, c.name) })
+        if (opts.expanded.has(c.path) && used < cap) hub.kids.push({ kind: 'hub', hub: makeHub(c) })
         else if (used < cap) {
           used++
           hub.kids.push({ kind: 'folder', dir: c })
@@ -163,119 +150,61 @@ export function buildGraph(files: RepoFile[], repoName: string, opts: GraphOptio
     }
     return hub
   }
-  const rootHub = makeHub(root, repoName)
+  const rootHub = makeHub(root)
 
-  // 2. layout: each open folder is a hub with its contents on rings around it. A folder's whole cluster is measured
-  // first (its radius), so neighbouring clusters never overlap. Ring after ring, nothing is stretched into a long line.
-  const ids = new Map<Item, string>()
-  const idOf = (it: Item): string => {
-    let id = ids.get(it)
-    if (!id) {
-      id =
-        it.kind === 'hub'
-          ? dirId(it.hub.dir.path)
-          : it.kind === 'folder'
-            ? dirId(it.dir.path)
-            : fileId(it.file.path)
-      ids.set(it, id)
-    }
-    return id
-  }
-  const hubR = (hub: Hub) => hubDiameter(hub.dir.fileCount, hub.dir.path === '') / 2
-  const clusterR = new Map<Hub, number>()
-  const ringsOf = new Map<Hub, { r: number; items: Item[] }[]>()
-  const radiusOf = (it: Item): number => (it.kind === 'hub' ? measure(it.hub) : LEAF_R)
-  const measure = (hub: Hub): number => {
-    const kids = [...hub.kids].sort((a, b) => radiusOf(b) - radiusOf(a))
-    const rings: { r: number; items: Item[]; max: number }[] = []
-    let ring: { r: number; items: Item[]; max: number } | null = null
-    let used = 0
-    for (const k of kids) {
-      const rk = radiusOf(k)
-      const arc = 2 * rk + GAP
-      if (ring && used + arc <= Math.PI * 2 * ring.r * 0.96) {
-        ring.items.push(k)
-        used += arc
-        ring.max = Math.max(ring.max, rk)
-        continue
-      }
-      const r: number = ring ? ring.r + ring.max + rk + GAP : hubR(hub) + rk + GAP + 18
-      ring = { r, items: [k], max: rk }
-      rings.push(ring)
-      used = arc
-    }
-    ringsOf.set(hub, rings)
-    const total = rings.length ? rings[rings.length - 1]!.r + rings[rings.length - 1]!.max : hubR(hub)
-    clusterR.set(hub, total)
-    return total
-  }
-  measure(rootHub)
-  const placed: { id: string; item: Item; parent: string | null; cx: number; cy: number }[] = []
-  const lay = (it: Item, cx: number, cy: number, parent: string | null) => {
-    placed.push({ id: idOf(it), item: it, parent, cx, cy })
-    if (it.kind !== 'hub') return
-    ringsOf.get(it.hub)!.forEach((ring, ri) => {
-      const total = ring.items.reduce((n, k) => n + 2 * radiusOf(k) + GAP, 0)
-      let a = ri % 2 === 0 ? -Math.PI / 2 : -Math.PI / 2 + Math.PI / ring.items.length
-      for (const k of ring.items) {
-        const width = ((2 * radiusOf(k) + GAP) / total) * Math.PI * 2
-        const mid = a + width / 2
-        lay(k, cx + Math.cos(mid) * ring.r, cy + Math.sin(mid) * ring.r, idOf(it))
-        a += width
-      }
-    })
-  }
-  lay({ kind: 'hub', hub: rootHub }, 0, 0, null)
-  const at = new Map(placed.map((p) => [p.id, { cx: p.cx, cy: p.cy }]))
-
-  // 3. nodes and the thin lines that join each to its folder
+  // 2. tidy tree: one column per depth, leaves in consecutive rows, a folder centred beside what it holds
+  const rowH = NODE_H + ROW_GAP
+  let nextRow = 0
   const nodes: ExplorerNode[] = []
   const edges: ExplorerEdge[] = []
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity // prettier-ignore
-  for (const p of placed) {
-    const pos = at.get(p.id)!
-    const it = p.item
+  const place = (it: Item, depth: number, parent: string | null): { id: string; y: number } => {
+    const id =
+      it.kind === 'file' ? fileId(it.file.path) : dirId(it.kind === 'hub' ? it.hub.dir.path : it.dir.path)
+    let y: number
+    const index = nodes.length
+    nodes.push(null as unknown as ExplorerNode) // keeps parents before children
+    if (it.kind === 'hub' && it.hub.kids.length > 0) {
+      const ys = it.hub.kids.map((k) => place(k, depth + 1, id).y)
+      y = (ys[0]! + ys[ys.length - 1]!) / 2
+    } else {
+      y = nextRow++ * rowH
+    }
     let data: GraphNodeData
     let type: NodeKind
     if (it.kind === 'file') {
       const f = it.file
-      const d = fileDiameter(f.lines)
       type = 'file'
       data = {
         kind: 'file', name: f.path.slice(f.path.lastIndexOf('/') + 1), path: f.path, count: 0, expanded: false,
         language: f.language, lines: f.lines, size: f.size, note: noteFor(f), problems: problemsByPath.get(f.path) ?? 0,
-        width: d, height: d,
+        width: NODE_W, height: NODE_H,
       } // prettier-ignore
     } else {
       const dir = it.kind === 'hub' ? it.hub.dir : it.dir
-      const isRoot = dir.path === ''
-      const d = hubDiameter(dir.fileCount, isRoot)
       type = 'folder'
       data = {
-        kind: 'folder', name: isRoot ? repoName : dir.name, path: dir.path, count: dir.fileCount,
+        kind: 'folder', name: dir.path === '' ? repoName : dir.name, path: dir.path, count: dir.fileCount,
         expanded: it.kind === 'hub', language: '', lines: 0, size: 0, note: null, problems: problemsUnder(dir.path),
-        width: d, height: d,
+        width: NODE_W, height: NODE_H,
       } // prettier-ignore
     }
-    const w = data.width
-    nodes.push({
-      id: p.id, type, position: { x: pos.cx - w / 2, y: pos.cy - w / 2 }, draggable: false, selectable: false,
-      width: w, height: w, style: { width: w, height: w }, data,
-    }) // prettier-ignore
-    minX = Math.min(minX, pos.cx - w / 2 - 50)
-    maxX = Math.max(maxX, pos.cx + w / 2 + 50)
-    minY = Math.min(minY, pos.cy - w / 2 - 20)
-    maxY = Math.max(maxY, pos.cy + w / 2 + 40)
-    if (p.parent) {
+    nodes[index] = {
+      id, type, position: { x: depth * (NODE_W + COL_GAP), y }, draggable: false, selectable: false,
+      width: NODE_W, height: NODE_H, style: { width: NODE_W, height: NODE_H }, data,
+    } // prettier-ignore
+    if (parent) {
       edges.push({
-        id: `t:${p.parent}>${p.id}`, source: p.parent, target: p.id, type: 'tree',
-        selectable: false, focusable: false,
-        data: { kind: 'tree', from: p.parent, to: p.id, relations: [], count: 0, aggregated: false, confidence: 'resolved', direction: '' },
+        id: `t:${parent}>${id}`, source: parent, target: id, type: 'tree', selectable: false, focusable: false,
+        data: { kind: 'tree', from: parent, to: id, relations: [], count: 0, aggregated: false, confidence: 'resolved', direction: '' },
       }) // prettier-ignore
     }
+    return { id, y }
   }
+  place({ kind: 'hub', hub: rootHub }, 0, null)
+  const maxX = nodes.reduce((m, n) => Math.max(m, n.position.x + NODE_W), 0)
+  const maxY = nodes.reduce((m, n) => Math.max(m, n.position.y + NODE_H), 0)
 
-  // 4. dependency lines, only as many as can be read
+  // 3. dependency lines, only as many as can be read
   const dep = buildDependencyEdges(nodes, opts)
   return {
     nodes,
@@ -285,7 +214,7 @@ export function buildGraph(files: RepoFile[], repoName: string, opts: GraphOptio
     matchingFiles: root.fileCount,
     dependencyEdges: dep.edges.length,
     hiddenDependencyEdges: dep.hidden,
-    size: { width: maxX - minX, height: maxY - minY },
+    size: { width: maxX, height: maxY },
   }
 }
 
@@ -404,22 +333,22 @@ export interface Rect {
   height: number
 }
 
-/** Where a node is, including the label that hangs under it. */
+/** Where a node is. */
 export function absoluteRect(nodes: ExplorerNode[], id: string): Rect | null {
   const n = nodes.find((x) => x.id === id)
   if (!n) return null
   return { x: n.position.x, y: n.position.y, width: n.data.width, height: n.data.height }
 }
 
-/** The box around every node, with room for labels: what "fit the whole network" frames. */
+/** The box around every node, what "fit the whole network" frames. */
 export function boundsOf(nodes: ExplorerNode[]): Rect | null {
   if (nodes.length === 0) return null
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity // prettier-ignore
   for (const n of nodes) {
-    x0 = Math.min(x0, n.position.x - 40)
-    y0 = Math.min(y0, n.position.y - 10)
-    x1 = Math.max(x1, n.position.x + n.data.width + 40)
-    y1 = Math.max(y1, n.position.y + n.data.height + 36)
+    x0 = Math.min(x0, n.position.x - 20)
+    y0 = Math.min(y0, n.position.y - 20)
+    x1 = Math.max(x1, n.position.x + n.data.width + 20)
+    y1 = Math.max(y1, n.position.y + n.data.height + 20)
   }
   return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 }
 }
