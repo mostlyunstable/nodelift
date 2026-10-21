@@ -14,6 +14,8 @@ from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 HEALTH_PATH = "/api/v1/health"
+# A webhook is authenticated by the secret in its own URL, so scripts need no app token.
+HOOK_PREFIX = "/api/v1/hooks/"
 
 
 def hostname(host_header: str) -> str:
@@ -64,7 +66,10 @@ class SecurityMiddleware:
         origin = headers.get(b"origin")
         if origin is not None and _normalize_origin(origin.decode("latin-1")) not in self.origins:
             return self._reject(403, "forbidden_origin", "Origin not allowed")
-        if self.token is not None and scope["path"] != HEALTH_PATH:
+        public = scope["path"] == HEALTH_PATH or (
+            scope["method"] == "POST" and scope["path"].startswith(HOOK_PREFIX)
+        )
+        if self.token is not None and not public:
             supplied = headers.get(b"authorization", b"")
             scheme, _, value = supplied.partition(b" ")
             ok = scheme.lower() == b"bearer" and hmac.compare_digest(value.strip(), self.token)

@@ -1,3 +1,4 @@
+import { GitHubAccess } from './GitHubAccess'
 import { useEffect } from 'react'
 import { useExplorer } from '../state/explorer'
 import { ExplorerGraph } from './ExplorerGraph'
@@ -78,10 +79,10 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
             {e.starting ? 'Checking…' : 'Show Nodes'}
           </button>
           <p className="muted small">
-            Paste a link and the nodes are made. Public repositories only; nothing from the repository is ever
-            run.
+            Paste a link and the nodes are made. Nothing from the repository is ever run.
           </p>
         </form>
+        <GitHubAccess />
 
         {e.error && (
           <div className="explorer-error" role="alert">
@@ -268,8 +269,9 @@ export function ExplorerView({ theme }: { theme: 'dark' | 'light' }) {
               <div className="explorer-welcome">
                 <h2>See a codebase as nodes</h2>
                 <p className="muted">
-                  Paste the link of a public GitHub repository. Every file becomes a node, and the imports,
-                  links and calls between them become lines. Nothing from the repository is run.
+                  Paste the link of a GitHub repository (private ones need a token). Every file becomes a
+                  node, and the imports, links and calls between them become lines. Nothing from the
+                  repository is run.
                 </p>
                 <div className="boot-actions">
                   <span className="muted small">Or try one:</span>

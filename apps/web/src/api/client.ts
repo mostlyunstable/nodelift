@@ -51,6 +51,8 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
 }
 
 type Schemas = components['schemas']
+export type Trigger = Schemas['TriggerRecord']
+export type TriggerCreated = Schemas['TriggerCreated']
 export type RepoRevision = Schemas['RepoRevisionRecord']
 export type RepoFile = Schemas['RepoFileRecord']
 export type RepoFileContent = Schemas['FileContent']
@@ -181,5 +183,13 @@ export const api = {
     request<Credential>('POST', '/credentials', c),
   rotateCredential: (name: string, value: string) =>
     request<Credential>('PUT', `/credentials/${encodeURIComponent(name)}`, { value }),
+  listTriggers: (workflowId: string) => request<Trigger[]>('GET', `/workflows/${workflowId}/triggers`),
+  addTrigger: (
+    workflowId: string,
+    body: { kind: 'schedule' | 'webhook'; every_minutes?: number; daily_at?: string },
+  ) => request<TriggerCreated>('POST', `/workflows/${workflowId}/triggers`, body),
+  setTriggerEnabled: (id: string, enabled: boolean) =>
+    request<Trigger>('PUT', `/triggers/${id}`, { enabled }),
+  deleteTrigger: (id: string) => request<null>('DELETE', `/triggers/${id}`),
   deleteCredential: (name: string) => request<null>('DELETE', `/credentials/${encodeURIComponent(name)}`),
 }

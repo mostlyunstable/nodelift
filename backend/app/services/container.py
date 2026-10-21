@@ -10,12 +10,14 @@ from app.domain.nodes import NodeRegistry
 from app.domain.repositories import CredentialRepository
 from app.services.command_service import CommandRuns
 from app.services.explorer_service import ExplorerService
+from app.services.triggers import TriggerService
 from app.services.workflow_service import WorkflowService
 from app.storage.db import current_revision, head_revision
 from app.storage.repositories import (
     SqlCredentialRepository,
     SqlRepoRepository,
     SqlRunRepository,
+    SqlTriggerRepository,
     SqlWorkflowRepository,
 )
 
@@ -40,6 +42,7 @@ def explorer_service(state: Any) -> ExplorerService:
         state.settings,
         state.import_jobs,
         getattr(state, "github_transport", None),
+        state.secrets,
     )
 
 
@@ -55,3 +58,9 @@ def credential_repository(state: Any) -> CredentialRepository:
 def schema_status(database_url: str) -> tuple[str | None, str]:
     """(revision the database is at, latest revision this version of Nodecraft knows)."""
     return current_revision(database_url), head_revision()
+
+
+def trigger_service(state: Any) -> TriggerService:
+    return TriggerService(
+        SqlTriggerRepository(state.session_factory), workflow_service(state, state.registry)
+    )

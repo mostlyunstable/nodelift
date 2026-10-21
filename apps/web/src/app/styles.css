@@ -1036,50 +1036,6 @@ code {
 .graph-viewer {
   border-left: 1px solid var(--border);
 }
-.xn {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 7px 10px;
-  width: 210px;
-  font-size: 12px;
-  color: var(--text);
-}
-.xn:hover {
-  border-color: var(--border-strong);
-}
-.xn-file.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-.xn-file.unreadable {
-  opacity: 0.7;
-}
-.xn-dir {
-  background: var(--raised);
-  padding: 6px 10px;
-}
-.xn-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.xn-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-}
-.xn-meta {
-  color: var(--text-muted);
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 .xn-badge {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -1088,43 +1044,9 @@ code {
   background: var(--neutral-bg);
   color: var(--text-muted);
 }
-.xn-count {
-  color: var(--text-muted);
-  font-size: 11px;
-}
-.xn-toggle {
-  border: 0;
-  background: transparent;
-  padding: 0 4px;
-  min-width: 20px;
-}
-.xn .react-flow__handle {
-  width: 6px;
-  height: 6px;
-  min-width: 0;
-  min-height: 0;
-  background: var(--border-strong);
-  border: 0;
-}
 .xe path,
 path.xe {
   fill: none;
-}
-.xe-contains,
-.xe-contains.react-flow__edge-path {
-  stroke: var(--border-strong);
-  stroke-width: 1.25;
-  stroke-dasharray: 5 4;
-}
-.xe-contains.selected {
-  stroke: var(--accent);
-  stroke-width: 2;
-}
-.graph-tools {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-width: 360px;
 }
 .graph-tools input {
   width: 240px;
@@ -1209,12 +1131,6 @@ path.xe-dep.xe-heuristic {
   padding: 0 6px;
   font-size: 10px;
   pointer-events: none;
-}
-.legend-toggle {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 2px;
 }
 .edge-detail ul {
   margin: 4px 0 0;
@@ -1911,4 +1827,25 @@ path.xe-dep.dir-in {
   fill: none;
   stroke: var(--border-strong);
   stroke-width: 2;
+}
+
+.github-access {
+  margin: 8px 0 12px;
+}
+.github-token-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.fatal {
+  max-width: 560px;
+  margin: 12vh auto;
+  padding: 0 24px;
+}
+.fatal .row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }

@@ -2,6 +2,8 @@
 
 import re
 import threading
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -32,13 +34,21 @@ class ResolvedRepo:
 
 class GitHubClient:
     def __init__(
-        self, transport: httpx.AsyncBaseTransport | None = None, timeout: float = 20.0
+        self,
+        transport: httpx.AsyncBaseTransport | None = None,
+        timeout: float = 20.0,
+        token: str | None = None,
     ) -> None:
+        self.authenticated = bool(token)
+        # The token only ever goes to the two fixed GitHub hosts: `_send` refuses any other address.
+        headers = {"User-Agent": USER_AGENT}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
         self._client = httpx.AsyncClient(
             transport=transport,
             timeout=httpx.Timeout(timeout, read=60.0),
             follow_redirects=False,
-            headers={"User-Agent": USER_AGENT},
+            headers=headers,
         )
 
     async def aclose(self) -> None:
@@ -71,25 +81,42 @@ class GitHubClient:
             return resp
         raise AppError(502, "too_many_redirects", "GitHub redirected too many times")
 
-    @staticmethod
-    def _fail(resp: httpx.Response, what: str) -> AppError:
+    def _fail(self, resp: httpx.Response, what: str) -> AppError:
         s = resp.status_code
         if s in (403, 429) and (resp.headers.get("x-ratelimit-remaining") == "0" or s == 429):
             reset = resp.headers.get("x-ratelimit-reset")
+            when = ""
+            if reset and reset.isdigit():
+                minutes = max(1, (int(reset) - int(time.time()) + 59) // 60)
+                when = f" It resets in about {minutes} minute{'s' if minutes != 1 else ''}."
+            hint = (
+                "Your GitHub token's hourly limit was reached."
+                if self.authenticated
+                else "GitHub allows 60 anonymous requests an hour and they are used up. "
+                "Add a free GitHub token (GitHub access, in the Explorer) to raise that to 5,000."
+            )
             return AppError(
-                429,
-                "rate_limited",
-                "GitHub's anonymous rate limit was reached. Try again later.",
-                [{"reset_epoch": reset}] if reset else [],
+                429, "rate_limited", hint + when, [{"reset_epoch": reset}] if reset else []
             )
         if s == 404:
             return AppError(
                 404,
                 "repo_not_found",
-                f"{what} was not found. It may not exist, or it may be private "
-                "(private repositories are not supported yet).",
+                f"{what} was not found. It may not exist, or it may be private"
+                + (
+                    " and your GitHub token cannot see it."
+                    if self.authenticated
+                    else ". For a private repository add a GitHub token with access to it "
+                    "(GitHub access, in the Explorer)."
+                ),
             )
-        if s in (401, 403):
+        if s == 401:
+            return AppError(
+                401,
+                "bad_token",
+                "GitHub rejected the saved token. Replace it under GitHub access in the Explorer.",
+            )
+        if s == 403:
             return AppError(403, "repo_forbidden", f"GitHub denied access to {what}.")
         return AppError(502, "github_error", f"GitHub returned an unexpected status ({s}).")
 
@@ -133,6 +160,7 @@ class GitHubClient:
         dest: Path,
         max_bytes: int,
         cancel: threading.Event | None = None,
+        on_progress: Callable[[int], None] | None = None,
     ) -> int:
         if not _SHA.match(sha):
             raise ValueError("commit sha required")
@@ -142,6 +170,7 @@ class GitHubClient:
             if resp.status_code != 200:
                 raise self._fail(resp, f"{owner}/{repo}")
             written = 0
+            reported = 0
             try:
                 with dest.open("wb") as fh:
                     async for chunk in resp.aiter_bytes(64 * 1024):
@@ -152,9 +181,13 @@ class GitHubClient:
                             raise AppError(
                                 413,
                                 "repo_too_large",
-                                "The repository download is too large to import",
+                                f"This repository is larger than the {max_bytes // 1048576} MB "
+                                "download limit, so it cannot be imported.",
                             )
                         fh.write(chunk)
+                        if on_progress is not None and written - reported >= 512 * 1024:
+                            reported = written
+                            on_progress(written)
             except httpx.HTTPError as e:
                 raise AppError(502, "github_unreachable", "The download was interrupted") from e
             return written

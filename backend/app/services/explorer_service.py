@@ -32,6 +32,7 @@ from app.domain.records import (
     WorkspaceRecord,
 )
 from app.domain.repositories import RepoRepository
+from app.domain.secrets import SecretStore, SecretsUnavailable
 from app.explorer.analysis.runner import analyze_files
 from app.explorer.archive import (
     Cancelled,
@@ -68,6 +69,9 @@ class ImportJobs:
             await asyncio.wait(list(self.tasks.values()), timeout=5)
 
 
+GITHUB_CREDENTIAL = "github"
+
+
 class FileContent(BaseModel):
     path: str
     language: str
@@ -85,7 +89,9 @@ class ExplorerService:
         settings: Settings,
         jobs: ImportJobs,
         transport: httpx.AsyncBaseTransport | None = None,
+        secrets: SecretStore | None = None,
     ) -> None:
+        self.secrets = secrets
         self.repo = repo
         self.jobs = jobs
         self.transport = transport
@@ -98,6 +104,16 @@ class ExplorerService:
         self.max_download = settings.explorer_max_download_mb * 1024 * 1024
         self.analysis_seconds = settings.explorer_analysis_seconds
         self.max_graph_edges = settings.explorer_max_graph_edges
+
+    def _github(self) -> GitHubClient:
+        """A GitHub client carrying the saved token, if there is one (private repositories, 5,000 requests an hour)."""
+        token: str | None = None
+        if self.secrets is not None:
+            try:
+                token = self.secrets.get(GITHUB_CREDENTIAL)
+            except SecretsUnavailable:
+                token = None
+        return GitHubClient(self.transport, token=token)
 
     # -- paths ------------------------------------------------------------------------------
     def _dir(self, revision_id: str) -> Path:
@@ -117,7 +133,7 @@ class ExplorerService:
             ref = parse_github_url(url)
         except InvalidRepoUrl as e:
             raise AppError(422, "invalid_repo_url", str(e)) from e
-        async with GitHubClient(self.transport) as gh:
+        async with self._github() as gh:
             resolved = await gh.resolve(ref)
         owner, name = ref.owner.lower(), ref.repo.lower()
         existing = self.repo.find_revision(owner, name, resolved.commit_sha)
@@ -155,9 +171,15 @@ class ExplorerService:
             async with self.jobs.sem:
                 self.repo.update_revision(rid, phase="Downloading from GitHub")
                 archive.parent.mkdir(parents=True, exist_ok=True)
-                async with GitHubClient(self.transport) as gh:
+                async with self._github() as gh:
                     size = await gh.download_tarball(
-                        rev.owner, rev.repo, rev.commit_sha, archive, self.max_download, cancel
+                        rev.owner,
+                        rev.repo,
+                        rev.commit_sha,
+                        archive,
+                        self.max_download,
+                        cancel,
+                        lambda n: self._downloading(rid, n),
                     )
                 self.repo.update_revision(
                     rid, phase="Extracting and indexing files", total_bytes=size
@@ -190,6 +212,13 @@ class ExplorerService:
         finally:
             with contextlib.suppress(OSError):
                 archive.unlink()
+
+    def _downloading(self, rid: str, n: int) -> None:
+        self.repo.update_revision(
+            rid,
+            phase=f"Downloading from GitHub: {n / 1048576:.1f} MB "
+            f"(limit {self.max_download // 1048576} MB)",
+        )
 
     def _progress(self, rid: str, n: int) -> None:
         self.repo.update_revision(rid, file_count=n)
@@ -360,7 +389,7 @@ class ExplorerService:
             async with self.jobs.sem:
                 base.mkdir(parents=True, exist_ok=True)
                 shutil.rmtree(dest, ignore_errors=True)
-                async with GitHubClient(self.transport) as gh:
+                async with self._github() as gh:
                     await gh.download_tarball(
                         rev.owner, rev.repo, rev.commit_sha, archive, self.max_download, cancel
                     )

@@ -101,8 +101,12 @@ def test_token_required_on_every_route_except_health(tmp_path: Path) -> None:
                 continue
             for method in ops:
                 url = path
-                for name in ("workflow_id", "run_id", "version_no"):
+                for name in ("workflow_id", "run_id", "version_no", "trigger_id", "token"):
                     url = url.replace("{" + name + "}", "1")
+                if path.startswith("/api/v1/hooks/"):
+                    # a webhook is authenticated by the secret in its own URL, not by the app token
+                    assert c.request(method.upper(), url).status_code == 404
+                    continue
                 r = c.request(method.upper(), url)
                 assert r.status_code == 401, (method, path, r.status_code)
                 assert r.headers["www-authenticate"] == "Bearer"

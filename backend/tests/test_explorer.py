@@ -370,3 +370,53 @@ def test_reanalysis_replaces_old_results(api: TestClient) -> None:
     wait_analysis(api, rev["id"])
     after = api.get(f"/api/v1/explorer/revisions/{rev['id']}/graph").json()["edges"]
     assert before == after  # idempotent, not duplicated
+
+
+# ---- GitHub token --------------------------------------------------------------------------
+def save_token(c: TestClient, value: str = "ghp_exampletoken123456") -> None:
+    r = c.post("/api/v1/credentials", json={"name": "github", "value": value, "kind": "github"})
+    assert r.status_code == 201, r.text
+
+
+def test_saved_token_is_sent_to_github_only(api: TestClient, gh: FakeGitHub) -> None:
+    save_token(api)
+    rev = api.post("/api/v1/explorer/imports", json={"url": "github.com/octo/hello"}).json()
+    wait_ready(api, rev["id"])
+    assert gh.requests
+    for req in gh.requests:
+        assert req.url.host in {"api.github.com", "codeload.github.com"}
+        assert req.headers["authorization"] == "Bearer ghp_exampletoken123456"
+
+
+def test_without_a_token_nothing_is_sent_and_errors_say_what_to_do(
+    api: TestClient, gh: FakeGitHub
+) -> None:
+    gh.repo_status = 404
+    nf = api.post("/api/v1/explorer/imports", json={"url": "github.com/octo/hello"}).json()["error"]
+    assert "GitHub access" in nf["message"] and "private" in nf["message"]
+    assert all("authorization" not in r.headers for r in gh.requests)
+    gh.rate_limited = True
+    rl = api.post("/api/v1/explorer/imports", json={"url": "github.com/octo/hello"}).json()["error"]
+    assert (
+        "60 anonymous" in rl["message"]
+        and "5,000" in rl["message"]
+        and "resets in" in rl["message"]
+    )
+
+
+def test_with_a_token_the_messages_change(api: TestClient, gh: FakeGitHub) -> None:
+    save_token(api)
+    gh.repo_status = 404
+    nf = api.post("/api/v1/explorer/imports", json={"url": "github.com/octo/hello"}).json()["error"]
+    assert "your GitHub token cannot see it" in nf["message"]
+    gh.repo_status = 200
+    gh.rate_limited = True
+    rl = api.post("/api/v1/explorer/imports", json={"url": "github.com/octo/hello"}).json()["error"]
+    assert "token's hourly limit" in rl["message"]
+
+
+def test_too_large_message_states_the_limit(api: TestClient, gh: FakeGitHub) -> None:
+    api.app.state.settings.explorer_max_download_mb = 0
+    rev = api.post("/api/v1/explorer/imports", json={"url": "github.com/octo/hello"}).json()
+    failed = wait_ready(api, rev["id"], "failed")
+    assert "0 MB" in failed["error_message"] and "limit" in failed["error_message"]

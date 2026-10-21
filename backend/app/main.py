@@ -6,14 +6,26 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import install_error_handlers
 from app.api.security import SecurityMiddleware
-from app.api.v1 import credentials, explorer, health, nodes, portability, stored, system, workflows
+from app.api.v1 import (
+    credentials,
+    explorer,
+    health,
+    nodes,
+    portability,
+    stored,
+    system,
+    triggers,
+    workflows,
+)
 from app.config import Settings, get_settings
 from app.nodes import default_registry, load_plugins
 from app.runtime.subprocess_runner import SubprocessRunner
 from app.services.command_service import CommandRuns
+from app.services.container import trigger_service
 from app.services.explorer_service import ImportJobs
 from app.services.gate import ExecutionGate
 from app.services.run_hub import RunHub
+from app.services.triggers import Scheduler
 from app.storage.db import make_engine, make_session_factory, upgrade_with_backup
 from app.storage.repositories import SqlRepoRepository, SqlRunRepository
 from app.storage.secret_stores import make_secret_store
@@ -52,7 +64,10 @@ def create_app(database_url: str | None = None, settings: Settings | None = None
         app.state.import_jobs = ImportJobs()
         app.state.command_runs = CommandRuns(settings.sandbox)
         SqlRepoRepository(app.state.session_factory).fail_stale_imports()
+        scheduler = Scheduler(lambda: trigger_service(app.state))
+        scheduler.start()
         yield
+        await scheduler.stop()
         await app.state.import_jobs.shutdown()
         await app.state.command_runs.shutdown()
         for task in list(app.state.run_hub.tasks):
@@ -85,6 +100,7 @@ def create_app(database_url: str | None = None, settings: Settings | None = None
     app.include_router(system.router, prefix="/api/v1")
     app.include_router(credentials.router, prefix="/api/v1")
     app.include_router(explorer.router, prefix="/api/v1")
+    app.include_router(triggers.router, prefix="/api/v1")
     return app
 
 

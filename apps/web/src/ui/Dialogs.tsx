@@ -4,6 +4,7 @@ import { diffWorkflows, isEmptyDiff } from '../canvas/diff'
 import { toWorkflow } from '../canvas/mapper'
 import { useStore } from '../state/store'
 import type { SystemInfo } from '../types/workflow'
+import { recordedErrors, saveTextFile } from '../utils/errorLog'
 import { formatTime } from '../utils/format'
 import { Dialog } from './Dialog'
 
@@ -107,6 +108,7 @@ export function DiagnosticsDialog() {
       ? `code sandbox: ${info.sandbox.active ? `on (${info.sandbox.kind})` : 'off'} · memory limit: ${info.sandbox.memory_limit}`
       : '',
     error ? `error: ${error}` : '',
+    ...recordedErrors(),
     '',
     ...logs,
   ].join('\n')
@@ -137,7 +139,10 @@ export function DiagnosticsDialog() {
       )}
       <h3>Recent log</h3>
       <pre className="boot-log">{logs.length ? logs.join('\n') : 'No log lines to show.'}</pre>
-      <button onClick={() => void navigator.clipboard?.writeText(report)}>Copy diagnostics</button>
+      <div className="row">
+        <button onClick={() => void navigator.clipboard?.writeText(report)}>Copy diagnostics</button>
+        <button onClick={() => saveTextFile('nodecraft-diagnostics.txt', report)}>Save as a file</button>
+      </div>
       <p className="muted">Logs never contain your API token or workflow data.</p>
     </Dialog>
   )

@@ -55,12 +55,12 @@ test.describe('with GitHub', () => {
     await page.getByRole('tab', { name: 'Run' }).click()
     await page.getByRole('button', { name: 'Prepare workspace' }).click()
     await expect(page.getByText(/Ready: a full copy of this commit/)).toBeVisible({ timeout: 60_000 })
-    await page.getByLabel('Custom command').fill('python3 -c "print(6*7)"')
+    await page.getByLabel('Custom command').fill('echo 42')
     await page
       .getByRole('button', { name: /Review and run/ })
       .last()
       .click()
-    await expect(page.getByLabel('Command to run')).toContainText('print(6*7)')
+    await expect(page.getByLabel('Command to run')).toContainText('echo 42')
     await page.getByRole('button', { name: 'Cancel' }).click() // reviewing is not running
     await expect(page.getByLabel('Command output')).toHaveCount(0)
     await page

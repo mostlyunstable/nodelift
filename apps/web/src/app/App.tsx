@@ -18,6 +18,7 @@ import {
   VersionsDialog,
 } from '../ui/Dialogs'
 import { Menu, type MenuItem } from '../ui/Menu'
+import { TriggersDialog } from '../ui/TriggersDialog'
 import { EmptyCanvas, LonelyNodesNotice, RunAnnouncer, Toast, TourBanner } from '../ui/Overlays'
 import { buildCommands, type CommandContext } from './commands'
 import { matchShortcut } from './shortcuts'
@@ -31,6 +32,41 @@ function FitOnTidy() {
   useEffect(() => {
     if (nonce > 0) void rf.fitView({ duration: 300, padding: 0.2, maxZoom: 1 })
   }, [nonce, rf])
+  return null
+}
+
+/**
+ * Keeps the whole workflow in view when the canvas changes size (an inspector opens, the window is resized), until the
+ * person pans or zooms themselves; after that their view is left alone.
+ */
+function FitOnResize() {
+  const rf = useReactFlow()
+  const store = useStore
+  useEffect(() => {
+    const el = document.querySelector<HTMLElement>('.canvas')
+    if (!el) return
+    let moved = false
+    const mark = () => {
+      moved = true
+    }
+    el.addEventListener('wheel', mark, { passive: true })
+    el.addEventListener('pointerdown', mark)
+    let timer = 0
+    const ro = new ResizeObserver(() => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        if (!moved && store.getState().nodes.length > 0)
+          void rf.fitView({ duration: 0, padding: 0.2, maxZoom: 1 })
+      }, 120)
+    })
+    ro.observe(el)
+    return () => {
+      window.clearTimeout(timer)
+      ro.disconnect()
+      el.removeEventListener('wheel', mark)
+      el.removeEventListener('pointerdown', mark)
+    }
+  }, [rf, store])
   return null
 }
 
@@ -153,6 +189,7 @@ export function App() {
       exportAll: () => void s.exportAll(),
       importFile: () => setImportRequests((n) => n + 1),
       credentials: () => s.openDialog('credentials'),
+      triggers: () => s.openDialog('triggers'),
       diagnostics: () => s.openDialog('diagnostics'),
       shortcuts: () => s.openDialog('shortcuts'),
       theme: s.setTheme,
@@ -209,6 +246,7 @@ export function App() {
     },
     { label: 'Import a workflow…', onSelect: () => setImportRequests((n) => n + 1) },
     { label: 'Export everything…', onSelect: () => void s.exportAll() },
+    { label: 'Triggers…', onSelect: () => s.openDialog('triggers'), disabled: !s.workflowId },
     { label: 'Credentials…', onSelect: () => s.openDialog('credentials'), separatorBefore: true },
     { label: 'Diagnostics…', onSelect: () => s.openDialog('diagnostics') },
     { label: 'Keyboard shortcuts…', onSelect: () => s.openDialog('shortcuts') },
@@ -346,6 +384,7 @@ export function App() {
                 >
                   <Background />
                   <FitOnTidy />
+                  <FitOnResize />
                   <Controls />
                   {s.nodes.length > 12 && <MiniMap pannable zoomable />}
                 </ReactFlow>
@@ -374,6 +413,7 @@ export function App() {
       {s.dialog === 'versions' && <VersionsDialog />}
       {s.dialog === 'diagnostics' && <DiagnosticsDialog />}
       {s.dialog === 'credentials' && <CredentialsDialog />}
+      {s.dialog === 'triggers' && <TriggersDialog />}
       {s.dialog === 'import' && <ImportDialog />}
       {s.dialog === 'shortcuts' && <ShortcutsDialog />}
     </div>

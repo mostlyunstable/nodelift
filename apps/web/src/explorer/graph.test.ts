@@ -130,7 +130,7 @@ describe('the repository is a tree read left to right', () => {
   })
 })
 
-describe('the layout is tidy', () => {
+describe('the layout is a landscape, tidy and compact', () => {
   const synthetic = {
     'one flat folder of 120 files': Array.from({ length: 120 }, (_, i) => f(`a${i}.py`, 'python')),
     'eight folders of 15': Array.from({ length: 120 }, (_, i) => f(`pkg${i % 8}/m${i}.py`, 'python')),
@@ -151,23 +151,26 @@ describe('the layout is tidy', () => {
       for (let i = 0; i < g.nodes.length; i++)
         for (let j = i + 1; j < g.nodes.length; j++)
           expect(overlap(g.nodes[i]!, g.nodes[j]!), `${g.nodes[i]!.id} / ${g.nodes[j]!.id}`).toBe(false)
-      const by = new Map(g.nodes.map((n) => [n.id, n]))
-      for (const e of g.edges.filter((x) => x.type === 'tree')) {
-        const parent = by.get(e.source)!
-        const kids = g.edges
-          .filter((x) => x.type === 'tree' && x.source === e.source)
-          .map((x) => by.get(x.target)!.position.y)
-        expect(parent.position.y).toBeGreaterThanOrEqual(Math.min(...kids))
-        expect(parent.position.y).toBeLessThanOrEqual(Math.max(...kids))
-      }
+      const { width, height } = g.size
+      expect(width / height, `${width}x${height}`).toBeGreaterThan(1)
+      expect(width / height).toBeLessThan(4)
     })
   }
 
-  it('files of one folder stack in a single column', () => {
-    const repo = Array.from({ length: 20 }, (_, i) => f(`pkg/m${i}.py`, 'python'))
-    const g = buildGraph(repo, 'r', opts({ expanded: new Set(['', 'pkg']) }))
+  it('a folder of 60 files is a grid, wider than tall, not 60 stacked rows', () => {
+    const repo = Array.from({ length: 60 }, (_, i) => f(`pkg/m${i}.py`, 'python'))
+    const g = buildGraph(repo, 'r', opts({ expanded: new Set(['', 'pkg']), cap: 500 }))
     const xs = new Set(g.nodes.filter((n) => n.type === 'file').map((n) => n.position.x))
-    expect(xs.size).toBe(1)
+    expect(xs.size).toBeGreaterThanOrEqual(4)
+    expect(g.size.width).toBeGreaterThan(g.size.height)
+  })
+
+  it('every node sits right of the folder that holds it', () => {
+    const repo = Array.from({ length: 30 }, (_, i) => f(`a/b/f${i}.py`, 'python'))
+    const g = buildGraph(repo, 'r', opts({ expanded: allDirs(repo), cap: 500 }))
+    const by = new Map(g.nodes.map((n) => [n.id, n]))
+    for (const e of g.edges.filter((x) => x.type === 'tree'))
+      expect(by.get(e.target)!.position.x).toBeGreaterThan(by.get(e.source)!.position.x)
   })
 })
 

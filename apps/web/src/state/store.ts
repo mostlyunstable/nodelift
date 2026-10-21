@@ -111,7 +111,8 @@ let editSeq = 0 // bumped on every edit; a save only clears "dirty" if nothing c
 let generation = 0 // bumped when a different workflow is opened/reset; stale saves must not apply
 let inFlight: Promise<string | null> | null = null
 
-export type DialogName = 'palette' | 'versions' | 'diagnostics' | 'import' | 'shortcuts' | 'credentials'
+export type DialogName =
+  'palette' | 'versions' | 'diagnostics' | 'import' | 'shortcuts' | 'credentials' | 'triggers'
 export type ThemeChoice = 'dark' | 'light' | 'system'
 export type Tour = 'run' | 'fix' | 'done' | null
 

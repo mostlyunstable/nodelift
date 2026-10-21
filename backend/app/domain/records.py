@@ -238,3 +238,18 @@ class WorkflowDraftRecord(BaseModel):
     copied: list[dict[str, object]]
     warnings: list[str]
     params: list[str]
+
+
+class TriggerRecord(BaseModel):
+    """Something that starts a workflow by itself. The webhook token is never part of this."""
+
+    id: str
+    workflow_id: str
+    kind: str  # "schedule" | "webhook"
+    every_minutes: int | None = None  # schedule: every N minutes ...
+    daily_at: str | None = None  # ... or once a day at HH:MM (this computer's local time)
+    enabled: bool = True
+    last_run_at: datetime | None = None
+    last_run_id: str | None = None
+    next_run_at: datetime | None = None
+    created_at: datetime

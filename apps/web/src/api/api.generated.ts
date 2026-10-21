@@ -471,6 +471,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hooks/{trigger_id}/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fire Webhook
+         * @description Starts the workflow; a JSON body becomes the run input. The URL itself is the credential.
+         */
+        post: operations["fire_webhook_api_v1_hooks__trigger_id___token__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nodes/code/test": {
         parameters: {
             query?: never;
@@ -698,6 +718,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/triggers/{trigger_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Enabled */
+        put: operations["set_enabled_api_v1_triggers__trigger_id__put"];
+        post?: never;
+        /** Delete Trigger */
+        delete: operations["delete_trigger_api_v1_triggers__trigger_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workflows": {
         parameters: {
             query?: never;
@@ -821,6 +859,24 @@ export interface paths {
         put?: never;
         /** Start Run */
         post: operations["start_run_api_v1_workflows__workflow_id__runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/{workflow_id}/triggers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Triggers */
+        get: operations["list_triggers_api_v1_workflows__workflow_id__triggers_get"];
+        put?: never;
+        /** Add Trigger */
+        post: operations["add_trigger_api_v1_workflows__workflow_id__triggers_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1023,6 +1079,11 @@ export interface components {
             /** Symbol */
             symbol: string;
         };
+        /** Enable */
+        Enable: {
+            /** Enabled */
+            enabled: boolean;
+        };
         /** Endpoint */
         Endpoint: {
             /** Node */
@@ -1158,6 +1219,15 @@ export interface components {
             name: string;
             /** Value */
             value: string;
+        };
+        /** NewTrigger */
+        NewTrigger: {
+            /** Daily At */
+            daily_at?: string | null;
+            /** Every Minutes */
+            every_minutes?: number | null;
+            /** Kind */
+            kind: string;
         };
         /**
          * NodeDefinition
@@ -1631,6 +1701,44 @@ export interface components {
             label: string;
             /** Notes */
             notes: string[];
+        };
+        /** TriggerCreated */
+        TriggerCreated: {
+            trigger: components["schemas"]["TriggerRecord"];
+            /** Webhook Path */
+            webhook_path?: string | null;
+        };
+        /**
+         * TriggerRecord
+         * @description Something that starts a workflow by itself. The webhook token is never part of this.
+         */
+        TriggerRecord: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Daily At */
+            daily_at?: string | null;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Every Minutes */
+            every_minutes?: number | null;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Last Run At */
+            last_run_at?: string | null;
+            /** Last Run Id */
+            last_run_id?: string | null;
+            /** Next Run At */
+            next_run_at?: string | null;
+            /** Workflow Id */
+            workflow_id: string;
         };
         /** UpdateWorkflow */
         UpdateWorkflow: {
@@ -2861,6 +2969,40 @@ export interface operations {
             };
         };
     };
+    fire_webhook_api_v1_hooks__trigger_id___token__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: string;
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     test_code_api_v1_nodes_code_test_post: {
         parameters: {
             query?: never;
@@ -3212,6 +3354,70 @@ export interface operations {
             };
         };
     };
+    set_enabled_api_v1_triggers__trigger_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Enable"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_trigger_api_v1_triggers__trigger_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_workflows_api_v1_workflows_get: {
         parameters: {
             query?: never;
@@ -3545,6 +3751,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_triggers_api_v1_workflows__workflow_id__triggers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerRecord"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_trigger_api_v1_workflows__workflow_id__triggers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewTrigger"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerCreated"];
                 };
             };
             /** @description Validation Error */

@@ -8,7 +8,9 @@ import {
   MiniMap,
   Panel,
   ReactFlow,
+  Position,
   ReactFlowProvider,
+  useInternalNode,
   useReactFlow,
   type EdgeProps,
   type ReactFlowInstance,
@@ -30,26 +32,54 @@ import {
 } from './graph'
 import { searchFiles } from './tree'
 
-function DependencyEdge({
-  id,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
-  selected,
-  data,
-  markerEnd,
-}: EdgeProps<ExplorerEdge>) {
+/** Where a line leaves a box and enters another: the facing sides, so a line never cuts back across its own box. */
+function anchors(
+  a: { x: number; y: number; w: number; h: number },
+  b: { x: number; y: number; w: number; h: number },
+) {
+  const ax = a.x + a.w / 2
+  const ay = a.y + a.h / 2
+  const bx = b.x + b.w / 2
+  const by = b.y + b.h / 2
+  const dx = bx - ax
+  const dy = by - ay
+  if (Math.abs(dx) * a.h >= Math.abs(dy) * a.w) {
+    const right = dx >= 0
+    return {
+      s: { x: right ? a.x + a.w : a.x, y: ay },
+      t: { x: right ? b.x : b.x + b.w, y: by },
+      sp: right ? Position.Right : Position.Left,
+      tp: right ? Position.Left : Position.Right,
+    }
+  }
+  const down = dy >= 0
+  return {
+    s: { x: ax, y: down ? a.y + a.h : a.y },
+    t: { x: bx, y: down ? b.y : b.y + b.h },
+    sp: down ? Position.Bottom : Position.Top,
+    tp: down ? Position.Top : Position.Bottom,
+  }
+}
+
+function DependencyEdge({ id, source, target, selected, data, markerEnd }: EdgeProps<ExplorerEdge>) {
+  const from = useInternalNode(source)
+  const to = useInternalNode(target)
+  if (!from || !to) return null
+  const box = (n: typeof from) => ({
+    x: n.internals.positionAbsolute.x,
+    y: n.internals.positionAbsolute.y,
+    w: n.measured.width ?? 210,
+    h: n.measured.height ?? 46,
+  })
+  const k = anchors(box(from), box(to))
   const [path, lx, ly] = getBezierPath({
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    sourcePosition,
-    targetPosition,
-    curvature: 0.4,
+    sourceX: k.s.x,
+    sourceY: k.s.y,
+    targetX: k.t.x,
+    targetY: k.t.y,
+    sourcePosition: k.sp,
+    targetPosition: k.tp,
+    curvature: 0.35,
   })
   const kind = data?.confidence === 'heuristic' ? 'heuristic' : 'resolved'
   return (
@@ -173,7 +203,7 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
   useEffect(() => {
     if (lastFit.current === fitKey || built.nodes.length < 2) return
     lastFit.current = fitKey
-    showRect(rf, canvas.current, boundsOf(built.nodes), { minZoom: 0.4, duration: 0 })
+    showRect(rf, canvas.current, boundsOf(built.nodes), { minZoom: 0.25, duration: 0 })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitKey, built.nodes.length])
 
@@ -323,8 +353,9 @@ function Canvas({ repoName, theme }: { repoName: string; theme: 'dark' | 'light'
         >
           <Background gap={22} size={1.2} />
           <Controls showInteractive={false} />
-          {built.nodes.length > 40 && (
+          {built.nodes.length > 80 && (
             <MiniMap
+              style={{ width: 130, height: 90 }}
               pannable
               zoomable
               nodeStrokeWidth={0}

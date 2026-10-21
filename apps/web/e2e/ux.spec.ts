@@ -58,7 +58,7 @@ test.describe('with GitHub', () => {
     const zoom = await page.evaluate(
       () => new DOMMatrix(getComputedStyle(document.querySelector('.react-flow__viewport')!).transform).a,
     )
-    expect(zoom).toBeGreaterThanOrEqual(0.4)
+    expect(zoom).toBeGreaterThanOrEqual(0.2)
     await expect(page.getByRole('tab', { name: /Problems/ })).not.toContainText('⚠')
 
     // switch the filter, then leave and come back through the list of imports

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Any, cast
 
 from sqlalchemy import delete, func, select
@@ -17,6 +18,7 @@ from app.domain.records import (
     RepoSymbolRecord,
     RunRecord,
     RunSummary,
+    TriggerRecord,
     VersionRecord,
     VersionSummary,
     WorkflowRecord,
@@ -37,6 +39,7 @@ from app.storage.models import (
     RepoSymbolRow,
     RunEventRow,
     RunRow,
+    TriggerRow,
     WorkflowRow,
     WorkflowVersionRow,
     utcnow,
@@ -706,6 +709,99 @@ class SqlRepoRepository:
     def delete_patch(self, patch_id: str) -> bool:
         with self.sf.begin() as s:
             row = s.get(RepoPatchRow, patch_id)
+            if row is None:
+                return False
+            s.delete(row)
+            return True
+
+
+class SqlTriggerRepository:
+    def __init__(self, sf: sessionmaker[Session]) -> None:
+        self.sf = sf
+
+    @staticmethod
+    def _rec(r: TriggerRow) -> TriggerRecord:
+        return TriggerRecord(
+            id=r.id, workflow_id=r.workflow_id, kind=r.kind, every_minutes=r.every_minutes,
+            daily_at=r.daily_at, enabled=r.enabled, last_run_at=r.last_run_at,
+            last_run_id=r.last_run_id, next_run_at=r.next_run_at, created_at=r.created_at,
+        )  # fmt: skip
+
+    def list_for_workflow(self, workflow_id: str) -> list[TriggerRecord]:
+        with self.sf() as s:
+            rows = s.scalars(
+                select(TriggerRow)
+                .where(TriggerRow.workflow_id == workflow_id)
+                .order_by(TriggerRow.created_at)
+            )
+            return [self._rec(r) for r in rows]
+
+    def list_due(self, now: datetime) -> list[TriggerRecord]:
+        with self.sf() as s:
+            rows = s.scalars(
+                select(TriggerRow).where(
+                    TriggerRow.kind == "schedule",
+                    TriggerRow.enabled.is_(True),
+                    TriggerRow.next_run_at.is_not(None),
+                    TriggerRow.next_run_at <= now,
+                )
+            )
+            return [self._rec(r) for r in rows]
+
+    def get(self, trigger_id: str) -> TriggerRecord | None:
+        with self.sf() as s:
+            row = s.get(TriggerRow, trigger_id)
+            return self._rec(row) if row else None
+
+    def create(
+        self,
+        workflow_id: str,
+        kind: str,
+        every_minutes: int | None,
+        daily_at: str | None,
+        token_hash: str | None,
+        next_run_at: datetime | None,
+    ) -> TriggerRecord:
+        with self.sf.begin() as s:
+            row = TriggerRow(
+                id=f"trg_{uuid.uuid4().hex[:12]}", workflow_id=workflow_id, kind=kind,
+                every_minutes=every_minutes, daily_at=daily_at, token_hash=token_hash,
+                next_run_at=next_run_at,
+            )  # fmt: skip
+            s.add(row)
+            s.flush()
+            return self._rec(row)
+
+    def token_hash(self, trigger_id: str) -> str | None:
+        with self.sf() as s:
+            row = s.get(TriggerRow, trigger_id)
+            return row.token_hash if row else None
+
+    def set_enabled(
+        self, trigger_id: str, enabled: bool, next_run_at: datetime | None
+    ) -> TriggerRecord | None:
+        with self.sf.begin() as s:
+            row = s.get(TriggerRow, trigger_id)
+            if row is None:
+                return None
+            row.enabled = enabled
+            row.next_run_at = next_run_at
+            s.flush()
+            return self._rec(row)
+
+    def mark_fired(
+        self, trigger_id: str, run_id: str | None, at: datetime, next_run_at: datetime | None
+    ) -> None:
+        with self.sf.begin() as s:
+            row = s.get(TriggerRow, trigger_id)
+            if row is not None:
+                row.last_run_at = at
+                row.last_run_id = run_id
+                row.next_run_at = next_run_at
+
+    def delete(self, trigger_id: str) -> bool:
+        with self.sf.begin() as s:
+            row = s.get(TriggerRow, trigger_id)
             if row is None:
                 return False
             s.delete(row)

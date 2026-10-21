@@ -1,5 +1,6 @@
 """Persistence boundary. The engine and services depend on these, not on SQLAlchemy."""
 
+from datetime import datetime
 from typing import Any, Protocol
 
 from app.domain.records import (
@@ -14,6 +15,7 @@ from app.domain.records import (
     RepoSymbolRecord,
     RunRecord,
     RunSummary,
+    TriggerRecord,
     VersionRecord,
     VersionSummary,
     WorkflowRecord,
@@ -108,3 +110,26 @@ class CredentialRepository(Protocol):
     def create(self, name: str, kind: str, description: str) -> CredentialRecord: ...
     def touch(self, name: str, description: str | None = None) -> CredentialRecord | None: ...
     def delete(self, name: str) -> bool: ...
+
+
+class TriggerRepository(Protocol):
+    def list_for_workflow(self, workflow_id: str) -> list[TriggerRecord]: ...
+    def list_due(self, now: datetime) -> list[TriggerRecord]: ...
+    def get(self, trigger_id: str) -> TriggerRecord | None: ...
+    def create(
+        self,
+        workflow_id: str,
+        kind: str,
+        every_minutes: int | None,
+        daily_at: str | None,
+        token_hash: str | None,
+        next_run_at: datetime | None,
+    ) -> TriggerRecord: ...
+    def token_hash(self, trigger_id: str) -> str | None: ...
+    def set_enabled(
+        self, trigger_id: str, enabled: bool, next_run_at: datetime | None
+    ) -> TriggerRecord | None: ...
+    def mark_fired(
+        self, trigger_id: str, run_id: str | None, at: datetime, next_run_at: datetime | None
+    ) -> None: ...
+    def delete(self, trigger_id: str) -> bool: ...

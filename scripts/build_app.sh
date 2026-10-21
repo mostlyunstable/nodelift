@@ -6,9 +6,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"
 APP="$ROOT/apps/web/src-tauri/target/release/bundle/macos/Nodecraft.app"
+# Prefer the project's own Python: the system python3 on a Mac refuses to run until the Xcode licence is accepted.
+PY="$ROOT/backend/.venv/bin/python"
+[[ -x "$PY" ]] || PY=python3
 
 echo "==> bundled Python runtime"
-python3 "$ROOT/scripts/build_runtime.py"
+"$PY" "$ROOT/scripts/build_runtime.py"
 
 echo "==> frontend + desktop shell"
 (cd "$ROOT/apps/web" && pnpm install --frozen-lockfile >/dev/null && pnpm tauri build --bundles app)
@@ -18,7 +21,7 @@ codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"
 
 echo "==> smoke test of the runtime inside the app"
-python3 "$ROOT/scripts/smoke_runtime.py" "$APP/Contents/Resources/runtime"
+"$PY" "$ROOT/scripts/smoke_runtime.py" "$APP/Contents/Resources/runtime"
 
 echo "built: $APP ($(du -sh "$APP" | cut -f1))"
 

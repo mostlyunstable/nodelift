@@ -152,23 +152,14 @@ export function buildGraph(files: RepoFile[], repoName: string, opts: GraphOptio
   }
   const rootHub = makeHub(root)
 
-  // 2. tidy tree: one column per depth, leaves in consecutive rows, a folder centred beside what it holds
-  const rowH = NODE_H + ROW_GAP
-  let nextRow = 0
+  // 2. landscape layout. A folder is a box with its contents to its right. Its files and closed folders form a grid,
+  // and its open sub-folders are blocks of their own; all of these are packed in rows no wider than about the square root
+  // of their area, so the whole map comes out wider than tall and never needs scrolling down a long column.
   const nodes: ExplorerNode[] = []
   const edges: ExplorerEdge[] = []
-  const place = (it: Item, depth: number, parent: string | null): { id: string; y: number } => {
+  const nodeFor = (it: Item, x: number, y: number): ExplorerNode => {
     const id =
       it.kind === 'file' ? fileId(it.file.path) : dirId(it.kind === 'hub' ? it.hub.dir.path : it.dir.path)
-    let y: number
-    const index = nodes.length
-    nodes.push(null as unknown as ExplorerNode) // keeps parents before children
-    if (it.kind === 'hub' && it.hub.kids.length > 0) {
-      const ys = it.hub.kids.map((k) => place(k, depth + 1, id).y)
-      y = (ys[0]! + ys[ys.length - 1]!) / 2
-    } else {
-      y = nextRow++ * rowH
-    }
     let data: GraphNodeData
     let type: NodeKind
     if (it.kind === 'file') {
@@ -188,19 +179,111 @@ export function buildGraph(files: RepoFile[], repoName: string, opts: GraphOptio
         width: NODE_W, height: NODE_H,
       } // prettier-ignore
     }
-    nodes[index] = {
-      id, type, position: { x: depth * (NODE_W + COL_GAP), y }, draggable: false, selectable: false,
+    return {
+      id, type, position: { x, y }, draggable: false, selectable: false,
       width: NODE_W, height: NODE_H, style: { width: NODE_W, height: NODE_H }, data,
     } // prettier-ignore
-    if (parent) {
-      edges.push({
-        id: `t:${parent}>${id}`, source: parent, target: id, type: 'tree', selectable: false, focusable: false,
-        data: { kind: 'tree', from: parent, to: id, relations: [], count: 0, aggregated: false, confidence: 'resolved', direction: '' },
-      }) // prettier-ignore
-    }
-    return { id, y }
   }
-  place({ kind: 'hub', hub: rootHub }, 0, null)
+  const link = (parent: string, child: string) =>
+    edges.push({
+      id: `t:${parent}>${child}`, source: parent, target: child, type: 'tree', selectable: false, focusable: false,
+      data: { kind: 'tree', from: parent, to: child, relations: [], count: 0, aggregated: false, confidence: 'resolved', direction: '' },
+    }) // prettier-ignore
+
+  interface Block {
+    w: number
+    h: number
+    emit: (x: number, y: number) => void
+  }
+  const measure = (hub: Hub): Block => {
+    const leaves = hub.kids.filter((k) => k.kind !== 'hub')
+    const subs = hub.kids
+      .filter((k): k is { kind: 'hub'; hub: Hub } => k.kind === 'hub')
+      .map((k) => ({ k, b: measure(k.hub) }))
+    const cols =
+      leaves.length === 0 ? 0 : Math.max(1, Math.min(6, Math.round(Math.sqrt(leaves.length * 1.8))))
+    const rows = cols === 0 ? 0 : Math.ceil(leaves.length / cols)
+    const grid: Block | null =
+      leaves.length === 0
+        ? null
+        : {
+            w: cols * NODE_W + (cols - 1) * ROW_GAP,
+            h: rows * NODE_H + (rows - 1) * ROW_GAP,
+            emit: () => {},
+          }
+    const pieces: { w: number; h: number; at: (x: number, y: number) => void }[] = []
+    const hubId = dirId(hub.dir.path)
+    if (grid)
+      pieces.push({
+        w: grid.w,
+        h: grid.h,
+        at: (x, y) =>
+          leaves.forEach((it, i) => {
+            const n = nodeFor(
+              it,
+              x + (i % cols) * (NODE_W + ROW_GAP),
+              y + Math.floor(i / cols) * (NODE_H + ROW_GAP),
+            )
+            nodes.push(n)
+            link(hubId, n.id)
+          }),
+      })
+    for (const { k, b } of subs)
+      pieces.push({
+        w: b.w,
+        h: b.h,
+        at: (x, y) => {
+          b.emit(x, y)
+          link(hubId, dirId(k.hub.dir.path))
+        },
+      })
+    // shelf-pack the pieces, tallest first, trying several row widths and keeping the one closest to a landscape window
+    const order = [...pieces].sort((p, q) => q.h - p.h)
+    const widest = order.reduce((m, p) => Math.max(m, p.w), 0)
+    const sumW = order.reduce((n, p) => n + p.w + COL_GAP / 2, 0)
+    const pack = (target: number) => {
+      const spots: { p: (typeof order)[number]; x: number; y: number }[] = []
+      let x = 0
+      let y = 0
+      let rowTall = 0
+      let packW = 0
+      for (const p of order) {
+        if (x > 0 && x + p.w > target) {
+          y += rowTall + ROW_GAP * 2
+          x = 0
+          rowTall = 0
+        }
+        spots.push({ p, x, y })
+        x += p.w + COL_GAP / 2
+        rowTall = Math.max(rowTall, p.h)
+        packW = Math.max(packW, x - COL_GAP / 2)
+      }
+      return { spots, packW, packH: order.length === 0 ? 0 : y + rowTall }
+    }
+    let best = pack(widest)
+    let bestScore = Infinity
+    for (let t = widest; t <= Math.max(widest, sumW) + 1; t += Math.max(40, (sumW - widest) / 24)) {
+      const c = pack(t)
+      const score = Math.abs(Math.log((NODE_W + COL_GAP + c.packW) / Math.max(c.packH, NODE_H) / 1.7))
+      if (score < bestScore) {
+        bestScore = score
+        best = c
+      }
+    }
+    const { spots, packW, packH } = best
+    const left = NODE_W + COL_GAP
+    return {
+      w: left + packW,
+      h: Math.max(packH, NODE_H),
+      emit: (ox, oy) => {
+        const total = Math.max(packH, NODE_H)
+        nodes.push(nodeFor({ kind: 'hub', hub }, ox, oy + (total - NODE_H) / 2))
+        for (const s of spots) s.p.at(ox + left + s.x, oy + s.y + (total - packH) / 2)
+      },
+    }
+  }
+  const whole = measure(rootHub)
+  whole.emit(0, 0)
   const maxX = nodes.reduce((m, n) => Math.max(m, n.position.x + NODE_W), 0)
   const maxY = nodes.reduce((m, n) => Math.max(m, n.position.y + NODE_H), 0)
 

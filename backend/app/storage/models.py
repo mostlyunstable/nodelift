@@ -251,3 +251,22 @@ class RepoReferenceRow(Base):
     confidence: Mapped[str] = mapped_column(String)
     provenance: Mapped[str] = mapped_column(String)
     note: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class TriggerRow(Base):
+    """A schedule or a webhook that starts a workflow; a webhook token is stored only as a hash."""
+
+    __tablename__ = "triggers"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    workflow_id: Mapped[str] = mapped_column(
+        ForeignKey("workflows.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String)
+    every_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    daily_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    token_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    last_run_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    next_run_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
