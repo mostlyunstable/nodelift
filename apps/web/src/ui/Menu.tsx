@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 
 export interface MenuItem {
   label: string
@@ -24,6 +24,30 @@ export function Menu({
 }) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
+  const [place, setPlace] = useState<CSSProperties>({})
+
+  // The list is positioned against the window, not its parent: the toolbar scrolls sideways in narrow windows, and a
+  // list inside it would be clipped (and scroll the toolbar) instead of floating over the page.
+  useLayoutEffect(() => {
+    if (!open) return
+    const at = root.current?.querySelector('button')?.getBoundingClientRect()
+    if (!at) return
+    const top = at.bottom + 4
+    setPlace({
+      top,
+      maxHeight: Math.max(160, window.innerHeight - top - 12),
+      ...(align === 'right'
+        ? { right: Math.max(8, window.innerWidth - at.right) }
+        : { left: Math.max(8, at.left) }),
+    })
+  }, [open, align])
+
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    window.addEventListener('resize', close)
+    return () => window.removeEventListener('resize', close)
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -63,7 +87,7 @@ export function Menu({
         {label}
       </button>
       {open && (
-        <div role="menu" aria-label={ariaLabel} className={`menu-list menu-${align}`}>
+        <div role="menu" aria-label={ariaLabel} className="menu-list" style={place}>
           {items.map((item, i) => (
             <div key={`${item.label}-${i}`}>
               {item.separatorBefore && <hr />}

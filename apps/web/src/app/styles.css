@@ -511,23 +511,16 @@ h4 {
   position: relative;
 }
 .menu-list {
-  position: absolute;
-  top: calc(100% + 4px);
-  z-index: 30;
+  position: fixed;
+  z-index: 60;
   min-width: 220px;
-  max-height: 70vh;
+  max-width: calc(100vw - 16px);
   overflow: auto;
   background: var(--raised);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   padding: 4px;
-}
-.menu-left {
-  left: 0;
-}
-.menu-right {
-  right: 0;
 }
 .menu-list hr {
   border: none;

@@ -90,3 +90,29 @@ test('the code editor keeps its height when the window is short', async ({ page 
   const scrolls = await page.locator('.inspector').evaluate((el) => el.scrollHeight > el.clientHeight)
   expect(scrolls).toBe(true)
 })
+
+test('menus open fully over the page and never scroll or clip the toolbar', async ({ page }) => {
+  for (const size of [
+    { width: 1280, height: 800 },
+    { width: 900, height: 600 },
+  ]) {
+    await page.setViewportSize(size)
+    await page.goto('/')
+    for (const name of ['Workflows', 'More actions', '+ Node']) {
+      await page.getByRole('button', { name }).click()
+      const menu = page.getByRole('menu')
+      await expect(menu).toBeVisible()
+      const box = (await menu.boundingBox())!
+      expect(box.y, `${name} starts below the toolbar`).toBeGreaterThanOrEqual(30)
+      expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.x + box.width).toBeLessThanOrEqual(size.width)
+      expect(box.y + box.height).toBeLessThanOrEqual(size.height)
+      // every item is on screen, so none is cut off by the toolbar
+      for (const item of await menu.getByRole('menuitem').all()) await expect(item).toBeInViewport()
+      expect(await page.locator('.toolbar').evaluate((el) => el.scrollTop)).toBe(0)
+      expect(await page.evaluate(() => document.scrollingElement!.scrollTop)).toBe(0)
+      await page.keyboard.press('Escape')
+      await expect(menu).toHaveCount(0)
+    }
+  }
+})
